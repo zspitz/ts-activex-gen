@@ -5,7 +5,7 @@ Library and WPF UI for generating Typescript definitions from COM type libraries
 
 ### Library
 
-Generating the typescript with the library looks like this:
+Generating Typescript with the library looks like this:
 
 ```csharp
 var args = new {
@@ -41,7 +41,7 @@ string ts = builder.GetTypescript(ns, null);
 
 2. There is no simple, environment-independent technique for handling Automation events in JScript, and so this is also not reflected in the generated definitions. See [Scripting Events](https://msdn.microsoft.com/en-us/library/ms974564.aspx?f=255&MSPPError=-2147217396) for further details.
 
-3. Typescript enums are currently number-based, pending [#3192](https://github.com/Microsoft/TypeScript/issues/3192); there are some workarounds for string-based enums. This project does [the following](https://github.com/Microsoft/TypeScript/issues/3192#issuecomment-181363162):
+3. Typescript enums are currently number-based, pending [#3192](https://github.com/Microsoft/TypeScript/issues/3192); there are some workarounds for string-based enums. This project does [the following](https://github.com/Microsoft/TypeScript/issues/3192#issuecomment-181363162) (@dsherret):
   ```typescript
   type CommandID = 
     "{04E725B0-ACAE-11D2-A093-00C04F72DC3C}" //wiaCommandChangeDocument
