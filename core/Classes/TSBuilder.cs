@@ -16,7 +16,7 @@ namespace TsActivexGen {
             switch (@enum.Typename.Name) {
                 case "number":
                     $"const enum {name} {{".AppendLineTo(sb, 1);
-                    members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", 2, ", ");
+                    members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", 2, ",");
                     "}".AppendWithNewSection(sb, 1);
                     break;
                 case "string":
@@ -24,7 +24,7 @@ namespace TsActivexGen {
                     members.AppendLinesTo(sb, (memberName, value) => $"\"{value}\" //{memberName}", 2, null, "| ");
 
                     $"const {name}: {{".AppendLineTo(sb, 1);
-                    members.AppendLinesTo(sb, (memberName, value) => $"{memberName}: {name}", 2, ", ");
+                    members.AppendLinesTo(sb, (memberName, value) => $"{memberName}: {name}", 2, ",");
                     "}".AppendWithNewSection(sb, 1);
 
                     break;

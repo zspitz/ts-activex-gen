@@ -43,7 +43,7 @@ namespace TsActivexGen {
         }
 
         private void GetTypeLibInfo() {
-            var tliApp = new TLIApplication();
+            var tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime
             if (!tlbid.IsNullOrEmpty()) {
                 tli = tliApp.TypeLibInfoFromRegistry(tlbid, majorVersion, minorVersion, lcid);
             } else if (!filePath.IsNullOrEmpty()) {
@@ -125,7 +125,7 @@ namespace TsActivexGen {
             if (invokeable || (parameterList != null && parameterList.Any())) {
                 ret.Parameters = parameterList ?? new List<KeyValuePair<string, TSParameterDescription>>();
             }
-            ret.ReturnTypename = members.First().ReturnType.GetTypeName();
+            ret.ReturnTypename = members.First().ReturnType.GetTypeName(interfaceToCoClassMapping);
             if (hasSetter && parameterList.Any()) {
                 ret.Comment = "Also has setter with parameters";
             }

@@ -60,13 +60,13 @@ namespace TsActivexGen.wpf {
                 var ts = getTypescript(details);
 
                 var filepath = Combine(txbOutput.Text, $"{txbFilename.Text}.d.ts");
-                if (Exists(filepath) || MessageBox.Show("Overwrite existing?", "", YesNo) == Yes) {
+                if (!Exists(filepath) || MessageBox.Show("Overwrite existing?", "", YesNo) == Yes) {
                     WriteAllText(filepath, ts);
                     if (chkOutputTests.IsChecked == true) {
                         var testsFilePath = Combine(txbOutput.Text, $"{txbFilename.Text}-tests.ts");
-                        if (Exists(testsFilePath) || MessageBox.Show("Overwrite existing?", "", YesNo) == Yes) {
+                        if (!Exists(testsFilePath) || MessageBox.Show("Overwrite existing test file?", "", YesNo) == Yes) {
                             WriteAllLines(testsFilePath, new[] {
-                                $"/// <reference path=\"{filepath}\" />",""
+                                $"/// <reference path=\"{txbFilename.Text}.d.ts\" />",""
                             });
                         }
                     }
