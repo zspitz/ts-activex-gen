@@ -49,6 +49,7 @@
     <Compile Include="Classes\TlbInf32Generator.cs" />
     <Compile Include="Classes\TSBuilder.cs" />
     <Compile Include="Enums.cs" />
+    <Compile Include="Extensions\HashSetT.cs" />
     <Compile Include="Extensions\IDictionaryTKeyTValue.cs" />
     <Compile Include="Extensions\IEnumerable.cs" />
     <Compile Include="Extensions\IEnumerableKVP.cs" />

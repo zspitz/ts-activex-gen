@@ -149,6 +149,12 @@ namespace TsActivexGen {
             return KVP(c.Name, ret);
         }
 
+        private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(RecordInfo r) {
+            var ret = new TSInterfaceDescription();
+            ret.Members = GetMembers(r.Members);
+            return KVP(r.Name, ret);
+        }
+
         public TSNamespace Generate() {
             GetTypeLibInfo();
 
@@ -161,21 +167,25 @@ namespace TsActivexGen {
             var undefinedTypes = ret.GetUndefinedTypes();
             if (undefinedTypes.Any()) {
                 var tliInterfaces = tli.Interfaces.Cast().Select(x => KVP(x.Name, x)).ToDictionary();
-                undefinedTypes.Select(s => {
-                    if (!tliInterfaces.ContainsKey(s)) {
+                var tliRecords = tli.Records.Cast().Select(x => KVP(x.Name, x)).ToDictionary();
+                do {
+                    undefinedTypes.Select(s => {
+                        if (tliInterfaces.ContainsKey(s)) {
+                            return ToTSInterfaceDescription(tliInterfaces[s]);
+                        }
+                        if (tliRecords.ContainsKey(s)) {
+                            return ToTSInterfaceDescription(tliRecords[s]);
+                        }
                         throw new InvalidOperationException($"Unable to find type '{s}'.");
-                    }
-                    return ToTSInterfaceDescription(tliInterfaces[s]);
-                }).AddRangeTo(ret.Interfaces);
+                    }).AddRangeTo(ret.Interfaces);
+                    undefinedTypes = ret.GetUndefinedTypes();
+                } while (undefinedTypes.Any());
             }
 
             //TODO do we need to look at ImpliedInterfaces? Should we use GetMembers instead of manually iterating over Members?
             //TODO what about hidden members?
 
             //Haven't seen any of these yet; not sure what they even are
-            if (tli.Records.Cast().Any()) {
-                throw new NotImplementedException();
-            }
             if (tli.Declarations.Cast().Any()) {
                 throw new NotImplementedException();
             }
