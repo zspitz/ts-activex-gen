@@ -22,6 +22,8 @@ namespace TsActivexGen.wpf {
 
             txbOutput.Text = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
 
+            cmbVarDateHandling.ItemsSource = new List<string>() { "Don't generate", "Include in file", "Generate external" };
+
             dgTypeLibs.ItemsSource = typelibs;
 
             dgTypeLibs.Loaded += (s, e) => {
@@ -70,7 +72,9 @@ namespace TsActivexGen.wpf {
                     }
                 }
 
-                //TODO jscript-extensions add checkbox / include vardate inerface in file
+                if (cmbVarDateHandling.SelectedIndex == 2) {
+                    WriteAllText(Combine(txbOutput.Text, "jscript-extensions.d.ts"), varDateDefinition);
+                }
 
                 var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + filepath + "\"");
                 Process.Start(psi);
@@ -79,7 +83,6 @@ namespace TsActivexGen.wpf {
 
         private bool fillFolder() {
             var dlg = new VistaFolderBrowserDialog();
-            dlg.Description = "Choose a destination folder for definitions and test files";
             dlg.ShowNewFolderButton = true;
             if (!txbOutput.Text.IsNullOrEmpty()) { dlg.SelectedPath = txbOutput.Text; }
             var result = dlg.ShowDialog();
@@ -88,6 +91,18 @@ namespace TsActivexGen.wpf {
             return true;
         }
 
+        private const string varDateDefinition = @"
+interface VarDate { }
+
+interface DateConstructor {
+    new (vd: VarDate): Date;
+}
+
+interface Date {
+    getVarDate: () => VarDate;
+}
+";
+
         private string getTypescript(TypeLibDetails details) {
             //TODO needs to be changed to work with WMI details also
             var headers = new[] {
@@ -95,7 +110,10 @@ namespace TsActivexGen.wpf {
                 "// Project: ",
                 "// Definitions by: Zev Spitz <https://github.com/zspitz>",
                 "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
-            };
+            }.ToList();
+            if (cmbVarDateHandling.SelectedIndex == 1) {
+                headers.Add(varDateDefinition);
+            }
             var ns = new TlbInf32Generator(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID).Generate();
             var builder = new TSBuilder();
             return new TSBuilder().GetTypescript(ns, headers);

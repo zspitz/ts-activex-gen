@@ -78,8 +78,6 @@ namespace TsActivexGen {
                 sb.AppendLine();
             }
 
-            @"/// <reference path=""jscript-extensions.d.ts"" />".AppendWithNewSection(sb);
-
             $"declare namespace {ns.Name} {{".AppendWithNewSection(sb);
 
             if (ns.Enums.Any()) {
