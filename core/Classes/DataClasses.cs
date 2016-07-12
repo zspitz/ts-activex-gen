@@ -106,6 +106,7 @@ namespace TsActivexGen {
             var ret = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" }.ToHashSet();
             Enums.Keys.AddRangeTo(ret);
             Interfaces.Keys.AddRangeTo(ret);
+            ret.ToList().Select(x => x + "[]").AddRangeTo(ret);
             return ret;
         }
         public HashSet<string> GetUndefinedTypes() {
