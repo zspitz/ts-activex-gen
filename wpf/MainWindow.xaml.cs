@@ -4,15 +4,23 @@ using System.Linq;
 using System.Windows;
 using TsActivexGen.Util;
 using Microsoft.Win32;
-using mshtml;
+using Ookii.Dialogs;
+using Forms = System.Windows.Forms;
+using System.IO;
 using static System.IO.Path;
-using SHDocVw;
+using static System.IO.File;
+using static System.Windows.MessageBoxButton;
+using static System.Windows.MessageBoxResult;
+using System.Diagnostics;
+using static System.Reflection.Assembly;
 
 namespace TsActivexGen.wpf {
     public partial class MainWindow : Window {
         List<TypeLibDetails> typelibs = GetTypeLibs().ToList();
         public MainWindow() {
             InitializeComponent();
+
+            txbOutput.Text = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
 
             dgTypeLibs.ItemsSource = typelibs;
 
@@ -24,19 +32,73 @@ namespace TsActivexGen.wpf {
                     ReloadDatagrid();
                 }
             };
+
+            btnBrowseOutputFolder.Click += (s, e) => {
+                fillFolder();
+            };
+
             dgTypeLibs.SelectionChanged += (s, e) => {
                 if (e.AddedItems.Count == 0) { return; }
-                var added = (TypeLibDetails)e.AddedItems[0];
-                var ns = new TlbInf32Generator(added.TypeLibID, added.MajorVersion, added.MinorVersion, added.LCID).Generate();
-                var builder = new TSBuilder();
-                var headers = new[] {
-                    $"// Type definitions for {added.Name}",
-                    "// Project: ",
-                    "// Definitions by: Zev Spitz <https://github.com/zspitz>",
-                    "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
-                };
-                tbPreview.Text = builder.GetTypescript(ns, headers);
+                var details = (TypeLibDetails)e.AddedItems[0];
+                tbPreview.Text = getTypescript(details);
+                txbFilename.Text = details.Name.ToLower().Replace(" ", "-");
             };
+
+            btnOutput.Click += (s, e) => {
+                if (txbFilename.Text.IsNullOrEmpty()) { return; }
+                if (txbOutput.Text.IsNullOrEmpty()) {
+                    var filled = fillFolder();
+                    if (!filled) { return; }
+                }
+                if (!Directory.Exists(txbOutput.Text)) {
+                    Directory.CreateDirectory(txbOutput.Text);
+                }
+
+                var details = dgTypeLibs.SelectedItem<TypeLibDetails>();
+                var ts = getTypescript(details);
+
+                var filepath = Combine(txbOutput.Text, $"{txbFilename.Text}.d.ts");
+                if (Exists(filepath) || MessageBox.Show("Overwrite existing?", "", YesNo) == Yes) {
+                    WriteAllText(filepath, ts);
+                    if (chkOutputTests.IsChecked == true) {
+                        var testsFilePath = Combine(txbOutput.Text, $"{txbFilename.Text}-tests.ts");
+                        if (Exists(testsFilePath) || MessageBox.Show("Overwrite existing?", "", YesNo) == Yes) {
+                            WriteAllLines(testsFilePath, new[] {
+                                $"/// <reference path=\"{filepath}\" />",""
+                            });
+                        }
+                    }
+                }
+
+                //TODO jscript-extensions add checkbox / include vardate inerface in file
+
+                var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + filepath + "\"");
+                Process.Start(psi);
+            };
+        }
+
+        private bool fillFolder() {
+            var dlg = new VistaFolderBrowserDialog();
+            dlg.Description = "Choose a destination folder for definitions and test files";
+            dlg.ShowNewFolderButton = true;
+            if (!txbOutput.Text.IsNullOrEmpty()) { dlg.SelectedPath = txbOutput.Text; }
+            var result = dlg.ShowDialog();
+            if (result == Forms.DialogResult.Cancel) { return false; }
+            txbOutput.Text = dlg.SelectedPath;
+            return true;
+        }
+
+        private string getTypescript(TypeLibDetails details) {
+            //TODO needs to be changed to work with WMI details also
+            var headers = new[] {
+                $"// Type definitions for {details.Name}",
+                "// Project: ",
+                "// Definitions by: Zev Spitz <https://github.com/zspitz>",
+                "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
+            };
+            var ns = new TlbInf32Generator(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID).Generate();
+            var builder = new TSBuilder();
+            return new TSBuilder().GetTypescript(ns, headers);
         }
 
         private void ReloadDatagrid() {
@@ -86,3 +148,6 @@ namespace TsActivexGen.wpf {
         }
     }
 }
+
+
+//TODO enable loading from file

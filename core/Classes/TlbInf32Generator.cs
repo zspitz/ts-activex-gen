@@ -29,6 +29,7 @@ namespace TsActivexGen {
         TypeLibInfo tli;
         Dictionary<string, List<string>> interfaceToCoClassMapping;
 
+        //TODO implement constructors as two static differently named methods; otherwise how can we differentiate between them if the other arguments are optional?
         public TlbInf32Generator(string tlbid, short majorVersion, short minorVersion, int lcid) {
             this.tlbid = tlbid;
             this.majorVersion = majorVersion;
