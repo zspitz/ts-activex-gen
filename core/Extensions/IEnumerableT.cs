@@ -39,6 +39,9 @@ namespace TsActivexGen.Util {
         public static IEnumerable<T> Ordered<T>(this IEnumerable<T> src) {
             return src.OrderBy(x => x);
         }
+        public static IEnumerable<T> OrderedDescending<T>(this IEnumerable<T> src) {
+            return src.OrderByDescending(x => x);
+        }
         public static IEnumerable<T> SelectMany<T>(this IEnumerable<IEnumerable<T>> src) {
             return src.SelectMany(x => x);
         }
