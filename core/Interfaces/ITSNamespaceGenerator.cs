@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace TsActivexGen {
-    interface ITSNamespaceGenerator {
+    public interface ITSNamespaceGenerator {
         TSNamespace Generate();
     }
 }

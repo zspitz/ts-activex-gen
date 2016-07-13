@@ -41,9 +41,8 @@ namespace TsActivexGen.wpf {
 
             dgTypeLibs.SelectionChanged += (s, e) => {
                 if (e.AddedItems.Count == 0) { return; }
-                var details = (TypeLibDetails)e.AddedItems[0];
-                tbPreview.Text = getTypescript(details);
-                txbFilename.Text = details.Name.ToLower().Replace(" ", "-");
+                tbPreview.Text = getTypescript();
+                txbFilename.Text = dgTypeLibs.SelectedItem<TypeLibDetails>().Name.ToLower().Replace(" ", "-");
             };
 
             btnOutput.Click += (s, e) => {
@@ -56,8 +55,7 @@ namespace TsActivexGen.wpf {
                     Directory.CreateDirectory(txbOutput.Text);
                 }
 
-                var details = dgTypeLibs.SelectedItem<TypeLibDetails>();
-                var ts = getTypescript(details);
+                var ts = getTypescript();
 
                 var filepath = Combine(txbOutput.Text, $"{txbFilename.Text}.d.ts");
                 if (!Exists(filepath) || MessageBox.Show("Overwrite existing?", "", YesNo) == Yes) {
@@ -79,15 +77,28 @@ namespace TsActivexGen.wpf {
                 var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + filepath + "\"");
                 Process.Start(psi);
             };
+
+            var fileDlg = new VistaOpenFileDialog();
+            fileDlg.CheckFileExists = true;
+            fileDlg.CheckPathExists = true;
+            fileDlg.Multiselect = false;
+            btnBrowseTypeLibFile.Click += (s, e) => {
+                if (!txbTypeLibFromFile.Text.IsNullOrEmpty()) { fileDlg.FileName = txbTypeLibFromFile.Text; }
+                if (fileDlg.ShowDialog() == Forms.DialogResult.Cancel) { return; }
+                txbTypeLibFromFile.Text = fileDlg.FileName;
+                tbPreview.Text = getTypescript();
+            };
         }
 
+        VistaFolderBrowserDialog folderDlg = new VistaFolderBrowserDialog() {
+            ShowNewFolderButton = true
+        };
+
         private bool fillFolder() {
-            var dlg = new VistaFolderBrowserDialog();
-            dlg.ShowNewFolderButton = true;
-            if (!txbOutput.Text.IsNullOrEmpty()) { dlg.SelectedPath = txbOutput.Text; }
-            var result = dlg.ShowDialog();
+            if (!txbOutput.Text.IsNullOrEmpty()) { folderDlg.SelectedPath = txbOutput.Text; }
+            var result = folderDlg.ShowDialog();
             if (result == Forms.DialogResult.Cancel) { return false; }
-            txbOutput.Text = dlg.SelectedPath;
+            txbOutput.Text = folderDlg.SelectedPath;
             return true;
         }
 
@@ -103,18 +114,40 @@ interface Date {
 }
 ";
 
-        private string getTypescript(TypeLibDetails details) {
-            //TODO needs to be changed to work with WMI details also
-            var headers = new[] {
-                $"// Type definitions for {details.Name}",
-                "// Project: ",
-                "// Definitions by: Zev Spitz <https://github.com/zspitz>",
-                "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
-            }.ToList();
+        private string getTypescript() {
+            var headers = new List<string>();
+            ITSNamespaceGenerator generator = null;
+
+            switch (tcMain.SelectedIndex) {
+                case 0:
+                    var details = dgTypeLibs.SelectedItem<TypeLibDetails>();
+                    new[] {
+                        $"// Type definitions for {details.Name}",
+                        "// Project: <project url>",
+                        "// Definitions by: Zev Spitz <https://github.com/zspitz>",
+                        "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
+                    }.AddRangeTo(headers);
+                    generator = TlbInf32Generator.CreateFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
+                    break;
+                case 1:
+                    new[] {
+                        "// Type definitions for <library description here>",
+                        "// Project: <project url>",
+                        "// Definitions by: Zev Spitz <https://github.com/zspitz>",
+                        "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
+                    }.AddRangeTo(headers);
+                    generator = TlbInf32Generator.CreateFromFile(txbTypeLibFromFile.Text);
+                    break;
+                case 2:
+                    break;
+                default:
+                    throw new InvalidOperationException();
+            }
+
+            var ns = generator.Generate();
             if (cmbVarDateHandling.SelectedIndex == 1) {
                 headers.Add(varDateDefinition);
             }
-            var ns = new TlbInf32Generator(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID).Generate();
             var builder = new TSBuilder();
             return new TSBuilder().GetTypescript(ns, headers);
         }
@@ -166,6 +199,3 @@ interface Date {
         }
     }
 }
-
-
-//TODO enable loading from file

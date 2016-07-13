@@ -95,7 +95,7 @@ namespace TsActivexGen.Util {
             return ret.ToHashSet();
         }
 
-
+        //unhandled values for VarType
         /*
 VT_RESERVED	32768
 VT_BYREF	16384
@@ -115,13 +115,10 @@ VT_SAFEARRAY	27
 VT_PTR	26
 VT_UNKNOWN	13
 VT_ERROR	10
-VT_DISPATCH	9
 VT_NULL	1
 VT_EMPTY	0
  */
-
-
-
+ 
         internal static TSTypeName GetTypeName(this VarTypeInfo vti, Dictionary<string, List<string>> mapping = null, object value = null) {
             //TODO this should be in TlbInf32Generator class; then it will have access to the mapping
             var ret = new TSTypeName();
@@ -141,12 +138,11 @@ VT_EMPTY	0
                 var ti = vti.TypeInfo;
                 ret.Name = ti.Name;
                 mapping.IfContainsKey(ret.Name, val => ret.Name = val.FirstOrDefault());
-            } else if (splitValues.ContainsAny(VT_VARIANT)) {
+            } else if (splitValues.ContainsAny(VT_VARIANT, VT_DISPATCH)) {
                 ret.Name = "any";
             } else {
-                if (vti.TypeInfo != null) {
-                    var testName = vti.TypeInfo.Name;
-                    Debugger.Break();
+                if (Debugger.IsAttached) {
+                    var debug = vti.Debug();
                 }
                 var external = vti.IsExternalType ? " (external)" : "";
                 ret.Comment = $"{vti.VarType.ToString()}{external}";
@@ -217,14 +213,30 @@ VT_EMPTY	0
                 Members = ii.Members.Debug()
             };
         }
+        public static object Debug(this TypeInfo t) {
+            Array strings;
+            var i = t.AttributeStrings[out strings];
+            VarTypeInfo resolvedType=null;
+            try {
+                resolvedType = t.ResolvedType;
+            } catch (Exception) { }
+            return new {
+                t.Name,
+                t.AttributeMask,
+                DefaultInterface = t.DefaultInterface?.Debug(),
+                ResolvedType = resolvedType?.Debug(),
+                t.TypeKind
+            };
+        }
         public static object Debug(this VarTypeInfo vt) {
             if (vt == null) { return null; }
-            var Typename = vt.GetTypeName();
+            //var Typename = vt.GetTypeName();
             return new {
-                Typename,
+                //Typename,
                 vt.IsExternalType,
                 vt.TypeLibInfoExternal?.Name,
-                vt.VarType
+                vt.VarType//,
+                //TypeInfo = vt.TypeInfo?.Debug()
             };
         }
         public static List<object> Debug(this Parameters parameters) {

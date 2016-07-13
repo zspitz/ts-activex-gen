@@ -29,18 +29,23 @@ namespace TsActivexGen {
         TypeLibInfo tli;
         Dictionary<string, List<string>> interfaceToCoClassMapping;
 
-        //TODO implement constructors as two static differently named methods; otherwise how can we differentiate between them if the other arguments are optional?
-        public TlbInf32Generator(string tlbid, short majorVersion, short minorVersion, int lcid) {
-            this.tlbid = tlbid;
-            this.majorVersion = majorVersion;
-            this.minorVersion = minorVersion;
-            this.lcid = lcid;
-
+        public static TlbInf32Generator CreateFromRegistry(string tlbid, short majorVersion, short minorVersion, int lcid) {
             ////TODO include logic here to figure out majorVersion/minorVersion/lcid even when not passed in
+            return new TlbInf32Generator() {
+                tlbid = tlbid,
+                majorVersion = majorVersion,
+                minorVersion = minorVersion,
+                lcid = lcid
+            };
         }
-        public TlbInf32Generator(string filePath) {
-            this.filePath = filePath;
+
+        public static TlbInf32Generator CreateFromFile(string filename) {
+            return new TlbInf32Generator() {
+                filePath = filename
+            };
         }
+
+        private TlbInf32Generator() { }
 
         private void GetTypeLibInfo() {
             var tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime
@@ -54,6 +59,9 @@ namespace TsActivexGen {
             interfaceToCoClassMapping = tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name, (key, grp) => KVP(key ?? "", grp.Select(x => x.Name).OrderBy(x => x.StartsWith("_")).ToList())).ToDictionary();
         }
 
+        //TODO handle module with constants (not a regular enum) -- Microsoft Fax Service Extended COM Library
+        //  check TypeKind for TKIND_MODULE
+        //  does this also include non-constant members on the module? mk:@MSITStore:C:\programs\tlbinf32\TlbInf32.chm::/TLIHelp_1.htm seems to imply that it doesn't, but only when using SearchResult
         private KeyValuePair<string, TSEnumDescription> ToTSEnumDescription(ConstantInfo c) {
             var ret = new TSEnumDescription();
             ret.Members = c.Members.Cast().Select(x => {
@@ -187,6 +195,7 @@ namespace TsActivexGen {
 
             //Haven't seen any of these yet; not sure what they even are
             if (tli.Declarations.Cast().Any()) {
+                var lst = tli.Declarations.Cast().Select(x => x.Name).ToList();
                 throw new NotImplementedException();
             }
             if (tli.Unions.Cast().Any()) {

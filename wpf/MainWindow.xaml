@@ -22,30 +22,30 @@
         </TextBlock>
     </Window.Resources>
     <DockPanel>
-        <TabControl TabStripPlacement="Left">
-            <TabItem Header="Registered type libraries" IsSelected="True">
+        <DockPanel>
+            <DockPanel DockPanel.Dock="Top" ToolTip="Press SPACE to apply">
+                <TextBlock Text="Filter text:" />
+                <TextBox x:Name="txbFilter" />
+            </DockPanel>
+            <ag:AutoGrid DockPanel.Dock="Bottom" Columns="Auto,*" RowCount="5" x:Name="autogrid">
+                <Label Content="Output folder" ToolTip="{StaticResource ttOutput}" />
+                <DockPanel ToolTip="{StaticResource ttOutput}">
+                    <Button Content="..." Name="btnBrowseOutputFolder" DockPanel.Dock="Right" />
+                    <TextBox x:Name="txbOutput" />
+                </DockPanel>
+                <Label Content="Filename" />
                 <DockPanel>
-                    <ag:AutoGrid DockPanel.Dock="Bottom" Columns="Auto,*" RowCount="5" x:Name="autogrid">
-                        <Label Content="Output folder" ToolTip="{StaticResource ttOutput}" />
-                        <DockPanel ToolTip="{StaticResource ttOutput}">
-                            <Button Content="..." Name="btnBrowseOutputFolder" DockPanel.Dock="Right" />
-                            <TextBox x:Name="txbOutput" />
-                        </DockPanel>
-                        <Label Content="Filename" />
-                        <DockPanel>
-                            <TextBlock Text=".d.ts" DockPanel.Dock="Right" />
-                            <TextBox x:Name="txbFilename" />
-                        </DockPanel>
-                        <Label Content="Create tests file" ToolTip="{StaticResource ttCreateTestFile}" />
-                        <CheckBox IsChecked="True" Name="chkOutputTests" ToolTip="{StaticResource ttCreateTestFile}" />
-                        <Label Content="VarDate interface location" ToolTip="{StaticResource ttVarDateHandling}" />
-                        <ComboBox Name="cmbVarDateHandling" SelectedValuePath="Content" SelectedIndex="0" ToolTip="{StaticResource ttVarDateHandling}" />
-                        <Button Name="btnOutput" Content="Output" Grid.ColumnSpan="2" />
-                    </ag:AutoGrid>
-                    <DockPanel DockPanel.Dock="Top">
-                        <TextBlock Text="Filter text:" />
-                        <TextBox x:Name="txbFilter" />
-                    </DockPanel>
+                    <TextBlock Text=".d.ts" DockPanel.Dock="Right" />
+                    <TextBox x:Name="txbFilename" />
+                </DockPanel>
+                <Label Content="Create tests file" ToolTip="{StaticResource ttCreateTestFile}" />
+                <CheckBox IsChecked="True" Name="chkOutputTests" ToolTip="{StaticResource ttCreateTestFile}" />
+                <Label Content="VarDate interface" ToolTip="{StaticResource ttVarDateHandling}" />
+                <ComboBox Name="cmbVarDateHandling" SelectedValuePath="Content" SelectedIndex="0" ToolTip="{StaticResource ttVarDateHandling}" />
+                <Button Name="btnOutput" Content="Output" Grid.ColumnSpan="2" />
+            </ag:AutoGrid>
+            <TabControl TabStripPlacement="Left" Name="tcMain">
+                <TabItem Header="Registered type libraries" IsSelected="True">
                     <DataGrid x:Name="dgTypeLibs" AutoGenerateColumns="False" CanUserSortColumns="False">
                         <DataGrid.Columns>
                             <DataGridTextColumn Binding="{Binding Name}" Header="Name" />
@@ -55,20 +55,22 @@
                             <DataGridTextColumn Binding="{Binding LCID}" Header="LCID" />
                         </DataGrid.Columns>
                     </DataGrid>
-                </DockPanel>
-            </TabItem>
-            <TabItem Header="Browse type library">
-            </TabItem>
-            <TabItem Header="WMI">
-                <ListBox x:Name="lbWMIClasses" />
-                <!--Fill async-->
-            </TabItem>
-        </TabControl>
-        <DockPanel>
-            <ScrollViewer>
-                <TextBlock x:Name="tbPreview" Foreground="White" Background="Black" FontSize="16" />
-            </ScrollViewer>
-
+                </TabItem>
+                <TabItem Header="Browse type library">
+                    <DockPanel VerticalAlignment="Top">
+                        <Button Content="..." Name="btnBrowseTypeLibFile" DockPanel.Dock="Right" />
+                        <Label Content="Filename" />
+                        <TextBox Name="txbTypeLibFromFile" />
+                    </DockPanel>
+                </TabItem>
+                <TabItem Header="WMI">
+                    <ListBox x:Name="lbWMIClasses" />
+                    <!--Fill async-->
+                </TabItem>
+            </TabControl>
         </DockPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+            <TextBlock x:Name="tbPreview" Foreground="White" Background="Black" FontSize="16" />
+        </ScrollViewer>
     </DockPanel>
 </Window>
