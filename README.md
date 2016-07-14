@@ -1,7 +1,7 @@
 # ts-activex-gen
 Library and WPF UI for generating Typescript definitions from COM type libraries or WMI classes
 
-![Choosing a registerd COM library, and previewing the definitions](https://raw.githubusercontent.com/zspitz/ts-activex-gen/master/screenshot-wia.png)
+![Choosing a registerd COM library, and previewing the definitions](https://raw.githubusercontent.com/zspitz/ts-activex-gen/master/screenshot.png)
 
 ### Library
 
