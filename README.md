@@ -14,9 +14,13 @@ var args = new {
   minorVersion = 1,
   lcid = 0
 };
+ITSNamespaceGenerator generator = TlbInf32Generator.CreateFromRegistry(args.tlbid, args.majorVersion, args.minorVersion, args.lcid);
+
+//alternative overload allows passing the path to a COM server
+//ITSNamespaceGenerator generator = TlbInf32Generator.CreateFromFile(@"c:\path\to\file.dll");
+
 //TSNamespace describes the Typescript types in a single namespace
 TSNamespace ns = new TlbInf32Generator(args.tlbid, args.majorVersion, args.minorVersion, args.lcid);
-//alternative overload allows passing the path to a COM server
 
 var builder = new TSBuilder();
 string ts = builder.GetTypescript(ns, null);
