@@ -63,8 +63,14 @@ namespace TsActivexGen {
         //TODO handle module with constants (not a regular enum) -- Microsoft Fax Service Extended COM Library
         //  check TypeKind for TKIND_MODULE
         //  does this also include non-constant members on the module? mk:@MSITStore:C:\programs\tlbinf32\TlbInf32.chm::/TLIHelp_1.htm seems to imply that it doesn't, but only when using SearchResult
+
+        //  three cases:
+        //      numeric enum
+        //      string-based (or other type based) enum
+        //      TKIND_MODULE - collection of named constants: members+values
         private KeyValuePair<string, TSEnumDescription> ToTSEnumDescription(ConstantInfo c) {
             var ret = new TSEnumDescription();
+            //TODO if all the types are the same, then set ret.Typename to that type; otherwise set to null
             ret.Members = c.Members.Cast().Select(x => {
                 var oValue = (object)x.Value;
                 var typename = x.ReturnType.GetTypeName(null, oValue);
@@ -224,3 +230,4 @@ namespace TsActivexGen {
 //TODO emiited Javascript for string enums uses the enum names, which are not accessible from code
 //  because the only way to access members in JS is via ActiveXObject and creation of instance
 //  unless a property/method can return typeinfo of TKIND_MODULE?
+//TODO WIA string enum type is not used for ExecuteCommand

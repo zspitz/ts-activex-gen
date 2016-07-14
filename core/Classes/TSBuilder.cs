@@ -20,13 +20,10 @@ namespace TsActivexGen {
                     "}".AppendWithNewSection(sb, 1);
                     break;
                 case "string":
+                    //TODO this works for all values, not just for string
                     $"type {name} = ".AppendLineTo(sb, 1);
                     members.AppendLinesTo(sb, (memberName, value) => $"\"{value}\" //{memberName}", 2, null, "| ");
-
-                    $"const {name}: {{".AppendLineTo(sb, 1);
-                    members.AppendLinesTo(sb, (memberName, value) => $"{memberName}: {name}", 2, ",");
-                    "}".AppendWithNewSection(sb, 1);
-
+                    sb.AppendLine();
                     break;
                 default:
                     throw new InvalidOperationException("Unable to emit declarations for enum type which is not numeric or string");
