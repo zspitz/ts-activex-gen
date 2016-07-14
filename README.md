@@ -1,4 +1,5 @@
 # ts-activex-gen
+Library and WPF UI for generating Typescript definitions from COM type libraries or WMI classes
 
 ###UI
 
