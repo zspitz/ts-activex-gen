@@ -71,7 +71,6 @@ string ts = builder.GetTypescript(ns, null);
   ```javascript
   dict.CompareMode = 1;
   ```
-  ---
   For other types, we have to declare a union type, and lose the value's name:
   ```typescript
   type CommandID = 
