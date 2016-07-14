@@ -6,6 +6,7 @@ using TsActivexGen.Util;
 using static TsActivexGen.Util.Functions;
 using static TsActivexGen.TSParameterType;
 using static TLI.InvokeKinds;
+using static TLI.TypeKinds;
 
 namespace TsActivexGen {
     public class TlbInf32Generator : ITSNamespaceGenerator {
@@ -168,6 +169,10 @@ namespace TsActivexGen {
 
             var ret = new TSNamespace() { Name = tli.Name };
 
+            //TODO build data structures for modules
+            //  the only way to access members in a type library is through an instance -- var obj = new ActiveXObject(progID); obj.member
+            //  therefore module members are not accessible from Javascript.
+            //  There might still be value where the module is nothing more than a collection of constants of the same type (number or string) and can be represented 
             ret.Enums = tli.Constants.Cast().Select(ToTSEnumDescription).ToDictionary();
 
             ret.Interfaces = tli.CoClasses.Cast().Select(ToTSInterfaceDescription).ToDictionary();
@@ -214,3 +219,8 @@ namespace TsActivexGen {
 //  build parameter list for each MemberInfo (using GetParameter)
 //  if any methodinfo has a different parameter list from the previous, throw an exception
 //GetMemberList
+
+//TODO use readonly modifier for readonly properties, and for all methods!!!
+//TODO emiited Javascript for string enums uses the enum names, which are not accessible from code
+//  because the only way to access members in JS is via ActiveXObject and creation of instance
+//  unless a property/method can return typeinfo of TKIND_MODULE?
