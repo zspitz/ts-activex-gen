@@ -69,7 +69,7 @@ string ts = builder.GetTypescript(ns, null);
   ```
   will compile to Javascript as:
   ```javascript
-  dict.CompareMode = 1;
+  dict.CompareMode = 1 /* Scripting.CompareMode.TextCompare */;
   ```
   For other types, we have to declare a union type, and lose the value's name:
   ```typescript
