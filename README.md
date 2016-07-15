@@ -81,3 +81,4 @@ string ts = builder.GetTypescript(ns, null);
     | "{1F3B3D8E-ACAE-11D2-A093-00C04F72DC3C}"; //wiaCommandUnloadDocument
   var cmd: CommandID = "{E208C170-ACAD-11D2-A093-00C04F72DC3C}";
   ```
+  There is a [pending issue for this](https://github.com/Microsoft/TypeScript/issues/9729).
