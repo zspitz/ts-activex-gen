@@ -1,7 +1,7 @@
 # ts-activex-gen
 Library and WPF UI for generating Typescript definitions from COM type libraries or WMI classes
 
-###UI
+### UI
 
 ![Choosing a registerd COM library, and previewing the definitions](https://raw.githubusercontent.com/zspitz/ts-activex-gen/master/screenshot.png)
 
@@ -48,13 +48,16 @@ string ts = builder.GetTypescript(ns, null);
 2. There is no simple, environment-independent technique for handling Automation events in JScript, and so this is also not reflected in the generated definitions. See [Scripting Events](https://msdn.microsoft.com/en-us/library/ms974564.aspx?f=255&MSPPError=-2147217396) for further details.
 
 3. Enum values (and constants in modules) are not really accessible via Javascript; only instance members of an object created via `new ActiveXObject(progID)` are accessible. When writing code in Javascript, the actual values must be used:
+
   ```javascript
   var dict=new ActiveXObject('Scripting.Dictionary');
   //The CompareMode property is defined as type CompareMethod, with values BinaryCompare = 0, DatabaseCompare = 2 and TextCompare = 1
   //However, there is no way to access these values from Javascript; we have to use the numeric literals instead
   dict.CompareMode=1;
   ```
+
   For numeric types we can work around this with `const enum`, which can be assigned values in ambient contexts. The actual values will be used on compilation:
+
   ```typescript
   //microsoft-scripting-runtime.d.ts
   declare namespace Scripting {
@@ -67,11 +70,15 @@ string ts = builder.GetTypescript(ns, null);
   //test.ts
   dict.CompareMode = Scripting.CompareMethod.TextCompare;
   ```
+
   will compile to Javascript as:
+
   ```javascript
   dict.CompareMode = 1;
   ```
+
   For other types, we have to declare a union type, and lose the value's name:
+
   ```typescript
   type CommandID = 
     "{04E725B0-ACAE-11D2-A093-00C04F72DC3C}" //wiaCommandChangeDocument
@@ -81,3 +88,12 @@ string ts = builder.GetTypescript(ns, null);
     | "{1F3B3D8E-ACAE-11D2-A093-00C04F72DC3C}"; //wiaCommandUnloadDocument
   var cmd: CommandID = "{E208C170-ACAD-11D2-A093-00C04F72DC3C}";
   ```
+
+With the introduction of literal types, modules consisting of constants can be rendered as follows:
+```
+namespace FaxConstants {
+    var bstrGROUPNAME_ALLDEVICES: '<All Devices>';
+    var lDEFAULT_PREFETCH_SIZE: 100;
+    var wcharREASSIGN_RECIPIENTS_DELIMITER: 59;
+}
+```

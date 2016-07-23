@@ -87,6 +87,7 @@ namespace TsActivexGen {
         public List<KeyValuePair<string, TSParameterDescription>> Parameters { get; set; } //(null means a property, empty means empty parameter list); this mut be a list, becaus parameter order is important
         public TSTypeName ReturnTypename { get; set; }
         public string Comment { get; set; }
+        public bool ReadOnly { get; set; }
     }
 
     public class TSInterfaceDescription {
@@ -95,10 +96,16 @@ namespace TsActivexGen {
         public Dictionary<string, TSMemberDescription> Members { get; set; }
     }
 
+    public class TSNamespaceDescription {
+        public Dictionary<string, string> Members { get; set; }
+    }
+
     public class TSNamespace {
         public string Name { get; set; }
         public Dictionary<string, TSEnumDescription> Enums { get; set; }
         public Dictionary<string, TSInterfaceDescription> Interfaces { get; set; }
+        public Dictionary<string, TSNamespaceDescription> Namespaces { get; set; }
+        
         public HashSet<string> GetUsedTypes() {
             return Interfaces.SelectKVP((name, i) => i.Members.SelectKVP((memberName, m) => m.ReturnTypename.Name)).SelectMany().ToHashSet();
         }

@@ -9,8 +9,7 @@ using System.Diagnostics;
 
 namespace TsActivexGen.Util {
     public static class TLIExtensions {
-        //each collection type needs its own Cast extension method
-        //cannot be made generic because the source collections cannot be casted to IEnumerable (???)
+        //using the LINQ Cast method fails; apprently because the source collections cannot be casted to IEnumerable (???)
 
         public static IEnumerable<CoClassInfo> Cast(this CoClasses src) {
             foreach (CoClassInfo item in src) {

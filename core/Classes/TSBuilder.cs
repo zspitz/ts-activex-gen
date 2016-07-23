@@ -9,10 +9,13 @@ namespace TsActivexGen {
     public class TSBuilder {
         private StringBuilder sb;
 
+        [Obsolete("Depends on literal types -- https://github.com/Microsoft/TypeScript/pull/9407")]
+        public bool WriteValueOnlyNamespaces { get; set; } = false;
+
         private void WriteEnum(KeyValuePair<string, TSEnumDescription> x) {
             var name = x.Key;
             var @enum = x.Value;
-            var members = @enum.Members.OrderBy(y=>y.Key);
+            var members = @enum.Members.OrderBy(y => y.Key);
             switch (@enum.Typename.Name) {
                 case "number":
                     $"const enum {name} {{".AppendLineTo(sb, 1);
@@ -21,6 +24,7 @@ namespace TsActivexGen {
                     break;
                 case "string":
                     //TODO this works for all values, not just for string
+                    //TODO all types can be better represented using literal types, pending https://github.com/Microsoft/TypeScript/pull/9407
                     $"type {name} = ".AppendLineTo(sb, 1);
                     members.AppendLinesTo(sb, (memberName, value) => $"\"{value}\" //{memberName}", 2, null, "| ");
                     sb.AppendLine();
@@ -28,6 +32,14 @@ namespace TsActivexGen {
                 default:
                     throw new InvalidOperationException("Unable to emit declarations for enum type which is not numeric or string");
             }
+        }
+
+        private void WriteNamespace(KeyValuePair<string, TSNamespaceDescription> x) {
+            var name = x.Key;
+            var members = x.Value.Members.OrderBy(y => y.Key);
+            $"namespace {name} {{".AppendLineTo(sb, 1);
+            members.AppendLinesTo(sb, (memberName, value) => $"var {memberName}: {value};", 2);
+            "}".AppendWithNewSection(sb, 1);
         }
 
         private string GetParameter(KeyValuePair<string, TSParameterDescription> x) {
@@ -54,7 +66,12 @@ namespace TsActivexGen {
                 parameterList = "(" + memberDescription.Parameters.Joined(", ", GetParameter) + ") => ";
             }
 
-            $"{name}: {parameterList}{returnType};{comment}".AppendLineTo(sb, 2);
+            string @readonly = "";
+            if (memberDescription.ReadOnly) {
+                @readonly = "readonly ";
+            }
+
+            $"{@readonly}{name}: {parameterList}{returnType};{comment}".AppendLineTo(sb, 2);
         }
 
         private void WriteInterface(KeyValuePair<string, TSInterfaceDescription> x) {
@@ -82,6 +99,11 @@ namespace TsActivexGen {
                 ns.Enums.OrderBy(x => x.Key).ForEach(WriteEnum);
             }
 
+            if (WriteValueOnlyNamespaces && ns.Namespaces.Any()) {
+                "//Modules with constant values".AppendLineTo(sb, 1);
+                ns.Namespaces.OrderBy(x => x.Key).ForEach(WriteNamespace);
+            }
+
             if (ns.Interfaces.Any()) {
                 "//Interfaces".AppendLineTo(sb, 1);
                 ns.Interfaces.OrderBy(x => x.Key).ForEach(WriteInterface);
@@ -105,3 +127,5 @@ namespace TsActivexGen {
         }
     }
 }
+
+//TODO use const keyword instead of readonly keyword?

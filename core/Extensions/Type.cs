@@ -19,7 +19,7 @@ namespace TsActivexGen.Util {
             return t;
         }
         public static bool IsNumeric(this Type t) {
-            return t.UnderlyingIfNullable().In(typeof(int), typeof(short), typeof(decimal), typeof(double)); //other types should be here too
+            return t.UnderlyingIfNullable().In(typeof(int), typeof(short), typeof(decimal), typeof(double), typeof(UInt16)); //other types should be here too
         }
     }
 }

@@ -11,11 +11,13 @@ using static TLI.TypeKinds;
 namespace TsActivexGen {
     public class TlbInf32Generator : ITSNamespaceGenerator {
         static string AsString(object value) {
-            var t = value.GetType();
+            var t = value.GetType().UnderlyingIfNullable();
             if (t == typeof(string)) {
                 return $"\'{(value as string).Replace("'", "\\'")}\'";
             } else if (t.IsNumeric()) {
                 return $"{value}";
+            } else if (t==typeof(bool)) {
+                return (bool)value ? "true" : "false";
             }
             throw new Exception($"Unable to generate string representation of value '{value}' of type '{t.Name}'");
         }
@@ -60,17 +62,17 @@ namespace TsActivexGen {
             interfaceToCoClassMapping = tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name, (key, grp) => KVP(key ?? "", grp.Select(x => x.Name).OrderBy(x => x.StartsWith("_")).ToList())).ToDictionary();
         }
 
-        //TODO handle module with constants (not a regular enum) -- Microsoft Fax Service Extended COM Library
-        //  check TypeKind for TKIND_MODULE
-        //  does this also include non-constant members on the module? mk:@MSITStore:C:\programs\tlbinf32\TlbInf32.chm::/TLIHelp_1.htm seems to imply that it doesn't, but only when using SearchResult
+        //We're assuming all members are constant
+        //In any case, in JS there is no way to access module members
+        private KeyValuePair<string,TSNamespaceDescription> ToTSNamespaceDescription(ConstantInfo c) {
+            var ret = new TSNamespaceDescription();
+            ret.Members = c.Members.Cast().Select( x=> KVP(x.Name,AsString((object)x.Value))).ToDictionary();
+            return KVP(c.Name,ret);
+        }
 
-        //  three cases:
-        //      numeric enum
-        //      string-based (or other type based) enum
-        //      TKIND_MODULE - collection of named constants: members+values
         private KeyValuePair<string, TSEnumDescription> ToTSEnumDescription(ConstantInfo c) {
             var ret = new TSEnumDescription();
-            //TODO if all the types are the same, then set ret.Typename to that type; otherwise set to null
+            //TODO if all the types are the same, then set ret.Typename to that type; otherwise set to null and treat as module with constants
             ret.Members = c.Members.Cast().Select(x => {
                 var oValue = (object)x.Value;
                 var typename = x.ReturnType.GetTypeName(null, oValue);
@@ -136,10 +138,12 @@ namespace TsActivexGen {
             if (members.Any(x => x.IsInvokeable() != invokeable)) {
                 throw new InvalidOperationException("Invokeable and non-invokeable members with the same name.");
             }
-
-            if (invokeable || (parameterList != null && parameterList.Any())) {
+            invokeable = invokeable || (parameterList != null && parameterList.Any());
+            if (invokeable) {
                 ret.Parameters = parameterList ?? new List<KeyValuePair<string, TSParameterDescription>>();
             }
+            ret.ReadOnly = invokeable || !hasSetter;
+
             ret.ReturnTypename = members.First().ReturnType.GetTypeName(interfaceToCoClassMapping);
             if (hasSetter && parameterList.Any()) {
                 ret.Comment = "Also has setter with parameters";
@@ -175,11 +179,9 @@ namespace TsActivexGen {
 
             var ret = new TSNamespace() { Name = tli.Name };
 
-            //TODO build data structures for modules
-            //  the only way to access members in a type library is through an instance -- var obj = new ActiveXObject(progID); obj.member
-            //  therefore module members are not accessible from Javascript.
-            //  There might still be value where the module is nothing more than a collection of constants of the same type (number or string) and can be represented 
-            ret.Enums = tli.Constants.Cast().Select(ToTSEnumDescription).ToDictionary();
+            ret.Enums = tli.Constants.Cast().Where(x=>x.TypeKind != TKIND_MODULE).Select(ToTSEnumDescription).ToDictionary();
+
+            ret.Namespaces = tli.Constants.Cast().Where(x => x.TypeKind == TKIND_MODULE).Select(ToTSNamespaceDescription).ToDictionary();
 
             ret.Interfaces = tli.CoClasses.Cast().Select(ToTSInterfaceDescription).ToDictionary();
 
@@ -202,7 +204,6 @@ namespace TsActivexGen {
             }
 
             //TODO do we need to look at ImpliedInterfaces? Should we use GetMembers instead of manually iterating over Members?
-            //TODO what about hidden members?
 
             //Haven't seen any of these yet; not sure what they even are
             if (tli.Declarations.Cast().Any()) {
@@ -217,17 +218,3 @@ namespace TsActivexGen {
         }
     }
 }
-
-//single COM interface - multiple members with the same name
-// if all the members with the same name do not have the same parameter list
-//      throw exception
-//GetParameterList - takes IEnumerable<MemberInfo>, returns List<KeyValuePair<string, TSParameterDescription>>
-//  build parameter list for each MemberInfo (using GetParameter)
-//  if any methodinfo has a different parameter list from the previous, throw an exception
-//GetMemberList
-
-//TODO use readonly modifier for readonly properties, and for all methods!!!
-//TODO emiited Javascript for string enums uses the enum names, which are not accessible from code
-//  because the only way to access members in JS is via ActiveXObject and creation of instance
-//  unless a property/method can return typeinfo of TKIND_MODULE?
-//TODO WIA string enum type is not used for ExecuteCommand

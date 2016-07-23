@@ -148,8 +148,8 @@ interface Date {
             if (cmbVarDateHandling.SelectedIndex == 1) {
                 headers.Add(varDateDefinition);
             }
-            var builder = new TSBuilder();
-            return new TSBuilder().GetTypescript(ns, headers);
+            var builder = new TSBuilder() { WriteValueOnlyNamespaces = (bool)chkModulesWithConstants.IsChecked };
+            return builder.GetTypescript(ns, headers);
         }
 
         private void ReloadDatagrid() {
