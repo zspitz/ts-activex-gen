@@ -89,11 +89,11 @@ string ts = builder.GetTypescript(ns, null);
   var cmd: CommandID = "{E208C170-ACAD-11D2-A093-00C04F72DC3C}";
   ```
 
-With the introduction of literal types, modules consisting of constants can be rendered as follows:
-```
-namespace FaxConstants {
-    var bstrGROUPNAME_ALLDEVICES: '<All Devices>';
-    var lDEFAULT_PREFETCH_SIZE: 100;
-    var wcharREASSIGN_RECIPIENTS_DELIMITER: 59;
-}
-```
+  With the introduction of literal types, modules consisting of constants can be rendered as follows:
+  ```
+  namespace FaxConstants {
+      var bstrGROUPNAME_ALLDEVICES: '<All Devices>';
+      var lDEFAULT_PREFETCH_SIZE: 100;
+      var wcharREASSIGN_RECIPIENTS_DELIMITER: 59;
+  }
+  ```
