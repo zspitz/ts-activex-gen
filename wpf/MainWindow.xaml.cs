@@ -13,6 +13,7 @@ using static System.Windows.MessageBoxButton;
 using static System.Windows.MessageBoxResult;
 using System.Diagnostics;
 using static System.Reflection.Assembly;
+using static System.Windows.Input.Key;
 
 namespace TsActivexGen.wpf {
     public partial class MainWindow : Window {
@@ -31,6 +32,11 @@ namespace TsActivexGen.wpf {
             };
             txbFilter.TextChanged += (s, e) => {
                 if (txbFilter.Text.EndsWith(" ")) {
+                    ReloadDatagrid();
+                }
+            };
+            txbFilter.KeyUp += (s, e) => {
+                if (e.Key == Enter) {
                     ReloadDatagrid();
                 }
             };
