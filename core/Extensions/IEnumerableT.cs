@@ -51,5 +51,14 @@ namespace TsActivexGen.Util {
             }
             return src;
         }
+        public static IEnumerable<T> ForEach<T>(this IEnumerable<T> src, Action<T,int> action) {
+            var current = 0;
+            foreach (var item in src) {
+                action(item, current);
+                current += 1;
+            }
+            return src;
+        }
+        public static IEnumerable<T> DefaultIfNull<T>(this IEnumerable<T> src) => src ?? Enumerable.Empty<T>();
     }
 }

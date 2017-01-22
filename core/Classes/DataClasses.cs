@@ -21,14 +21,17 @@ namespace TsActivexGen {
     }
 
     public class TSTypeName : EqualityBase<TSTypeName> {
-        public string Name { get; set; }
+        public string FullName { get; set; }
+        public string Namespace => FullName.Split('.').First();
+        public string RelativeName(string currentNamespace) => Functions.RelativeName(FullName, currentNamespace);
+        public string NameOnly => FullName.Split('.').Last();
         public string Comment { get; set; }
 
         public override bool Equals(TSTypeName other) {
-            return Name == other?.Name;
+            return FullName == other?.FullName;
         }
         public override int GetHashCode() {
-            return Name.GetHashCode();
+            return FullName.GetHashCode();
         }
         public override bool Equals(object other) {
             return base.Equals(other);
@@ -44,15 +47,13 @@ namespace TsActivexGen {
         public override string ToString() {
             var comment = Comment;
             if (!comment.IsNullOrEmpty()) { comment = $" /*{comment}*/"; }
-            return $"{Name}{comment}";
+            return $"{FullName}{comment}";
         }
-        
-        
     }
 
     public class TSEnumDescription {
         public TSTypeName Typename { get; set; }
-        public Dictionary<string, string> Members { get; set; } //values -> string representation of value
+        public Dictionary<string, string> Members { get; } = new Dictionary<string, string>(); //values -> string representation of value
     }
 
     public class TSParameterDescription : EqualityBase<TSParameterDescription> {
@@ -93,28 +94,51 @@ namespace TsActivexGen {
     public class TSInterfaceDescription {
         //TODO This functionality is specific to ActiveX definition creation, and should really be in the TlbInf32Generator class
         public bool IsActiveXCreateable { get; set; }
-        public Dictionary<string, TSMemberDescription> Members { get; set; }
+        public Dictionary<string, TSMemberDescription> Members { get; } = new Dictionary<string, TSMemberDescription>();
     }
 
     public class TSNamespaceDescription {
-        public Dictionary<string, string> Members { get; set; }
+        public Dictionary<string, string> Members { get; } = new Dictionary<string, string>();
     }
 
     public class TSNamespace {
         public string Name { get; set; }
-        public Dictionary<string, TSEnumDescription> Enums { get; set; }
-        public Dictionary<string, TSInterfaceDescription> Interfaces { get; set; }
-        public Dictionary<string, TSNamespaceDescription> Namespaces { get; set; }
+        public Dictionary<string, TSEnumDescription> Enums { get; } = new Dictionary<string, TSEnumDescription>();
+        public Dictionary<string, TSInterfaceDescription> Interfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
+        public Dictionary<string, TSNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSNamespaceDescription>();
+        public Dictionary<string, TSTypeName> Aliases { get; } = new Dictionary<string, TSTypeName>();
         
         public HashSet<string> GetUsedTypes() {
-            return Interfaces.SelectKVP((name, i) => i.Members.SelectKVP((memberName, m) => m.ReturnTypename.Name)).SelectMany().ToHashSet();
+            //parameters, return type, alias mapping
+            var ret = new HashSet<string>();
+            var members = Interfaces.SelectMany(i => i.Value.Members);
+            members.SelectMany(kvp => kvp.Value.Parameters.DefaultIfNull()).SelectKVP((parameterName, p) => p.Typename.FullName).AddRangeTo(ret);
+            members.SelectKVP((memberName, m) => m.ReturnTypename.FullName).AddRangeTo(ret);
+            Aliases.SelectKVP((aliasName, a) => a.FullName).AddRangeTo(ret);
+            return ret;
         }
         public HashSet<string> GetKnownTypes() {
             var ret = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" }.ToHashSet();
             Enums.Keys.AddRangeTo(ret);
             Interfaces.Keys.AddRangeTo(ret);
+            Aliases.Keys.AddRangeTo(ret);
             ret.ToList().Select(x => x + "[]").AddRangeTo(ret);
             return ret;
+        }
+        public HashSet<string> GetUndefinedTypes() {
+            var ret = GetUsedTypes();
+            ret.ExceptWith(GetKnownTypes());
+            return ret;
+        }
+    }
+
+    public class TSNamespaceSet {
+        public Dictionary<string, TSNamespace> Namespaces { get; } = new Dictionary<string, TSNamespace>();
+        public HashSet<string> GetUsedTypes() {
+            return Namespaces.SelectMany(x => x.Value.GetUsedTypes()).ToHashSet();
+        }
+        public HashSet<string> GetKnownTypes() {
+            return Namespaces.SelectMany(x => x.Value.GetKnownTypes()).ToHashSet();
         }
         public HashSet<string> GetUndefinedTypes() {
             var ret = GetUsedTypes();

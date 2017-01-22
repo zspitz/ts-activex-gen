@@ -14,6 +14,7 @@ namespace TsActivexGen.Util {
         public static IEnumerable<TResult> SelectKVP<TKey, TValue, TResult>(this IEnumerable<KeyValuePair<TKey, TValue>> src, Func<TKey, TValue, TResult> selector) {
             return src.Select(kvp => selector(kvp.Key, kvp.Value));
         }
+        
         public static string JoinedKVP<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> src, Func<TKey, TValue, string> selector, string delimiter = ",") {
             return src.SelectKVP(selector).Joined(delimiter);
         }
@@ -67,6 +68,10 @@ namespace TsActivexGen.Util {
 
         public static ILookup<TKey, TValue> ToLookup<TKey,TValue>(this IEnumerable<KeyValuePair<TKey,TValue>> src) {
             return src.ToLookup(x => x.Key, x => x.Value);
+        }
+
+        public static bool AnyKVP<TKey,TValue>(this IEnumerable<KeyValuePair<TKey,TValue>> src, Func<TKey,TValue,bool> predicate) {
+            return src.WhereKVP(predicate).Any();
         }
     }
 }

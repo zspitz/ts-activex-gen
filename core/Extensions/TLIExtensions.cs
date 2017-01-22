@@ -117,48 +117,6 @@ VT_ERROR	10
 VT_NULL	1
 VT_EMPTY	0
  */
- 
-        internal static TSTypeName GetTypeName(this VarTypeInfo vti, Dictionary<string, List<string>> mapping = null, object value = null) {
-            //TODO this should be in TlbInf32Generator class; then it will have access to the mapping
-            var ret = new TSTypeName();
-            var splitValues = vti.VarType.SplitValues();
-            var isArray = splitValues.ContainsAny(VT_VECTOR,VT_ARRAY);
-            if (splitValues.ContainsAny(VT_I1, VT_I2, VT_I4, VT_I8, VT_R4, VT_R8, VT_UI1, VT_UI2, VT_UI4, VT_UI8, VT_CY, VT_DECIMAL, VT_INT, VT_UINT)) {
-                ret.Name = "number";
-            } else if (splitValues.ContainsAny(VT_BSTR, VT_LPSTR, VT_LPWSTR)) {
-                ret.Name = "string";
-            } else if (splitValues.ContainsAny(VT_BOOL)) {
-                ret.Name = "boolean";
-            } else if (splitValues.ContainsAny(VT_VOID, VT_HRESULT)) {
-                ret.Name = "void";
-            } else if (splitValues.ContainsAny(VT_DATE)) {
-                ret.Name = "VarDate";
-            } else if (splitValues.ContainsAny(VT_EMPTY)) {
-                var ti = vti.TypeInfo;
-                ret.Name = ti.Name;
-                mapping.IfContainsKey(ret.Name, val => ret.Name = val.FirstOrDefault());
-            } else if (splitValues.ContainsAny(VT_VARIANT, VT_DISPATCH)) {
-                ret.Name = "any";
-            } else {
-                if (Debugger.IsAttached) {
-                    var debug = vti.Debug();
-                }
-                var external = vti.IsExternalType ? " (external)" : "";
-                ret.Comment = $"{vti.VarType.ToString()}{external}";
-                ret.Name = "any";
-            }
-
-            if (ret.Name == "any" && value != null) {
-                var t = value.GetType();
-                if (t == typeof(string)) {
-                    ret.Name = "string";
-                } else if (t.IsNumeric()) {
-                    ret.Name = "number";
-                }
-            }
-            if (isArray) { ret.Name += "[]"; }
-            return ret;
-        }
 
         public static List<object> Debug(this CoClasses coclasses) {
             return coclasses.Cast().Select(x => {

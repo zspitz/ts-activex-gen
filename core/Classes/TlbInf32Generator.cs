@@ -7,6 +7,8 @@ using static TsActivexGen.Util.Functions;
 using static TsActivexGen.TSParameterType;
 using static TLI.InvokeKinds;
 using static TLI.TypeKinds;
+using static TLI.TliVarType;
+using System.Diagnostics;
 
 namespace TsActivexGen {
     public class TlbInf32Generator : ITSNamespaceGenerator {
@@ -16,79 +18,85 @@ namespace TsActivexGen {
                 return $"\'{(value as string).Replace("'", "\\'")}\'";
             } else if (t.IsNumeric()) {
                 return $"{value}";
-            } else if (t==typeof(bool)) {
+            } else if (t == typeof(bool)) {
                 return (bool)value ? "true" : "false";
             }
             throw new Exception($"Unable to generate string representation of value '{value}' of type '{t.Name}'");
         }
 
-        string tlbid;
-        short majorVersion;
-        short minorVersion;
-        int lcid;
-
-        string filePath;
-
-        TypeLibInfo tli;
-        Dictionary<string, List<string>> interfaceToCoClassMapping;
-
-        public static TlbInf32Generator CreateFromRegistry(string tlbid, short majorVersion, short minorVersion, int lcid) {
-            ////TODO include logic here to figure out majorVersion/minorVersion/lcid even when not passed in
-            return new TlbInf32Generator() {
-                tlbid = tlbid,
-                majorVersion = majorVersion,
-                minorVersion = minorVersion,
-                lcid = lcid
-            };
-        }
-
-        public static TlbInf32Generator CreateFromFile(string filename) {
-            return new TlbInf32Generator() {
-                filePath = filename
-            };
-        }
-
-        private TlbInf32Generator() { }
-
-        private void GetTypeLibInfo() {
-            var tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime
-            if (!tlbid.IsNullOrEmpty()) {
-                tli = tliApp.TypeLibInfoFromRegistry(tlbid, majorVersion, minorVersion, lcid);
-            } else if (!filePath.IsNullOrEmpty()) {
-                tli = tliApp.TypeLibInfoFromFile(filePath);
-            } else {
-                throw new ArgumentException();
+        private TSTypeName GetTypeName(VarTypeInfo vti, object value = null) {
+            //TODO this should be in TlbInf32Generator class; then it will have access to the mapping
+            var ret = new TSTypeName();
+            var splitValues = vti.VarType.SplitValues();
+            if (splitValues.SequenceEqual(new[] { VT_EMPTY }) && vti.TypeInfo.TypeKind == TKIND_ALIAS && !vti.IsExternalType) {
+                splitValues = vti.TypeInfo.ResolvedType.VarType.SplitValues();
             }
-            interfaceToCoClassMapping = tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name, (key, grp) => KVP(key ?? "", grp.Select(x => x.Name).OrderBy(x => x.StartsWith("_")).ToList())).ToDictionary();
+            var isArray = splitValues.ContainsAny(VT_VECTOR, VT_ARRAY);
+            if (splitValues.ContainsAny(VT_I1, VT_I2, VT_I4, VT_I8, VT_R4, VT_R8, VT_UI1, VT_UI2, VT_UI4, VT_UI8, VT_CY, VT_DECIMAL, VT_INT, VT_UINT)) {
+                ret.FullName = "number";
+            } else if (splitValues.ContainsAny(VT_BSTR, VT_LPSTR, VT_LPWSTR)) {
+                ret.FullName = "string";
+            } else if (splitValues.ContainsAny(VT_BOOL)) {
+                ret.FullName = "boolean";
+            } else if (splitValues.ContainsAny(VT_VOID, VT_HRESULT)) {
+                ret.FullName = "void";
+            } else if (splitValues.ContainsAny(VT_DATE)) {
+                ret.FullName = "VarDate";
+            } else if (splitValues.ContainsAny(VT_EMPTY)) {
+                var ti = vti.TypeInfo;
+                ret.FullName = $"{ti.Parent.Name}.{ti.Name}";
+                if (vti.IsExternalType) { AddTLI(vti.TypeLibInfoExternal); }
+                interfaceToCoClassMapping.IfContainsKey(ret.FullName, val => ret.FullName = val.FirstOrDefault());
+            } else if (splitValues.ContainsAny(VT_VARIANT, VT_DISPATCH)) {
+                ret.FullName = "any";
+            } else {
+                if (Debugger.IsAttached) {
+                    var debug = vti.Debug();
+                }
+                var external = vti.IsExternalType ? " (external)" : "";
+                ret.Comment = $"{vti.VarType.ToString()}{external}";
+                ret.FullName = "any";
+            }
+
+            if (ret.FullName == "any" && value != null) {
+                var t = value.GetType();
+                if (t == typeof(string)) {
+                    ret.FullName = "string";
+                } else if (t.IsNumeric()) {
+                    ret.FullName = "number";
+                }
+            }
+            if (isArray) { ret.FullName += "[]"; }
+            return ret;
         }
+
 
         //We're assuming all members are constant
         //In any case, in JS there is no way to access module members
-        private KeyValuePair<string,TSNamespaceDescription> ToTSNamespaceDescription(ConstantInfo c) {
+        private KeyValuePair<string, TSNamespaceDescription> ToTSNamespaceDescription(ConstantInfo c) {
             var ret = new TSNamespaceDescription();
-            ret.Members = c.Members.Cast().Select( x=> KVP(x.Name,AsString((object)x.Value))).ToDictionary();
-            return KVP(c.Name,ret);
+            c.Members.Cast().Select(x => KVP(x.Name, AsString((object)x.Value))).AddRangeTo(ret.Members);
+            return KVP($"{c.Parent.Name}.{c.Name}", ret);
         }
 
         private KeyValuePair<string, TSEnumDescription> ToTSEnumDescription(ConstantInfo c) {
             var ret = new TSEnumDescription();
-            //TODO if all the types are the same, then set ret.Typename to that type; otherwise set to null and treat as module with constants
-            ret.Members = c.Members.Cast().Select(x => {
+            c.Members.Cast().Select(x => {
                 var oValue = (object)x.Value;
-                var typename = x.ReturnType.GetTypeName(null, oValue);
+                var typename = GetTypeName(x.ReturnType, oValue);
                 if (ret.Typename == null) {
                     ret.Typename = typename;
                 } else if (ret.Typename != typename) {
-                    throw new InvalidOperationException("Multiple types in enum");
+                    throw new InvalidOperationException("Multiple types in enum"); //this should really be handled as a module with constants; but it's irrelevant because Javascript has no way to access module members
                 }
                 return KVP(x.Name, AsString(oValue));
-            }).ToDictionary();
-            return KVP(c.Name, ret);
+            }).AddRangeTo(ret.Members);
+            return KVP($"{c.Parent.Name}.{c.Name}", ret);
         }
 
         private KeyValuePair<string, TSParameterDescription> ToTSParameterDescription(ParameterInfo p, bool isRest) {
             var ret = new TSParameterDescription();
-            ret.Typename = p.VarTypeInfo.GetTypeName(interfaceToCoClassMapping);
+            ret.Typename = GetTypeName(p.VarTypeInfo);
             if (isRest) {
                 ret.ParameterType = Rest;
             } else if (p.Optional || p.Default) {
@@ -144,7 +152,7 @@ namespace TsActivexGen {
             }
             ret.ReadOnly = invokeable || !hasSetter;
 
-            ret.ReturnTypename = members.First().ReturnType.GetTypeName(interfaceToCoClassMapping);
+            ret.ReturnTypename = GetTypeName(members.First().ReturnType);
             if (hasSetter && parameterList.Any()) {
                 ret.Comment = "Also has setter with parameters";
             }
@@ -157,61 +165,105 @@ namespace TsActivexGen {
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(InterfaceInfo i) {
             var ret = new TSInterfaceDescription();
-            ret.Members = GetMembers(i.Members);
-            return KVP(i.Name, ret);
+            GetMembers(i.Members).AddRangeTo(ret.Members);
+            return KVP($"{i.Parent.Name}.{i.Name}", ret);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(CoClassInfo c) {
             var ret = new TSInterfaceDescription();
-            ret.Members = GetMembers(c.DefaultInterface.Members);
+            GetMembers(c.DefaultInterface.Members).AddRangeTo(ret.Members);
             ret.IsActiveXCreateable = c.IsCreateable();
-            return KVP(c.Name, ret);
+            return KVP($"{c.Parent.Name}.{c.Name}", ret);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(RecordInfo r) {
             var ret = new TSInterfaceDescription();
-            ret.Members = GetMembers(r.Members);
-            return KVP(r.Name, ret);
+            GetMembers(r.Members).AddRangeTo(ret.Members);
+            return KVP($"{r.Parent.Name}.{r.Name}", ret);
         }
 
-        public TSNamespace Generate() {
-            GetTypeLibInfo();
-
+        private TSNamespace ToNamespace(TypeLibInfo tli) {
             var ret = new TSNamespace() { Name = tli.Name };
-
-            ret.Enums = tli.Constants.Cast().Where(x=>x.TypeKind != TKIND_MODULE).Select(ToTSEnumDescription).ToDictionary();
-
-            ret.Namespaces = tli.Constants.Cast().Where(x => x.TypeKind == TKIND_MODULE).Select(ToTSNamespaceDescription).ToDictionary();
-
-            ret.Interfaces = tli.CoClasses.Cast().Select(ToTSInterfaceDescription).ToDictionary();
-
-            var undefinedTypes = ret.GetUndefinedTypes();
-            if (undefinedTypes.Any()) {
-                var tliInterfaces = tli.Interfaces.Cast().Select(x => KVP(x.Name, x)).ToDictionary();
-                var tliRecords = tli.Records.Cast().Select(x => KVP(x.Name, x)).ToDictionary();
-                do {
-                    undefinedTypes.Select(s => {
-                        if (tliInterfaces.ContainsKey(s)) {
-                            return ToTSInterfaceDescription(tliInterfaces[s]);
-                        }
-                        if (tliRecords.ContainsKey(s)) {
-                            return ToTSInterfaceDescription(tliRecords[s]);
-                        }
-                        throw new InvalidOperationException($"Unable to find type '{s}'.");
-                    }).AddRangeTo(ret.Interfaces);
-                    undefinedTypes = ret.GetUndefinedTypes();
-                } while (undefinedTypes.Any());
-            }
+            tli.Constants.Cast().Where(x => x.TypeKind != TKIND_MODULE).Select(ToTSEnumDescription).AddRangeTo(ret.Enums);
+            tli.Constants.Cast().Where(x => x.TypeKind == TKIND_MODULE).Select(ToTSNamespaceDescription).AddRangeTo(ret.Namespaces);
+            tli.CoClasses.Cast().Select(ToTSInterfaceDescription).AddRangeTo(ret.Interfaces);
 
             //TODO do we need to look at ImpliedInterfaces? Should we use GetMembers instead of manually iterating over Members?
 
-            //Haven't seen any of these yet; not sure what they even are
             if (tli.Declarations.Cast().Any()) {
-                var lst = tli.Declarations.Cast().Select(x => x.Name).ToList();
-                throw new NotImplementedException();
+                //not sure what these are, if they are accessible from JScript
+                //there is one in the Excel object library
             }
             if (tli.Unions.Cast().Any()) {
-                throw new NotImplementedException();
+                //not sure what these are, if they are accessible from JScript
+                //there are a few in the DirectX transforms library
+            }
+
+            return ret;
+        }
+
+        private KeyValuePair<string, TSTypeName> ToTypeAlias(IntrinsicAliasInfo ia) {
+            return KVP($"{ia.Parent.Name}.{ ia.Name}", GetTypeName(ia.ResolvedType));
+        }
+
+        TLIApplication tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime
+        List<TypeLibInfo> tlis = new List<TypeLibInfo>();
+        Dictionary<string, List<string>> interfaceToCoClassMapping = new Dictionary<string, List<string>>();
+
+        private void AddTLI(TypeLibInfo tli) {
+            if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
+            tlis.Add(tli);
+            tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
+                var fullInterfaceName = $"{tli.Name}.{interfaceName}";
+                if (interfaceToCoClassMapping.ContainsKey(fullInterfaceName)) { throw new Exception($"Interface {fullInterfaceName} already exists in dictionary"); }
+                interfaceToCoClassMapping[fullInterfaceName] = coclasses.OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
+            });
+        }
+        public void AddFromRegistry(string tlbid, short majorVersion, short minorVersion, int lcid) {
+            ////TODO include logic here to figure out majorVersion/minorVersion/lcid even when not passed in
+            var toAdd = tliApp.TypeLibInfoFromRegistry(tlbid, majorVersion, minorVersion, lcid);
+            AddTLI(toAdd);
+        }
+
+        public void AddFromFile(string filename) {
+            var toAdd = tliApp.TypeLibInfoFromFile(filename);
+            AddTLI(toAdd);
+        }
+
+        public TSNamespaceSet Generate() {
+            var ret = new TSNamespaceSet();
+            for (int i = 0; i < tlis.Count; i++) {
+                var toAdd = ToNamespace(tlis[i]);
+                ret.Namespaces.Add(toAdd.Name, toAdd);
+            }
+
+            var undefinedTypes = ret.GetUndefinedTypes();
+            if (undefinedTypes.Any()) {
+                ILookup<string, InterfaceInfo> allInterfaces = null;
+                Dictionary<string, RecordInfo> allRecords = null;
+                Dictionary<string, IntrinsicAliasInfo> allAliases = null;
+                var currentTliCount = 0;
+                do {
+                    if (currentTliCount != tlis.Count) {
+                        //a previously unused external type was discovered, adding to the list of TypeLibInfos
+                        allInterfaces = tlis.SelectMany(tli => tli.Interfaces.Cast()).ToLookup(x => $"{x.Parent.Name}.{x.Name}");
+                        allRecords = tlis.SelectMany(tli => tli.Records.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
+                        allAliases = tlis.SelectMany(tli => tli.IntrinsicAliases.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
+                        currentTliCount = tlis.Count;
+                    }
+                    undefinedTypes.ForEach(s => {
+                        var ns = ret.Namespaces[s.Split('.')[0]];
+
+                        //go pattern matching!!!!
+                        if (allInterfaces.IfContainsKey(s, grp => grp.Select(ToTSInterfaceDescription).AddRangeTo( ns.Interfaces))) {
+                        } else if (allRecords.IfContainsKey(s, x => ns.Interfaces.Add(ToTSInterfaceDescription(x)))) {
+                        } else if (allAliases.IfContainsKey(s,x=>ns.Aliases.Add(ToTypeAlias(x)))) {
+                        } else {
+                            throw new InvalidOperationException($"Unable to find type '{s}'.");
+                        }
+                    });
+                    undefinedTypes = ret.GetUndefinedTypes();
+                } while (undefinedTypes.Any());
             }
 
             return ret;

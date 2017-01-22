@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using TsActivexGen.Util;
 using static TsActivexGen.TSParameterType;
+using static TsActivexGen.Util.Functions;
 
 namespace TsActivexGen {
     public class TSBuilder {
@@ -13,10 +14,10 @@ namespace TsActivexGen {
         public bool WriteValueOnlyNamespaces { get; set; } = false;
 
         private void WriteEnum(KeyValuePair<string, TSEnumDescription> x) {
-            var name = x.Key;
+            var name = NameOnly(x.Key);
             var @enum = x.Value;
             var members = @enum.Members.OrderBy(y => y.Key);
-            switch (@enum.Typename.Name) {
+            switch (@enum.Typename.FullName) {
                 case "number":
                     $"const enum {name} {{".AppendLineTo(sb, 1);
                     members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", 2, ",");
@@ -35,14 +36,14 @@ namespace TsActivexGen {
         }
 
         private void WriteNamespace(KeyValuePair<string, TSNamespaceDescription> x) {
-            var name = x.Key;
+            var name = NameOnly(x.Key);
             var members = x.Value.Members.OrderBy(y => y.Key);
             $"namespace {name} {{".AppendLineTo(sb, 1);
             members.AppendLinesTo(sb, (memberName, value) => $"var {memberName}: {value};", 2);
             "}".AppendWithNewSection(sb, 1);
         }
 
-        private string GetParameter(KeyValuePair<string, TSParameterDescription> x) {
+        private string GetParameter(KeyValuePair<string, TSParameterDescription> x, string ns) {
             var name = x.Key;
             var parameterDescription = x.Value;
             if (parameterDescription.ParameterType == Rest) {
@@ -50,36 +51,40 @@ namespace TsActivexGen {
             } else if (parameterDescription.ParameterType == Optional) {
                 name += "?";
             }
-            return $"{name}: {parameterDescription.Typename}";
+            return $"{name}: {parameterDescription.Typename.RelativeName(ns)}";
         }
 
-        private void WriteMember(KeyValuePair<string, TSMemberDescription> x) {
+        private void WriteMember(KeyValuePair<string, TSMemberDescription> x, string ns) {
             var name = x.Key;
             var memberDescription = x.Value;
-            var returnType = memberDescription.ReturnTypename;
+            var returnType = memberDescription.ReturnTypename.RelativeName(ns);
 
             var comment = memberDescription.Comment;
             if (!comment.IsNullOrEmpty()) { comment = $"   //{comment}"; }
 
             string parameterList = "";
             if (memberDescription.Parameters != null) {
-                parameterList = "(" + memberDescription.Parameters.Joined(", ", GetParameter) + ") => ";
+                parameterList = "(" + memberDescription.Parameters.Joined(", ", y => GetParameter(y, ns)) + ") => ";
             }
 
             string @readonly = "";
-            if (memberDescription.ReadOnly) {
-                @readonly = "readonly ";
-            }
+            //if (memberDescription.ReadOnly) {
+            //    @readonly = "readonly ";
+            //}
 
             $"{@readonly}{name}: {parameterList}{returnType};{comment}".AppendLineTo(sb, 2);
         }
 
-        private void WriteInterface(KeyValuePair<string, TSInterfaceDescription> x) {
-            var name = x.Key;
+        private void WriteInterface(KeyValuePair<string, TSInterfaceDescription> x, string ns) {
+            var name = NameOnly(x.Key);
             var @interface = x.Value;
             $"interface {name} {{".AppendLineTo(sb, 1);
-            @interface.Members.OrderBy(y => y.Key).ForEach(WriteMember);
+            @interface.Members.OrderBy(y => y.Key).ForEach(y=> WriteMember(y,ns));
             "}".AppendWithNewSection(sb, 1);
+        }
+
+        private void WriteAlias(KeyValuePair<string, TSTypeName> x, string ns) {
+            $"type {NameOnly(x.Key)} = {x.Value.RelativeName(ns)};".AppendWithNewSection(sb, 1);
         }
 
         public string GetTypescript(TSNamespace ns, IEnumerable<string> headers) {
@@ -94,6 +99,11 @@ namespace TsActivexGen {
 
             $"declare namespace {ns.Name} {{".AppendWithNewSection(sb);
 
+            if (ns.Aliases.Any()) {
+                "//Type aliases".AppendLineTo(sb, 1);
+                ns.Aliases.OrderBy(x => x.Key).ForEach(x=>WriteAlias(x,ns.Name));
+            }
+
             if (ns.Enums.Any()) {
                 "//Enums".AppendLineTo(sb, 1);
                 ns.Enums.OrderBy(x => x.Key).ForEach(WriteEnum);
@@ -106,7 +116,7 @@ namespace TsActivexGen {
 
             if (ns.Interfaces.Any()) {
                 "//Interfaces".AppendLineTo(sb, 1);
-                ns.Interfaces.OrderBy(x => x.Key).ForEach(WriteInterface);
+                ns.Interfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, ns.Name));
             }
 
             "}".AppendWithNewSection(sb);
@@ -116,8 +126,7 @@ namespace TsActivexGen {
             if (creatables.Any()) {
                 "interface ActiveXObject {".AppendLineTo(sb);
                 creatables.SelectKVP((interfaceName, @interface) => {
-                    var progid = $"{ns.Name}.{interfaceName}";
-                    return $"new (progID: '{progid}'): {progid};";
+                    return $"new (progID: '{interfaceName}'): {interfaceName};";
                 }).AppendLinesTo(sb, 1);
                 "}".AppendWithNewSection(sb);
             }

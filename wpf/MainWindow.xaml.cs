@@ -14,6 +14,7 @@ using static System.Windows.MessageBoxResult;
 using System.Diagnostics;
 using static System.Reflection.Assembly;
 using static System.Windows.Input.Key;
+using static Microsoft.VisualBasic.Interaction;
 
 namespace TsActivexGen.wpf {
     public partial class MainWindow : Window {
@@ -22,8 +23,6 @@ namespace TsActivexGen.wpf {
             InitializeComponent();
 
             txbOutput.Text = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
-
-            cmbVarDateHandling.ItemsSource = new List<string>() { "Don't generate", "Include in file", "Generate external" };
 
             dgTypeLibs.ItemsSource = typelibs;
 
@@ -47,7 +46,7 @@ namespace TsActivexGen.wpf {
 
             dgTypeLibs.SelectionChanged += (s, e) => {
                 if (e.AddedItems.Count == 0) { return; }
-                tbPreview.Text = getTypescript();
+                tbPreview.Text = getTypescript().Joined($"// {Enumerable.Repeat("-",80).Joined("")}");
                 txbFilename.Text = dgTypeLibs.SelectedItem<TypeLibDetails>().Name.ToLower().Replace(" ", "-");
             };
 
@@ -61,26 +60,23 @@ namespace TsActivexGen.wpf {
                     Directory.CreateDirectory(txbOutput.Text);
                 }
 
-                var ts = getTypescript();
-
-                var filepath = Combine(txbOutput.Text, $"{txbFilename.Text}.d.ts");
-                if (!Exists(filepath) || MessageBox.Show("Overwrite existing?", "", YesNo) == Yes) {
+                getTypescript().ForEach((ts,index) => {
+                    var basePath = index == 0 ? txbFilename.Text : InputBox(ts.FirstLine(), "Enter path for file");
+                    if (basePath == "") { return; }
+                    var filepath = Combine(txbOutput.Text, $"{basePath}.d.ts");
                     WriteAllText(filepath, ts);
                     if (chkOutputTests.IsChecked == true) {
-                        var testsFilePath = Combine(txbOutput.Text, $"{txbFilename.Text}-tests.ts");
+                        var testsFilePath = Combine(txbOutput.Text, $"{basePath}-tests.ts");
                         if (!Exists(testsFilePath) || MessageBox.Show("Overwrite existing test file?", "", YesNo) == Yes) {
                             WriteAllLines(testsFilePath, new[] {
-                                $"/// <reference path=\"{txbFilename.Text}.d.ts\" />",""
-                            });
+                                    $"/// <reference path=\"{filepath}\" />",""
+                                });
                         }
                     }
-                }
+                });
 
-                if (cmbVarDateHandling.SelectedIndex == 2) {
-                    WriteAllText(Combine(txbOutput.Text, "jscript-extensions.d.ts"), varDateDefinition);
-                }
-
-                var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + filepath + "\"");
+                var firstFilePath = Combine(txbOutput.Text, $"{txbFilename.Text}.d.ts");
+                var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + firstFilePath + "\"");
                 Process.Start(psi);
             };
 
@@ -92,7 +88,7 @@ namespace TsActivexGen.wpf {
                 if (!txbTypeLibFromFile.Text.IsNullOrEmpty()) { fileDlg.FileName = txbTypeLibFromFile.Text; }
                 if (fileDlg.ShowDialog() == Forms.DialogResult.Cancel) { return; }
                 txbTypeLibFromFile.Text = fileDlg.FileName;
-                tbPreview.Text = getTypescript();
+                tbPreview.Text = getTypescript().Joined($"// {Enumerable.Repeat("-", 80)}");
             };
         }
 
@@ -108,41 +104,36 @@ namespace TsActivexGen.wpf {
             return true;
         }
 
-        private const string varDateDefinition = @"
-interface VarDate { }
-
-interface DateConstructor {
-    new (vd: VarDate): Date;
-}
-
-interface Date {
-    getVarDate: () => VarDate;
-}
-";
-
-        private string getTypescript() {
+        private string[] getTypescript() {
             var headers = new List<string>();
             ITSNamespaceGenerator generator = null;
+            TlbInf32Generator tlbGenerator;
 
             switch (tcMain.SelectedIndex) {
                 case 0:
                     var details = dgTypeLibs.SelectedItem<TypeLibDetails>();
-                    new[] {
-                        $"// Type definitions for {details.Name}",
-                        "// Project: <project url>",
-                        "// Definitions by: Zev Spitz <https://github.com/zspitz>",
-                        "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
-                    }.AddRangeTo(headers);
-                    generator = TlbInf32Generator.CreateFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
+                    //new[] {
+                    //    $"// Type definitions for {details.Name}",
+                    //    "// Project: <project url>",
+                    //    "// Definitions by: Zev Spitz <https://github.com/zspitz>",
+                    //    "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
+                    //}.AddRangeTo(headers);
+                    //generator = TlbInf32Generator.CreateFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
+                    tlbGenerator = new TlbInf32Generator();
+                    tlbGenerator.AddFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
+                    generator = tlbGenerator;
                     break;
                 case 1:
-                    new[] {
-                        "// Type definitions for <library description here>",
-                        "// Project: <project url>",
-                        "// Definitions by: Zev Spitz <https://github.com/zspitz>",
-                        "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
-                    }.AddRangeTo(headers);
-                    generator = TlbInf32Generator.CreateFromFile(txbTypeLibFromFile.Text);
+                    //new[] {
+                    //    "// Type definitions for <library description here>",
+                    //    "// Project: <project url>",
+                    //    "// Definitions by: Zev Spitz <https://github.com/zspitz>",
+                    //    "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
+                    //}.AddRangeTo(headers);
+                    //generator = TlbInf32Generator.CreateFromFile(txbTypeLibFromFile.Text);
+                    tlbGenerator = new TlbInf32Generator();
+                    tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
+                    generator = tlbGenerator;
                     break;
                 case 2:
                     break;
@@ -150,19 +141,16 @@ interface Date {
                     throw new InvalidOperationException();
             }
 
-            var ns = generator.Generate();
-            if (cmbVarDateHandling.SelectedIndex == 1) {
-                headers.Add(varDateDefinition);
-            }
+            var nsSet = generator.Generate();
             var builder = new TSBuilder() { WriteValueOnlyNamespaces = (bool)chkModulesWithConstants.IsChecked };
-            return builder.GetTypescript(ns, headers);
+            return nsSet.Namespaces.SelectKVP((name, ns) => builder.GetTypescript(ns, new[] { $"// {name}" })).ToArray();
         }
 
         private void ReloadDatagrid() {
             IEnumerable<TypeLibDetails> lst = typelibs.OrderBy(x => x.Name);
-            var filterText = txbFilter.Text.Trim();
-            if (!filterText.IsNullOrEmpty()) {
-                lst = lst.Where(x => (x.Name ?? "").Contains(filterText, StringComparison.OrdinalIgnoreCase));
+            var terms = txbFilter.Text.Trim().Split(' ');
+            if (terms.Any()) {
+                lst = lst.Where(x => terms.Any(y => (x.Name ?? "").Contains(y, StringComparison.OrdinalIgnoreCase)));
             }
             dgTypeLibs.ItemsSource = lst;
         }

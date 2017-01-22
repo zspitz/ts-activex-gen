@@ -9,17 +9,6 @@
         <ToolTip x:Key="ttCreateTestFile">
             DefinitelyTyped requires a test file that uses the declarations. Check this box to create such a tests file.
         </ToolTip>
-        <TextBlock x:Key="ttVarDateHandling">
-            Automation dates are returned as the VarDate type, which need to be passed into the Date constructor before they can be used.
-            <LineBreak />
-            *  If the interface is already defined (in a different file, or using Typescript >= 2.0), don't generate
-            <LineBreak />
-            Otherwise, the interface can be generated in:
-            <LineBreak />
-            * an external file, or
-            <LineBreak />
-            * within the generated file
-        </TextBlock>
         <ToolTip x:Key="ttWriteModules">
             <TextBlock>
             Modules with constants can be defined using literal types
@@ -46,8 +35,6 @@
                 </DockPanel>
                 <Label Content="Create tests file" ToolTip="{StaticResource ttCreateTestFile}" />
                 <CheckBox IsChecked="True" Name="chkOutputTests" ToolTip="{StaticResource ttCreateTestFile}" />
-                <Label Content="VarDate interface" ToolTip="{StaticResource ttVarDateHandling}" />
-                <ComboBox Name="cmbVarDateHandling" SelectedValuePath="Content" SelectedIndex="0" ToolTip="{StaticResource ttVarDateHandling}" />
                 <Label Content="Constant-only modules" ToolTip="{StaticResource ttWriteModules}" />
                 <CheckBox IsChecked="False" Name="chkModulesWithConstants" ToolTip="{StaticResource ttWriteModules}" />
                 <Button Name="btnOutput" Content="Output" Grid.ColumnSpan="2" />

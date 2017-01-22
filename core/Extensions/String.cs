@@ -6,15 +6,9 @@ using System.Linq;
 
 namespace TsActivexGen.Util {
     public static class StringExtensions {
-        public static string RegexReplace(this string s, Regex re, string replacement) {
-            return re.Replace(s, replacement);
-        }
-        public static string RegexReplace(this string s, string pattern, string replacement) {
-            return Regex.Replace(s, pattern, replacement);
-        }
-        public static bool IsNullOrEmpty(this string s) {
-            return string.IsNullOrEmpty(s);
-        }
+        public static string RegexReplace(this string s, Regex re, string replacement) => re.Replace(s, replacement);
+        public static string RegexReplace(this string s, string pattern, string replacement)  => Regex.Replace(s, pattern, replacement);
+        public static bool IsNullOrEmpty(this string s)  => string.IsNullOrEmpty(s);
         public static void AppendLineTo(this string s, StringBuilder sb, int indentationLevel=0) {
             sb.Append(new string(' ', indentationLevel * 4));
             sb.AppendLine(s);
@@ -40,8 +34,11 @@ namespace TsActivexGen.Util {
             lines.SelectKVP(selector).AppendLinesTo(sb, indentationLevel, endOfLine, startOfLine);
         }
 
-        public static bool Contains(this string source, string toCheck, StringComparison comp) {
-            return source.IndexOf(toCheck, comp) >= 0;
+        public static bool Contains(this string source, string toCheck, StringComparison comp) => source.IndexOf(toCheck, comp) >= 0;
+
+        public static string FirstLine(this string s) {
+            var index = s.IndexOfAny(new char[] { '\r', '\n' });
+            return index == -1 ? s : s.Substring(0, index);
         }
     }
 }
