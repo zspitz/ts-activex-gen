@@ -10,22 +10,26 @@ Library and WPF UI for generating Typescript definitions from COM type libraries
 Generating Typescript with the library looks like this:
 
 ```csharp
+ITSNamespaceGenerator generator = new TlbInf32Generator();
+
 var args = new {
   tlbid = "{420B2830-E718-11CF-893D-00A0C9054228}",
   majorVersion = 1,
   minorVersion = 1,
   lcid = 0
 };
-ITSNamespaceGenerator generator = TlbInf32Generator.CreateFromRegistry(args.tlbid, args.majorVersion, args.minorVersion, args.lcid);
+generator.AddFromRegistry(args.tlbid, args.majorVersion, args.minorVersion, args.lcid);
 
 //alternative overload allows passing the path to a COM server
-//ITSNamespaceGenerator generator = TlbInf32Generator.CreateFromFile(@"c:\path\to\file.dll");
+//generator.AddFromFile(@"c:\path\to\file.dll");
 
-//TSNamespace describes the Typescript types in a single namespace
-TSNamespace ns = new TlbInf32Generator(args.tlbid, args.majorVersion, args.minorVersion, args.lcid);
+//multiple files / registry entries can be added
+
+//TSNamespaceSet describes a set of Typescript namespaces
+TSNamespaceSet namespaceSet = generator.Generate();
 
 var builder = new TSBuilder();
-string ts = builder.GetTypescript(ns, null);
+string ts = builder.GetTypescript(namespaceSet);
 ```
 
 ### Some caveats
