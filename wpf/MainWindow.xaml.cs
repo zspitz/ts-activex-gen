@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using TsActivexGen.Util;
-using Microsoft.Win32;
 using Ookii.Dialogs;
 using Forms = System.Windows.Forms;
 using System.IO;
@@ -15,39 +14,25 @@ using System.Diagnostics;
 using static System.Reflection.Assembly;
 using static System.Windows.Input.Key;
 using static Microsoft.VisualBasic.Interaction;
+using TsActivexGen.ActiveX;
+using System.Windows.Data;
 
 namespace TsActivexGen.wpf {
     public partial class MainWindow : Window {
-        List<TypeLibDetails> typelibs = GetTypeLibs().ToList();
         public MainWindow() {
             InitializeComponent();
 
             txbOutput.Text = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
 
-            dgTypeLibs.ItemsSource = typelibs;
+            dgTypeLibs.ItemsSource = TypeLibDetails.FromRegistry.Value;
 
-            dgTypeLibs.Loaded += (s, e) => {
-                ReloadDatagrid();
-            };
-            txbFilter.TextChanged += (s, e) => {
-                if (txbFilter.Text.EndsWith(" ")) {
-                    ReloadDatagrid();
-                }
-            };
-            txbFilter.KeyUp += (s, e) => {
-                if (e.Key == Enter) {
-                    ReloadDatagrid();
-                }
-            };
+            txbFilter.TextChanged += (s, e) => ApplyFilter();
 
-            btnBrowseOutputFolder.Click += (s, e) => {
-                fillFolder();
-            };
+            btnBrowseOutputFolder.Click += (s, e) => fillFolder();
 
             dgTypeLibs.SelectionChanged += (s, e) => {
                 if (e.AddedItems.Count == 0) { return; }
-                tbPreview.Text = getTypescript().Joined($"// {Enumerable.Repeat("-",80).Joined("")}");
-                txbFilename.Text = dgTypeLibs.SelectedItem<TypeLibDetails>().Name.ToLower().Replace(" ", "-");
+                loadPreviewText();
             };
 
             btnOutput.Click += (s, e) => {
@@ -60,8 +45,8 @@ namespace TsActivexGen.wpf {
                     Directory.CreateDirectory(txbOutput.Text);
                 }
 
-                getTypescript().ForEach((ts,index) => {
-                    var basePath = index == 0 ? txbFilename.Text : InputBox(ts.FirstLine(), "Enter path for file");
+                currentTypescript.ForEachKVP((name, ts, index) => {
+                    var basePath = index == 0 ? txbFilename.Text : InputBox(name, "Enter path for file");
                     if (basePath == "") { return; }
                     var filepath = Combine(txbOutput.Text, $"{basePath}.d.ts");
                     WriteAllText(filepath, ts);
@@ -88,13 +73,22 @@ namespace TsActivexGen.wpf {
                 if (!txbTypeLibFromFile.Text.IsNullOrEmpty()) { fileDlg.FileName = txbTypeLibFromFile.Text; }
                 if (fileDlg.ShowDialog() == Forms.DialogResult.Cancel) { return; }
                 txbTypeLibFromFile.Text = fileDlg.FileName;
-                tbPreview.Text = getTypescript().Joined($"// {Enumerable.Repeat("-", 80)}");
+                loadPreviewText();
             };
         }
 
         VistaFolderBrowserDialog folderDlg = new VistaFolderBrowserDialog() {
             ShowNewFolderButton = true
         };
+
+        private void loadPreviewText() {
+            loadTypescript();
+            tbPreview.Text= currentTypescript.JoinedKVP((name, text) => new string[] {
+                $"// {Enumerable.Repeat("-", 80).Joined("")}",
+                $"// {name}",
+                text
+            }.Joined(Environment.NewLine), Environment.NewLine);
+        }
 
         private bool fillFolder() {
             if (!txbOutput.Text.IsNullOrEmpty()) { folderDlg.SelectedPath = txbOutput.Text; }
@@ -104,7 +98,9 @@ namespace TsActivexGen.wpf {
             return true;
         }
 
-        private string[] getTypescript() {
+        List<KeyValuePair<string, string>> currentTypescript;
+
+        private void loadTypescript() {
             var headers = new List<string>();
             ITSNamespaceGenerator generator = null;
             TlbInf32Generator tlbGenerator;
@@ -143,53 +139,11 @@ namespace TsActivexGen.wpf {
 
             var nsSet = generator.Generate();
             var builder = new TSBuilder() { WriteValueOnlyNamespaces = (bool)chkModulesWithConstants.IsChecked };
-            return nsSet.Namespaces.SelectKVP((name, ns) => builder.GetTypescript(ns, new[] { $"// {name}" })).ToArray();
+            currentTypescript = builder.GetTypescript(nsSet);
         }
 
-        private void ReloadDatagrid() {
-            IEnumerable<TypeLibDetails> lst = typelibs.OrderBy(x => x.Name);
-            var terms = txbFilter.Text.Trim().Split(' ');
-            if (terms.Any()) {
-                lst = lst.Where(x => terms.Any(y => (x.Name ?? "").Contains(y, StringComparison.OrdinalIgnoreCase)));
-            }
-            dgTypeLibs.ItemsSource = lst;
-        }
-
-        private static IEnumerable<TypeLibDetails> GetTypeLibs() {
-            using (var key = Registry.ClassesRoot.OpenSubKey("TypeLib")) {
-                foreach (var tlbid in key.GetSubKeyNames()) {
-                    using (var tlbkey = key.OpenSubKey(tlbid)) {
-                        foreach (var version in tlbkey.GetSubKeyNames()) {
-                            var indexOf = version.IndexOf(".");
-                            short majorVersion;
-                            short.TryParse(version.Substring(0, indexOf), out majorVersion);
-                            short minorVersion;
-                            short.TryParse(version.Substring(indexOf + 1), out minorVersion);
-                            using (var versionKey = tlbkey.OpenSubKey(version)) {
-                                var libraryName = (string)versionKey.GetValue("");
-                                foreach (var lcid in versionKey.GetSubKeyNames()) {
-                                    short lcidParsed;
-                                    if (!short.TryParse(lcid, out lcidParsed)) { continue; } //exclude non-numeric keys such as FLAGS and HELPDIR
-                                    using (var lcidKey = versionKey.OpenSubKey(lcid)) {
-                                        var names = lcidKey.GetSubKeyNames();
-                                        yield return new TypeLibDetails() {
-                                            TypeLibID = tlbid,
-                                            Name = libraryName,
-                                            Version = version,
-                                            MajorVersion = majorVersion,
-                                            MinorVersion = minorVersion,
-                                            LCID = short.Parse(lcid),
-                                            Is32bit = names.Contains("win32"),
-                                            Is64bit = names.Contains("win64"),
-                                            RegistryKey = lcidKey.ToString()
-                                        };
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        private void ApplyFilter() {
+            CollectionViewSource.GetDefaultView(dgTypeLibs.ItemsSource).Filter = x => (((TypeLibDetails)x).Name ?? "").Contains(txbFilter.Text, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

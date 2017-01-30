@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using TsActivexGen.Util;
 using System.Linq;
+using Microsoft.Win32;
+using static TsActivexGen.Util.Functions;
 
 namespace TsActivexGen {
     public abstract class EqualityBase<T> : IEquatable<T> where T : class {
@@ -21,8 +23,15 @@ namespace TsActivexGen {
     }
 
     public class TSTypeName : EqualityBase<TSTypeName> {
+        public static TSTypeName Any = new TSTypeName { FullName = "any" };
         public string FullName { get; set; }
-        public string Namespace => FullName.Split('.').First();
+        public string Namespace {
+            get {
+                var parts = FullName.Split('.');
+                if (parts.Length == 1) { return ""; }
+                return parts[0];
+            }
+        }
         public string RelativeName(string currentNamespace) => Functions.RelativeName(FullName, currentNamespace);
         public string NameOnly => FullName.Split('.').Last();
         public string Comment { get; set; }
@@ -79,7 +88,7 @@ namespace TsActivexGen {
         public static bool operator ==(TSParameterDescription x, TSParameterDescription y) {
             return OperatorEquals(x, y);
         }
-        public static bool operator !=(TSParameterDescription x, TSParameterDescription  y) {
+        public static bool operator !=(TSParameterDescription x, TSParameterDescription y) {
             return !OperatorEquals(x, y);
         }
     }
@@ -88,12 +97,13 @@ namespace TsActivexGen {
         public List<KeyValuePair<string, TSParameterDescription>> Parameters { get; set; } //(null means a property, empty means empty parameter list); this mut be a list, becaus parameter order is important
         public TSTypeName ReturnTypename { get; set; }
         public string Comment { get; set; }
-        public bool ReadOnly { get; set; }
+        public bool? ReadOnly { get; set; }
     }
 
     public class TSInterfaceDescription {
         //TODO This functionality is specific to ActiveX definition creation, and should really be in the TlbInf32Generator class
         public bool IsActiveXCreateable { get; set; }
+        public string EnumerableType { get; set; }
         public Dictionary<string, TSMemberDescription> Members { get; } = new Dictionary<string, TSMemberDescription>();
     }
 
@@ -107,7 +117,8 @@ namespace TsActivexGen {
         public Dictionary<string, TSInterfaceDescription> Interfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
         public Dictionary<string, TSNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSNamespaceDescription>();
         public Dictionary<string, TSTypeName> Aliases { get; } = new Dictionary<string, TSTypeName>();
-        
+        public HashSet<string> Depndencies { get; } = new HashSet<string>();
+
         public HashSet<string> GetUsedTypes() {
             //parameters, return type, alias mapping
             var ret = new HashSet<string>();
@@ -149,7 +160,7 @@ namespace TsActivexGen {
 
     public class TSParameterListComparer : IEqualityComparer<List<KeyValuePair<string, TSParameterDescription>>> {
         public bool Equals(List<KeyValuePair<string, TSParameterDescription>> x, List<KeyValuePair<string, TSParameterDescription>> y) {
-            if (x==null) { return y == null; }
+            if (x == null) { return y == null; }
             return x.SequenceEqual(y);
         }
         public int GetHashCode(List<KeyValuePair<string, TSParameterDescription>> obj) {
@@ -158,5 +169,59 @@ namespace TsActivexGen {
             }
         }
     }
-}
 
+    namespace ActiveX {
+        public class TypeLibDetails {
+            public static Lazy<List<TypeLibDetails>> FromRegistry = new Lazy<List<TypeLibDetails>>(() => {
+                var ret = new List<TypeLibDetails>();
+
+                using (var key = Registry.ClassesRoot.OpenSubKey("TypeLib")) {
+                    foreach (var tlbid in key.GetSubKeyNames()) {
+                        using (var tlbkey = key.OpenSubKey(tlbid)) {
+                            foreach (var version in tlbkey.GetSubKeyNames()) {
+                                var indexOf = version.IndexOf(".");
+                                short majorVersion;
+                                short.TryParse(version.Substring(0, indexOf), out majorVersion);
+                                short minorVersion;
+                                short.TryParse(version.Substring(indexOf + 1), out minorVersion);
+                                using (var versionKey = tlbkey.OpenSubKey(version)) {
+                                    var libraryName = (string)versionKey.GetValue("");
+                                    foreach (var lcid in versionKey.GetSubKeyNames()) {
+                                        short lcidParsed;
+                                        if (!short.TryParse(lcid, out lcidParsed)) { continue; } //exclude non-numeric keys such as FLAGS and HELPDIR
+                                        using (var lcidKey = versionKey.OpenSubKey(lcid)) {
+                                            var names = lcidKey.GetSubKeyNames();
+                                            ret.Add(new TypeLibDetails() {
+                                                TypeLibID = tlbid,
+                                                Name = libraryName,
+                                                Version = version,
+                                                MajorVersion = majorVersion,
+                                                MinorVersion = minorVersion,
+                                                LCID = short.Parse(lcid),
+                                                Is32bit = names.Contains("win32"),
+                                                Is64bit = names.Contains("win64"),
+                                                RegistryKey = lcidKey.ToString()
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return ret.OrderBy(x => x.Name).ToList();
+            });
+
+            public string TypeLibID { get; set; }
+            public string Name { get; set; }
+            public string Version { get; set; }
+            public short MajorVersion { get; set; }
+            public short MinorVersion { get; set; }
+            public short LCID { get; set; }
+            public bool Is32bit { get; set; }
+            public bool Is64bit { get; set; }
+            public string RegistryKey { get; set; }
+        }
+    }
+}

@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using static TsActivexGen.Util.Functions;
 
 namespace TsActivexGen.Util {
     public static class MiscExtensions {
@@ -19,5 +17,8 @@ namespace TsActivexGen.Util {
             return !vals.Contains(val);
         }
 
+        public static void Add<TKey,TValue>(this ICollection<KeyValuePair<TKey,TValue>> col, TKey key, TValue value) {
+            col.Add(KVP(key, value));
+        }
     }
 }

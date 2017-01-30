@@ -9,6 +9,7 @@ using static TLI.InvokeKinds;
 using static TLI.TypeKinds;
 using static TLI.TliVarType;
 using System.Diagnostics;
+using TsActivexGen.ActiveX;
 
 namespace TsActivexGen {
     public class TlbInf32Generator : ITSNamespaceGenerator {
@@ -24,8 +25,30 @@ namespace TsActivexGen {
             throw new Exception($"Unable to generate string representation of value '{value}' of type '{t.Name}'");
         }
 
+        //unhandled values for VarType
+        /*
+VT_RESERVED	32768
+VT_BYREF	16384
+VT_CLSID	72
+VT_CF	71
+VT_BLOB_OBJECT	70
+VT_STORED_OBJECT	69
+VT_STREAMED_OBJECT	68
+VT_STORAGE	67
+VT_STREAM	66
+VT_BLOB	65
+VT_FILETIME	64
+VT_RECORD	36
+VT_USERDEFINED	29
+VT_CARRAY	28
+VT_SAFEARRAY	27
+VT_PTR	26
+VT_UNKNOWN	13
+VT_ERROR	10
+VT_NULL	1
+ */
+
         private TSTypeName GetTypeName(VarTypeInfo vti, object value = null) {
-            //TODO this should be in TlbInf32Generator class; then it will have access to the mapping
             var ret = new TSTypeName();
             var splitValues = vti.VarType.SplitValues();
             if (splitValues.SequenceEqual(new[] { VT_EMPTY }) && vti.TypeInfo.TypeKind == TKIND_ALIAS && !vti.IsExternalType) {
@@ -70,7 +93,6 @@ namespace TsActivexGen {
             return ret;
         }
 
-
         //We're assuming all members are constant
         //In any case, in JS there is no way to access module members
         private KeyValuePair<string, TSNamespaceDescription> ToTSNamespaceDescription(ConstantInfo c) {
@@ -104,6 +126,7 @@ namespace TsActivexGen {
             } else {
                 ret.ParameterType = Standard;
             }
+            var name = p.Name;
             return KVP(p.Name, ret);
         }
 
@@ -125,6 +148,11 @@ namespace TsActivexGen {
             var ret = new TSMemberDescription();
 
             var parameterList = GetSingleParameterList(members);
+            var paramType = Standard;
+            parameterList.ForEachKVP((name, p) => {
+                if (p.ParameterType==Standard && paramType == Optional) { p.ParameterType = Optional; }
+                paramType = p.ParameterType;
+            });
 
             var memberCount = members.Count();
             bool hasSetter = false;
@@ -133,7 +161,7 @@ namespace TsActivexGen {
                     throw new InvalidOperationException("Unable to parse single name with property and non-property members");
                 }
                 if (memberCount.In(2, 3)) {
-                    //readwrite properties will have multiple members - one getter and one setter
+                    //readwrite properties will have multiple members - one getter and one setter; setters can also be either Set or Let (simple assignment)
                     bool hasGetter = members.Any(m => m.InvokeKind == INVOKE_PROPERTYGET);
                     hasSetter = members.Any(m => m.InvokeKind.In(INVOKE_PROPERTYPUT, INVOKE_PROPERTYPUTREF));
                     if (!hasGetter || !hasSetter) { throw new InvalidOperationException("Unable to parse multiple getters or multiple setter."); }
@@ -150,7 +178,10 @@ namespace TsActivexGen {
             if (invokeable) {
                 ret.Parameters = parameterList ?? new List<KeyValuePair<string, TSParameterDescription>>();
             }
-            ret.ReadOnly = invokeable || !hasSetter;
+
+            if (!invokeable) {
+                ret.ReadOnly = !hasSetter;
+            }
 
             ret.ReturnTypename = GetTypeName(members.First().ReturnType);
             if (hasSetter && parameterList.Any()) {
@@ -159,26 +190,39 @@ namespace TsActivexGen {
             return ret;
         }
 
-        private Dictionary<string, TSMemberDescription> GetMembers(Members members) {
-            return members.Cast().Where(x => !x.IsRestricted()).ToLookup(x => x.Name).Select(grp => KVP(grp.Key, GetMemberDescriptionForName(grp))).ToDictionary();
+        private Dictionary<string, TSMemberDescription> GetMembers(Members members, ref string enumerableType) {
+            var ret = members.Cast().Where(x => !x.IsRestricted() && x.Name!="_NewEnum").ToLookup(x => x.Name).Select(grp => KVP(grp.Key, GetMemberDescriptionForName(grp))).ToDictionary();
+
+            var enumerableType1 = enumerableType; //because ref parameters cannot be used within lambda expressions
+            members.Cast().ToLookup(x => x.Name).IfContainsKey("_NewEnum", mi => {
+                ret.IfContainsKey("Item", itemMI => enumerableType1 = itemMI.ReturnTypename.FullName);
+            });
+            enumerableType = enumerableType1;
+
+            return ret;
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(InterfaceInfo i) {
             var ret = new TSInterfaceDescription();
-            GetMembers(i.Members).AddRangeTo(ret.Members);
+            string enumerableType=null;
+            GetMembers(i.Members, ref enumerableType).AddRangeTo(ret.Members);
+            ret.EnumerableType = enumerableType;
             return KVP($"{i.Parent.Name}.{i.Name}", ret);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(CoClassInfo c) {
             var ret = new TSInterfaceDescription();
-            GetMembers(c.DefaultInterface.Members).AddRangeTo(ret.Members);
+            string enumerableType = null;
+            GetMembers(c.DefaultInterface.Members, ref enumerableType).AddRangeTo(ret.Members);
+            ret.EnumerableType = enumerableType;
             ret.IsActiveXCreateable = c.IsCreateable();
             return KVP($"{c.Parent.Name}.{c.Name}", ret);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(RecordInfo r) {
             var ret = new TSInterfaceDescription();
-            GetMembers(r.Members).AddRangeTo(ret.Members);
+            string enumerableType = null; //this value will be ignored for RecordInfo
+            GetMembers(r.Members, ref enumerableType).AddRangeTo(ret.Members);
             return KVP($"{r.Parent.Name}.{r.Name}", ret);
         }
 
@@ -202,15 +246,14 @@ namespace TsActivexGen {
             return ret;
         }
 
-        private KeyValuePair<string, TSTypeName> ToTypeAlias(IntrinsicAliasInfo ia) {
-            return KVP($"{ia.Parent.Name}.{ ia.Name}", GetTypeName(ia.ResolvedType));
-        }
+        private KeyValuePair<string, TSTypeName> ToTypeAlias(IntrinsicAliasInfo ia)  => KVP($"{ia.Parent.Name}.{ ia.Name}", GetTypeName(ia.ResolvedType));
+        private KeyValuePair<string, TSTypeName> ToTypeAlias(UnionInfo u) => KVP($"{u.Parent.Name}.{u.Name}", TSTypeName.Any);
 
         TLIApplication tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime
         List<TypeLibInfo> tlis = new List<TypeLibInfo>();
         Dictionary<string, List<string>> interfaceToCoClassMapping = new Dictionary<string, List<string>>();
 
-        private void AddTLI(TypeLibInfo tli) {
+        private void AddTLI(TypeLibInfo tli, string dependencySource=null) {
             if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
             tlis.Add(tli);
             tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
@@ -219,9 +262,14 @@ namespace TsActivexGen {
                 interfaceToCoClassMapping[fullInterfaceName] = coclasses.OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
             });
         }
-        public void AddFromRegistry(string tlbid, short majorVersion, short minorVersion, int lcid) {
-            ////TODO include logic here to figure out majorVersion/minorVersion/lcid even when not passed in
-            var toAdd = tliApp.TypeLibInfoFromRegistry(tlbid, majorVersion, minorVersion, lcid);
+
+        public void AddFromRegistry(string tlbid, short? majorVersion=null, short? minorVersion=null, int? lcid=null) {
+            var tlb = TypeLibDetails.FromRegistry.Value.Where(x =>
+                x.TypeLibID == tlbid
+                && (majorVersion == null || x.MajorVersion == majorVersion)
+                && (minorVersion == null || x.MinorVersion == minorVersion)
+                && (lcid == null || x.LCID == lcid)).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).ThenBy(x => x.LCID).First();
+            var toAdd = tliApp.TypeLibInfoFromRegistry(tlb.TypeLibID, tlb.MajorVersion, tlb.MinorVersion, tlb.LCID);
             AddTLI(toAdd);
         }
 
@@ -242,29 +290,43 @@ namespace TsActivexGen {
                 ILookup<string, InterfaceInfo> allInterfaces = null;
                 Dictionary<string, RecordInfo> allRecords = null;
                 Dictionary<string, IntrinsicAliasInfo> allAliases = null;
+                Dictionary<string, UnionInfo> allUnions = null;
                 var currentTliCount = 0;
+                bool foundTypes;
                 do {
+                    foundTypes = false;
                     if (currentTliCount != tlis.Count) {
                         //a previously unused external type was discovered, adding to the list of TypeLibInfos
                         allInterfaces = tlis.SelectMany(tli => tli.Interfaces.Cast()).ToLookup(x => $"{x.Parent.Name}.{x.Name}");
                         allRecords = tlis.SelectMany(tli => tli.Records.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
                         allAliases = tlis.SelectMany(tli => tli.IntrinsicAliases.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
+                        allUnions = tlis.SelectMany(tli => tli.Unions.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
                         currentTliCount = tlis.Count;
                     }
                     undefinedTypes.ForEach(s => {
                         var ns = ret.Namespaces[s.Split('.')[0]];
 
                         //go pattern matching!!!!
-                        if (allInterfaces.IfContainsKey(s, grp => grp.Select(ToTSInterfaceDescription).AddRangeTo( ns.Interfaces))) {
-                        } else if (allRecords.IfContainsKey(s, x => ns.Interfaces.Add(ToTSInterfaceDescription(x)))) {
-                        } else if (allAliases.IfContainsKey(s,x=>ns.Aliases.Add(ToTypeAlias(x)))) {
-                        } else {
-                            throw new InvalidOperationException($"Unable to find type '{s}'.");
+                        if (allInterfaces.IfContainsKey(s, grp => grp.Select(ToTSInterfaceDescription).AddRangeTo( ns.Interfaces))
+                            || allRecords.IfContainsKey(s, x => ns.Interfaces.Add(ToTSInterfaceDescription(x))) 
+                            || allAliases.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)))
+                            || allUnions.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)))
+                        ) {
+                            foundTypes = true;
+                        } else if (Debugger.IsAttached) {
+                            Debugger.Break();
                         }
                     });
+
                     undefinedTypes = ret.GetUndefinedTypes();
-                } while (undefinedTypes.Any());
+                } while (undefinedTypes.Any() && foundTypes);
             }
+
+            ret.Namespaces.ForEachKVP((name, ns) => {
+                ns.GetUsedTypes().Select(x => x.Split('.')).Where(parts => 
+                    parts.Length > 1  //exclude built-in types (without '.')
+                    && parts[0] != name).Select(parts => parts[0]).AddRangeTo(ns.Depndencies);
+            });
 
             return ret;
         }

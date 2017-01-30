@@ -11,6 +11,14 @@ namespace TsActivexGen.Util {
                 action(x.Key, x.Value);
             });
         }
+        public static IEnumerable<KeyValuePair<TKey,TValue>> ForEachKVP<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> src, Action<TKey, TValue, int> action) {
+            var current = 0;
+            foreach (var kvp in src) {
+                action(kvp.Key,kvp.Value, current);
+                current += 1;
+            }
+            return src;
+        }
         public static IEnumerable<TResult> SelectKVP<TKey, TValue, TResult>(this IEnumerable<KeyValuePair<TKey, TValue>> src, Func<TKey, TValue, TResult> selector) {
             return src.Select(kvp => selector(kvp.Key, kvp.Value));
         }

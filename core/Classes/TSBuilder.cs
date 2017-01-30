@@ -67,10 +67,7 @@ namespace TsActivexGen {
                 parameterList = "(" + memberDescription.Parameters.Joined(", ", y => GetParameter(y, ns)) + ") => ";
             }
 
-            string @readonly = "";
-            //if (memberDescription.ReadOnly) {
-            //    @readonly = "readonly ";
-            //}
+            string @readonly = memberDescription.ReadOnly.GetValueOrDefault() ? "readonly " : "";
 
             $"{@readonly}{name}: {parameterList}{returnType};{comment}".AppendLineTo(sb, 2);
         }
@@ -79,7 +76,7 @@ namespace TsActivexGen {
             var name = NameOnly(x.Key);
             var @interface = x.Value;
             $"interface {name} {{".AppendLineTo(sb, 1);
-            @interface.Members.OrderBy(y => y.Key).ForEach(y=> WriteMember(y,ns));
+            @interface.Members.OrderBy(y => y.Key).ForEach(y => WriteMember(y, ns));
             "}".AppendWithNewSection(sb, 1);
         }
 
@@ -87,21 +84,14 @@ namespace TsActivexGen {
             $"type {NameOnly(x.Key)} = {x.Value.RelativeName(ns)};".AppendWithNewSection(sb, 1);
         }
 
-        public string GetTypescript(TSNamespace ns, IEnumerable<string> headers) {
-            //TODO handle multiple root declarations (namespace without a name)
-
+        public string GetTypescript(TSNamespace ns) {
             sb = new StringBuilder();
-
-            if (headers != null) {
-                headers.AppendLinesTo(sb);
-                sb.AppendLine();
-            }
 
             $"declare namespace {ns.Name} {{".AppendWithNewSection(sb);
 
             if (ns.Aliases.Any()) {
                 "//Type aliases".AppendLineTo(sb, 1);
-                ns.Aliases.OrderBy(x => x.Key).ForEach(x=>WriteAlias(x,ns.Name));
+                ns.Aliases.OrderBy(x => x.Key).ForEach(x => WriteAlias(x, ns.Name));
             }
 
             if (ns.Enums.Any()) {
@@ -125,8 +115,15 @@ namespace TsActivexGen {
             var creatables = ns.Interfaces.WhereKVP((name, interfaceDescription) => interfaceDescription.IsActiveXCreateable).ToList();
             if (creatables.Any()) {
                 "interface ActiveXObject {".AppendLineTo(sb);
-                creatables.SelectKVP((interfaceName, @interface) => {
-                    return $"new (progID: '{interfaceName}'): {interfaceName};";
+                creatables.SelectKVP((interfaceName, @interface) => $"new (progID: '{interfaceName}'): {interfaceName};").AppendLinesTo(sb, 1);
+                "}".AppendWithNewSection(sb);
+            }
+
+            var enumerables = ns.Interfaces.WhereKVP((name, interfaceDescription) => !interfaceDescription.EnumerableType.IsNullOrEmpty()).ToList();
+            if (enumerables.Any()) {
+                "interface EnumeratorConstructor {".AppendLineTo(sb);
+                enumerables.SelectKVP((interfaceName, @interface) => {
+                    return $"new (col: {interfaceName}): Enumerator<{@interface.EnumerableType}>;";
                 }).AppendLinesTo(sb, 1);
                 "}".AppendWithNewSection(sb);
             }
@@ -134,6 +131,8 @@ namespace TsActivexGen {
 
             return sb.ToString();
         }
+
+        public List<KeyValuePair<string,string>> GetTypescript(TSNamespaceSet namespaceSet)  => namespaceSet.Namespaces.SelectKVP((name, ns) => KVP(name, GetTypescript(ns))).ToList();
     }
 }
 

@@ -94,30 +94,6 @@ namespace TsActivexGen.Util {
             return ret.ToHashSet();
         }
 
-        //unhandled values for VarType
-        /*
-VT_RESERVED	32768
-VT_BYREF	16384
-VT_CLSID	72
-VT_CF	71
-VT_BLOB_OBJECT	70
-VT_STORED_OBJECT	69
-VT_STREAMED_OBJECT	68
-VT_STORAGE	67
-VT_STREAM	66
-VT_BLOB	65
-VT_FILETIME	64
-VT_RECORD	36
-VT_USERDEFINED	29
-VT_CARRAY	28
-VT_SAFEARRAY	27
-VT_PTR	26
-VT_UNKNOWN	13
-VT_ERROR	10
-VT_NULL	1
-VT_EMPTY	0
- */
-
         public static List<object> Debug(this CoClasses coclasses) {
             return coclasses.Cast().Select(x => {
                 Array strings;
