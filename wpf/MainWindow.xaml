@@ -16,7 +16,7 @@
     <DockPanel>
         <DockPanel>
             <ag:AutoGrid DockPanel.Dock="Top" ColumnCount="2" RowCount="2">
-                <Label Content="Type" />
+                <Label Content="Source" />
                 <my:DefinitionTypesComboBox x:Name="cmbDefinitionType" />
                 <Label Content="Filter text" />
                 <TextBox x:Name="txbFilter" />
