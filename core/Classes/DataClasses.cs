@@ -113,6 +113,7 @@ namespace TsActivexGen {
 
     public class TSNamespace {
         public string Name { get; set; }
+        public string Description { get; set; }
         public Dictionary<string, TSEnumDescription> Enums { get; } = new Dictionary<string, TSEnumDescription>();
         public Dictionary<string, TSInterfaceDescription> Interfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
         public Dictionary<string, TSNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSNamespaceDescription>();

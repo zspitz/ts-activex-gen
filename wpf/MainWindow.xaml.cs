@@ -16,53 +16,20 @@ using static System.Windows.Input.Key;
 using static Microsoft.VisualBasic.Interaction;
 using TsActivexGen.ActiveX;
 using System.Windows.Data;
+using System.Threading.Tasks;
 
-namespace TsActivexGen.wpf {
+namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
         public MainWindow() {
             InitializeComponent();
-
-            txbOutput.Text = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
 
             dgTypeLibs.ItemsSource = TypeLibDetails.FromRegistry.Value;
 
             txbFilter.TextChanged += (s, e) => ApplyFilter();
 
-            btnBrowseOutputFolder.Click += (s, e) => fillFolder();
-
             dgTypeLibs.SelectionChanged += (s, e) => {
                 if (e.AddedItems.Count == 0) { return; }
-                loadPreviewText();
-            };
-
-            btnOutput.Click += (s, e) => {
-                if (txbFilename.Text.IsNullOrEmpty()) { return; }
-                if (txbOutput.Text.IsNullOrEmpty()) {
-                    var filled = fillFolder();
-                    if (!filled) { return; }
-                }
-                if (!Directory.Exists(txbOutput.Text)) {
-                    Directory.CreateDirectory(txbOutput.Text);
-                }
-
-                currentTypescript.ForEachKVP((name, ts, index) => {
-                    var basePath = index == 0 ? txbFilename.Text : InputBox(name, "Enter path for file");
-                    if (basePath == "") { return; }
-                    var filepath = Combine(txbOutput.Text, $"{basePath}.d.ts");
-                    WriteAllText(filepath, ts);
-                    if (chkOutputTests.IsChecked == true) {
-                        var testsFilePath = Combine(txbOutput.Text, $"{basePath}-tests.ts");
-                        if (!Exists(testsFilePath) || MessageBox.Show("Overwrite existing test file?", "", YesNo) == Yes) {
-                            WriteAllLines(testsFilePath, new[] {
-                                    $"/// <reference path=\"{filepath}\" />",""
-                                });
-                        }
-                    }
-                });
-
-                var firstFilePath = Combine(txbOutput.Text, $"{txbFilename.Text}.d.ts");
-                var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + firstFilePath + "\"");
-                Process.Start(psi);
+                loadFileList();
             };
 
             var fileDlg = new VistaOpenFileDialog();
@@ -73,60 +40,87 @@ namespace TsActivexGen.wpf {
                 if (!txbTypeLibFromFile.Text.IsNullOrEmpty()) { fileDlg.FileName = txbTypeLibFromFile.Text; }
                 if (fileDlg.ShowDialog() == Forms.DialogResult.Cancel) { return; }
                 txbTypeLibFromFile.Text = fileDlg.FileName;
-                loadPreviewText();
+                loadFileList();
             };
+
+            txbOutputFolder.Text = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
+            txbOutputFolder.TextChanged += (s, e) => ((List<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.OutputFolder = txbOutputFolder.Text);
+            btnBrowseOutputFolder.Click += (s, e) => fillFolder();
+
+            Action onCheckToggled = () => ((List<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.PackageForTypings = cbPackageForTypes.IsChecked.Value);
+            cbPackageForTypes.Checked += (s, e) => onCheckToggled();
+            cbPackageForTypes.Unchecked += (s, e) => onCheckToggled();
+
+            btnOutput.Click += (s, e) => {
+                if (!Directory.Exists(txbOutputFolder.Text)) {
+                    Directory.CreateDirectory(txbOutputFolder.Text);
+                }
+                dtgFiles.Items<OutputFileDetails>().ForEach(x => {
+                    if (!x.WriteOutput) { return; }
+                    if (x.FileName.IsNullOrEmpty()) { return; }
+                    if (createFile(x.FullPath)) {
+                        //TODO if (x.PackageForTypings ...
+                        WriteAllText(x.FullPath, x.OutputText);
+                    }
+                });
+                var firstFilePath = dtgFiles.Items<OutputFileDetails>().FirstOrDefault()?.FullPath;
+                if (firstFilePath.IsNullOrEmpty()) { return; }
+                var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + firstFilePath + "\"");
+                Process.Start(psi);
+            };
+
+            //btnOutput.Click += (s, e) => {
+            //    if (txbFilename.Text.IsNullOrEmpty()) { return; }
+            //    if (txbOutput.Text.IsNullOrEmpty()) {
+            //        var filled = fillFolder();
+            //        if (!filled) { return; }
+            //    }
+            //    if (!Directory.Exists(txbOutput.Text)) {
+            //        Directory.CreateDirectory(txbOutput.Text);
+            //    }
+
+            //    currentTypescript.ForEachKVP((name, ts, index) => {
+            //        var basePath = index == 0 ? txbFilename.Text : InputBox(name, "Enter path for file");
+            //        if (basePath == "") { return; }
+            //        var filepath = Combine(txbOutput.Text, $"{basePath}.d.ts");
+            //        WriteAllText(filepath, ts);
+            //        if (chkOutputTests.IsChecked == true) {
+            //            var testsFilePath = Combine(txbOutput.Text, $"{basePath}-tests.ts");
+            //            if (!Exists(testsFilePath) || MessageBox.Show("Overwrite existing test file?", "", YesNo) == Yes) {
+            //                WriteAllLines(testsFilePath, new[] {
+            //                        $"/// <reference path=\"{filepath}\" />",""
+            //                    });
+            //            }
+            //        }
+            //    });
+
+            //    var firstFilePath = Combine(txbOutput.Text, $"{txbFilename.Text}.d.ts");
+            //    var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + firstFilePath + "\"");
+            //    Process.Start(psi);
+            //};
+
+        }
+
+        private bool createFile(string path) {
+            if (!Exists(path)) { return true; }
+            return MessageBox.Show($"Overwrite '{path}`?", "", YesNo) == Yes;
         }
 
         VistaFolderBrowserDialog folderDlg = new VistaFolderBrowserDialog() {
             ShowNewFolderButton = true
         };
 
-        private void loadPreviewText() {
-            loadTypescript();
-            tbPreview.Text= currentTypescript.JoinedKVP((name, text) => new string[] {
-                $"// {Enumerable.Repeat("-", 80).Joined("")}",
-                $"// {name}",
-                text
-            }.Joined(Environment.NewLine), Environment.NewLine);
-        }
-
-        private bool fillFolder() {
-            if (!txbOutput.Text.IsNullOrEmpty()) { folderDlg.SelectedPath = txbOutput.Text; }
-            var result = folderDlg.ShowDialog();
-            if (result == Forms.DialogResult.Cancel) { return false; }
-            txbOutput.Text = folderDlg.SelectedPath;
-            return true;
-        }
-
-        List<KeyValuePair<string, string>> currentTypescript;
-
-        private void loadTypescript() {
-            var headers = new List<string>();
+        private async void loadFileList() {
             ITSNamespaceGenerator generator = null;
             TlbInf32Generator tlbGenerator;
-
-            switch (tcMain.SelectedIndex) {
+            switch (cmbDefinitionType.SelectedIndex) {
                 case 0:
                     var details = dgTypeLibs.SelectedItem<TypeLibDetails>();
-                    //new[] {
-                    //    $"// Type definitions for {details.Name}",
-                    //    "// Project: <project url>",
-                    //    "// Definitions by: Zev Spitz <https://github.com/zspitz>",
-                    //    "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
-                    //}.AddRangeTo(headers);
-                    //generator = TlbInf32Generator.CreateFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
                     tlbGenerator = new TlbInf32Generator();
                     tlbGenerator.AddFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
                     generator = tlbGenerator;
                     break;
                 case 1:
-                    //new[] {
-                    //    "// Type definitions for <library description here>",
-                    //    "// Project: <project url>",
-                    //    "// Definitions by: Zev Spitz <https://github.com/zspitz>",
-                    //    "// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped"
-                    //}.AddRangeTo(headers);
-                    //generator = TlbInf32Generator.CreateFromFile(txbTypeLibFromFile.Text);
                     tlbGenerator = new TlbInf32Generator();
                     tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
                     generator = tlbGenerator;
@@ -137,9 +131,26 @@ namespace TsActivexGen.wpf {
                     throw new InvalidOperationException();
             }
 
-            var nsSet = generator.Generate();
-            var builder = new TSBuilder() { WriteValueOnlyNamespaces = (bool)chkModulesWithConstants.IsChecked };
-            currentTypescript = builder.GetTypescript(nsSet);
+            var nsSet = await Task.Run(() => generator.Generate());
+            var tsSet = await Task.Run(() => new TSBuilder().GetTypescript(nsSet));
+            dtgFiles.ItemsSource = tsSet.SelectKVP((name, ts) => {
+                return new OutputFileDetails {
+                    Name = name,
+                    FileName = $"activex-{name.ToLower()}.d.ts",
+                    OutputFolder = txbOutputFolder.Text,
+                    WriteOutput = true,
+                    PackageForTypings = cbPackageForTypes.IsChecked.Value,
+                    OutputText = ts
+                };
+            }).ToList();
+        }
+
+        private bool fillFolder() {
+            if (!txbOutputFolder.Text.IsNullOrEmpty()) { folderDlg.SelectedPath = txbOutputFolder.Text; }
+            var result = folderDlg.ShowDialog();
+            if (result == Forms.DialogResult.Cancel) { return false; }
+            txbOutputFolder.Text = folderDlg.SelectedPath;
+            return true;
         }
 
         private void ApplyFilter() {

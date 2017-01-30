@@ -11,5 +11,8 @@ namespace TsActivexGen.Util {
         public static T SelectedItem<T>(this Selector selector) {
             return (T)selector.SelectedItem;
         }
+        public static IEnumerable<T> Items<T>(this Selector selector) {
+            return selector.ItemsSource.Cast<T>();
+        }
     }
 }

@@ -1,8 +1,5 @@
-﻿<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ag="clr-namespace:WpfAutoGrid;assembly=WpfAutoGrid" x:Class="TsActivexGen.wpf.MainWindow">
+﻿<Window x:Class="TsActivexGen.Wpf.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ag="clr-namespace:WpfAutoGrid;assembly=WpfAutoGrid" xmlns:my="clr-namespace:TsActivexGen.Wpf">
     <Window.Resources>
-        <Style TargetType="{x:Type DataGridCell}">
-            <Setter Property="ToolTip" Value="{Binding RegistryKey}" />
-        </Style>
         <ToolTip x:Key="ttOutput">
             Path to output generated files. Will be created if it doesn't exist.
         </ToolTip>
@@ -18,30 +15,26 @@
     </Window.Resources>
     <DockPanel>
         <DockPanel>
-            <DockPanel DockPanel.Dock="Top" ToolTip="Press SPACE to apply">
-                <TextBlock Text="Filter text:" />
+            <ag:AutoGrid DockPanel.Dock="Top" ColumnCount="2" RowCount="2">
+                <Label Content="Type" />
+                <my:DefinitionTypesComboBox x:Name="cmbDefinitionType" />
+                <Label Content="Filter text" />
                 <TextBox x:Name="txbFilter" />
-            </DockPanel>
-            <ag:AutoGrid DockPanel.Dock="Bottom" Columns="Auto,*" RowCount="6" x:Name="autogrid">
-                <Label Content="Output folder" ToolTip="{StaticResource ttOutput}" />
-                <DockPanel ToolTip="{StaticResource ttOutput}">
-                    <Button Content="..." Name="btnBrowseOutputFolder" DockPanel.Dock="Right" />
-                    <TextBox x:Name="txbOutput" />
-                </DockPanel>
-                <Label Content="Filename" />
-                <DockPanel>
-                    <TextBlock Text=".d.ts" DockPanel.Dock="Right" />
-                    <TextBox x:Name="txbFilename" />
-                </DockPanel>
-                <Label Content="Create tests file" ToolTip="{StaticResource ttCreateTestFile}" />
-                <CheckBox IsChecked="True" Name="chkOutputTests" ToolTip="{StaticResource ttCreateTestFile}" />
-                <Label Content="Constant-only modules" ToolTip="{StaticResource ttWriteModules}" />
-                <CheckBox IsChecked="False" Name="chkModulesWithConstants" ToolTip="{StaticResource ttWriteModules}" />
-                <Button Name="btnOutput" Content="Output" Grid.ColumnSpan="2" />
+                <!-- more fields in here, for use with @types headers-->
             </ag:AutoGrid>
-            <TabControl TabStripPlacement="Left" Name="tcMain">
-                <TabItem Header="Registered type libraries" IsSelected="True">
-                    <DataGrid x:Name="dgTypeLibs" AutoGenerateColumns="False" CanUserSortColumns="False">
+            <TabControl SelectedIndex="{Binding SelectedIndex,ElementName=cmbDefinitionType}" BorderThickness="0">
+                <TabControl.Resources>
+                    <Style TargetType="TabItem">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                    </Style>
+                </TabControl.Resources>
+                <TabItem>
+                    <DataGrid x:Name="dgTypeLibs" AutoGenerateColumns="False" CanUserSortColumns="False" IsReadOnly="True">
+                        <DataGrid.Resources>
+                            <Style TargetType="{x:Type DataGridCell}">
+                                <Setter Property="ToolTip" Value="{Binding RegistryKey}" />
+                            </Style>
+                        </DataGrid.Resources>
                         <DataGrid.Columns>
                             <DataGridTextColumn Binding="{Binding Name}" Header="Name" />
                             <DataGridTextColumn Binding="{Binding Version}" Header="Version" />
@@ -51,21 +44,42 @@
                         </DataGrid.Columns>
                     </DataGrid>
                 </TabItem>
-                <TabItem Header="Browse type library">
+                <TabItem>
                     <DockPanel VerticalAlignment="Top">
                         <Button Content="..." Name="btnBrowseTypeLibFile" DockPanel.Dock="Right" />
                         <Label Content="Filename" />
                         <TextBox Name="txbTypeLibFromFile" />
                     </DockPanel>
                 </TabItem>
-                <TabItem Header="WMI">
-                    <ListBox x:Name="lbWMIClasses" />
-                    <!--Fill async-->
+                <TabItem>
+                    WMI classes - not yet implemented
                 </TabItem>
             </TabControl>
         </DockPanel>
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-            <TextBox x:Name="tbPreview" Foreground="White" Background="Black" FontSize="16" />
-        </ScrollViewer>
+        <DockPanel>
+            <ag:AutoGrid DockPanel.Dock="Top" RowCount="2" ColumnCount="2">
+                <Label Content="Output folder" ToolTip="{StaticResource ttOutput}" />
+                <DockPanel ToolTip="{StaticResource ttOutput}">
+                    <Button Content="..." Name="btnBrowseOutputFolder" DockPanel.Dock="Right" />
+                    <TextBox x:Name="txbOutputFolder" />
+                </DockPanel>
+                <Label Content="Package for @types" />
+                <CheckBox Name="cbPackageForTypes" />
+            </ag:AutoGrid>
+            <DataGrid Name="dtgFiles" DockPanel.Dock="Top" AutoGenerateColumns="False" CanUserAddRows="False">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Binding="{Binding Name}" IsReadOnly="True" Header="Name" />
+                    <DataGridTextColumn Binding="{Binding Description}" IsReadOnly="True" Header="Description" />
+                    <DataGridTextColumn Binding="{Binding FileName}" Header="Filename" />
+                    <DataGridCheckBoxColumn Binding="{Binding Exists, Mode=OneWay}" IsReadOnly="True" Header="Exists" />
+                    <DataGridCheckBoxColumn Binding="{Binding WriteOutput}" Header="Output" />
+                    <DataGridCheckBoxColumn Binding="{Binding PackageForTypings}" Header="@types packaging" />
+                </DataGrid.Columns>
+            </DataGrid>
+            <Button Name="btnOutput" Content="Output" DockPanel.Dock="Top" />
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                <TextBox x:Name="tbPreview" Foreground="White" Background="Black" FontSize="16" Text="{Binding SelectedItem.OutputText,ElementName=dtgFiles}" IsReadOnly="True" />
+            </ScrollViewer>
+        </DockPanel>
     </DockPanel>
 </Window>

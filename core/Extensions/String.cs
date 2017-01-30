@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq;
+using static System.StringComparison;
 
 namespace TsActivexGen.Util {
     public static class StringExtensions {
@@ -39,6 +40,12 @@ namespace TsActivexGen.Util {
         public static string FirstLine(this string s) {
             var index = s.IndexOfAny(new char[] { '\r', '\n' });
             return index == -1 ? s : s.Substring(0, index);
+        }
+        
+        public static string ForceEndsWith(this string s, string end, StringComparison comparisonType=OrdinalIgnoreCase) {
+            var ret = s;
+            if (!s.EndsWith(end,comparisonType)) { ret += end; }
+            return ret;
         }
     }
 }
