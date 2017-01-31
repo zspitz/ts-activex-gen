@@ -95,3 +95,5 @@ string ts = builder.GetTypescript(namespaceSet);
   //if cmd is not one of the values, the code will not compile
   var cmd: CommandID = "{E208C170-ACAD-11D2-A093-00C04F72DC3C}";
   ```
+  
+  See https://github.com/zspitz/ts-activex-gen/issues/25
