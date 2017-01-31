@@ -15,6 +15,7 @@ namespace TsActivexGen.Wpf {
         public bool WriteOutput { get; set; }
         public string OutputText { get; set; }
         public string FullPath => Path.Combine(OutputFolder, FileName.ForceEndsWith(".d.ts"));
+        public bool EmitModuleConstants { get; set; }
     }
 
     public class DefinitionTypesComboBox : ComboBox {

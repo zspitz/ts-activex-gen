@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using TsActivexGen.Util;
@@ -10,28 +11,20 @@ namespace TsActivexGen {
     public class TSBuilder {
         private StringBuilder sb;
 
-        [Obsolete("Depends on literal types -- https://github.com/Microsoft/TypeScript/pull/9407")]
-        public bool WriteValueOnlyNamespaces { get; set; } = false;
-
         private void WriteEnum(KeyValuePair<string, TSEnumDescription> x) {
             var name = NameOnly(x.Key);
             var @enum = x.Value;
             var members = @enum.Members.OrderBy(y => y.Key);
-            switch (@enum.Typename.FullName) {
-                case "number":
-                    $"const enum {name} {{".AppendLineTo(sb, 1);
-                    members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", 2, ",");
-                    "}".AppendWithNewSection(sb, 1);
-                    break;
-                case "string":
-                    //TODO this works for all values, not just for string
-                    //TODO all types can be better represented using literal types, pending https://github.com/Microsoft/TypeScript/pull/9407
-                    $"type {name} = ".AppendLineTo(sb, 1);
-                    members.AppendLinesTo(sb, (memberName, value) => $"\"{value}\" //{memberName}", 2, null, "| ");
-                    sb.AppendLine();
-                    break;
-                default:
-                    throw new InvalidOperationException("Unable to emit declarations for enum type which is not numeric or string");
+
+            //https://github.com/zspitz/ts-activex-gen/issues/25
+            if (@enum.Typename.FullName == "number") {
+                $"const enum {name} {{".AppendLineTo(sb, 1);
+                members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", 2, ",");
+                "}".AppendWithNewSection(sb, 1);
+            } else {
+                $"type {name} = ".AppendLineTo(sb, 1);
+                members.AppendLinesTo(sb, (memberName, value) => $"\"{value}\" //{memberName}", 2, null, "| ");
+                sb.AppendLine();
             }
         }
 
@@ -94,14 +87,23 @@ namespace TsActivexGen {
                 ns.Aliases.OrderBy(x => x.Key).ForEach(x => WriteAlias(x, ns.Name));
             }
 
-            if (ns.Enums.Any()) {
-                "//Enums".AppendLineTo(sb, 1);
-                ns.Enums.OrderBy(x => x.Key).ForEach(WriteEnum);
+            var numericEnums = ns.Enums.Where(x => x.Value.Typename.FullName == "number");
+            if (numericEnums.Any()) {
+                "//Numeric enums".AppendLineTo(sb, 1);
+                numericEnums.OrderBy(x => x.Key).ForEach(WriteEnum);
             }
 
-            if (WriteValueOnlyNamespaces && ns.Namespaces.Any()) {
-                "//Modules with constant values".AppendLineTo(sb, 1);
-                ns.Namespaces.OrderBy(x => x.Key).ForEach(WriteNamespace);
+            var nonnumericEnums = ns.Enums.Where(x => x.Value.Typename.FullName != "number");
+            if (nonnumericEnums.Any()) {
+                "//Nonnumeric enums".AppendLineTo(sb, 1);
+                numericEnums.OrderBy(x => x.Key).ForEach(WriteEnum);
+
+                //TODO add these to runtime file https://github.com/zspitz/ts-activex-gen/issues/25
+            }
+
+            if (ns.Namespaces.Any() && Debugger.IsAttached) {
+                //TODO add these to runtime file, not .d.ts -- https://github.com/zspitz/ts-activex-gen/issues/25
+                //use the WriteNamespace method
             }
 
             if (ns.Interfaces.Any()) {
@@ -132,8 +134,6 @@ namespace TsActivexGen {
             return sb.ToString();
         }
 
-        public List<KeyValuePair<string,string>> GetTypescript(TSNamespaceSet namespaceSet)  => namespaceSet.Namespaces.SelectKVP((name, ns) => KVP(name, GetTypescript(ns))).ToList();
+        public List<KeyValuePair<string, string>> GetTypescript(TSNamespaceSet namespaceSet) => namespaceSet.Namespaces.SelectKVP((name, ns) => KVP(name, GetTypescript(ns))).ToList();
     }
 }
-
-//TODO use const keyword instead of readonly keyword?

@@ -93,8 +93,7 @@ VT_NULL	1
             return ret;
         }
 
-        //We're assuming all members are constant
-        //In any case, in JS there is no way to access module members
+        //https://github.com/zspitz/ts-activex-gen/issues/25
         private KeyValuePair<string, TSNamespaceDescription> ToTSNamespaceDescription(ConstantInfo c) {
             var ret = new TSNamespaceDescription();
             c.Members.Cast().Select(x => KVP(x.Name, AsString((object)x.Value))).AddRangeTo(ret.Members);
@@ -108,8 +107,8 @@ VT_NULL	1
                 var typename = GetTypeName(x.ReturnType, oValue);
                 if (ret.Typename == null) {
                     ret.Typename = typename;
-                } else if (ret.Typename != typename) {
-                    throw new InvalidOperationException("Multiple types in enum"); //this should really be handled as a module with constants; but it's irrelevant because Javascript has no way to access module members
+                } else if (ret.Typename != TSTypeName.Any &&  ret.Typename != typename) {
+                    ret.Typename = TSTypeName.Any;
                 }
                 return KVP(x.Name, AsString(oValue));
             }).AddRangeTo(ret.Members);

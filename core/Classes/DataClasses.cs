@@ -101,7 +101,7 @@ namespace TsActivexGen {
     }
 
     public class TSInterfaceDescription {
-        //TODO This functionality is specific to ActiveX definition creation, and should really be in the TlbInf32Generator class
+        //TODO https://github.com/zspitz/ts-activex-gen/issues/22
         public bool IsActiveXCreateable { get; set; }
         public string EnumerableType { get; set; }
         public Dictionary<string, TSMemberDescription> Members { get; } = new Dictionary<string, TSMemberDescription>();
