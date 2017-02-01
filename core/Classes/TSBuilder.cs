@@ -9,6 +9,8 @@ using static TsActivexGen.Util.Functions;
 
 namespace TsActivexGen {
     public class TSBuilder {
+        private static string[] jsKeywords = new[] { "var" };
+
         private StringBuilder sb;
 
         private void WriteEnum(KeyValuePair<string, TSEnumDescription> x) {
@@ -57,7 +59,13 @@ namespace TsActivexGen {
 
             string parameterList = "";
             if (memberDescription.Parameters != null) {
-                parameterList = "(" + memberDescription.Parameters.Joined(", ", y => GetParameter(y, ns)) + ") => ";
+                var parameters = memberDescription.Parameters.Select((kvp, index) => {
+                    //this is an issue in ShDocVw
+                    var parameterName = kvp.Key;
+                    if (parameterName.In(jsKeywords)) { parameterName = $"{parameterName}_{index}"; } 
+                    return KVP(parameterName, kvp.Value);
+                }).ToList();
+                parameterList = "(" + parameters.Joined(", ", y => GetParameter(y, ns)) + ") => ";
             }
 
             string @readonly = memberDescription.ReadOnly.GetValueOrDefault() ? "readonly " : "";
