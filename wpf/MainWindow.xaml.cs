@@ -17,9 +17,11 @@ using static Microsoft.VisualBasic.Interaction;
 using TsActivexGen.ActiveX;
 using System.Windows.Data;
 using System.Threading.Tasks;
+using System.Collections.ObjectModel;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
+        ObservableCollection<OutputFileDetails> fileList = new ObservableCollection<OutputFileDetails>();
         public MainWindow() {
             InitializeComponent();
 
@@ -29,7 +31,7 @@ namespace TsActivexGen.Wpf {
 
             dgTypeLibs.SelectionChanged += (s, e) => {
                 if (e.AddedItems.Count == 0) { return; }
-                loadFileList();
+                addFiles();
             };
 
             var fileDlg = new VistaOpenFileDialog();
@@ -40,16 +42,18 @@ namespace TsActivexGen.Wpf {
                 if (!txbTypeLibFromFile.Text.IsNullOrEmpty()) { fileDlg.FileName = txbTypeLibFromFile.Text; }
                 if (fileDlg.ShowDialog() == Forms.DialogResult.Cancel) { return; }
                 txbTypeLibFromFile.Text = fileDlg.FileName;
-                loadFileList();
+                addFiles();
             };
 
             txbOutputFolder.Text = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
             txbOutputFolder.TextChanged += (s, e) => ((List<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.OutputFolder = txbOutputFolder.Text);
             btnBrowseOutputFolder.Click += (s, e) => fillFolder();
 
-            Action onCheckToggled = () => ((List<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.PackageForTypings = cbPackageForTypes.IsChecked.Value);
+            Action onCheckToggled = () => ((IEnumerable<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.PackageForTypings = cbPackageForTypes.IsChecked.Value);
             cbPackageForTypes.Checked += (s, e) => onCheckToggled();
             cbPackageForTypes.Unchecked += (s, e) => onCheckToggled();
+
+            dtgFiles.ItemsSource = fileList;
 
             btnOutput.Click += (s, e) => {
                 if (!Directory.Exists(txbOutputFolder.Text)) {
@@ -68,6 +72,8 @@ namespace TsActivexGen.Wpf {
                 var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + firstFilePath + "\"");
                 Process.Start(psi);
             };
+
+            btnClearFiles.Click += (s, e) => fileList.Clear();
 
             //btnOutput.Click += (s, e) => {
             //    if (txbFilename.Text.IsNullOrEmpty()) { return; }
@@ -110,7 +116,8 @@ namespace TsActivexGen.Wpf {
             ShowNewFolderButton = true
         };
 
-        private async void loadFileList() {
+        private async void addFiles() {
+            //TODO this should add to the global generator, instead of creating a new generator each time; this will prevent duplicate libraries in the file list
             ITSNamespaceGenerator generator = null;
             TlbInf32Generator tlbGenerator;
             switch (cmbDefinitionType.SelectedIndex) {
@@ -133,16 +140,14 @@ namespace TsActivexGen.Wpf {
 
             var nsSet = await Task.Run(() => generator.Generate());
             var tsSet = await Task.Run(() => new TSBuilder().GetTypescript(nsSet));
-            dtgFiles.ItemsSource = tsSet.SelectKVP((name, ts) => {
-                return new OutputFileDetails {
-                    Name = name,
-                    FileName = $"activex-{name.ToLower()}.d.ts",
-                    OutputFolder = txbOutputFolder.Text,
-                    WriteOutput = true,
-                    PackageForTypings = cbPackageForTypes.IsChecked.Value,
-                    OutputText = ts
-                };
-            }).ToList();
+            tsSet.SelectKVP((name, ts) => new OutputFileDetails {
+                Name = name,
+                FileName = $"activex-{name.ToLower()}.d.ts",
+                OutputFolder = txbOutputFolder.Text,
+                WriteOutput = true,
+                PackageForTypings = cbPackageForTypes.IsChecked.Value,
+                OutputText = ts
+            }).AddRangeTo(fileList);
         }
 
         private bool fillFolder() {

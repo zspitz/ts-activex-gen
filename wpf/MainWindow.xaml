@@ -57,15 +57,19 @@
             </TabControl>
         </DockPanel>
         <DockPanel>
-            <ag:AutoGrid DockPanel.Dock="Top" RowCount="2" ColumnCount="2">
-                <Label Content="Output folder" ToolTip="{StaticResource ttOutput}" />
-                <DockPanel ToolTip="{StaticResource ttOutput}">
-                    <Button Content="..." Name="btnBrowseOutputFolder" DockPanel.Dock="Right" />
-                    <TextBox x:Name="txbOutputFolder" />
-                </DockPanel>
-                <Label Content="Package for @types" />
-                <CheckBox Name="cbPackageForTypes" />
-            </ag:AutoGrid>
+            <DockPanel DockPanel.Dock="Top">
+                <Button Name="btnOutput" Content="Output" DockPanel.Dock="Right" />
+                <Button Name="btnClearFiles" Content="Clear file list" DockPanel.Dock="Right" />
+                <ag:AutoGrid RowCount="2" ColumnCount="2">
+                    <Label Content="Output folder" ToolTip="{StaticResource ttOutput}" />
+                    <DockPanel ToolTip="{StaticResource ttOutput}">
+                        <Button Content="..." Name="btnBrowseOutputFolder" DockPanel.Dock="Right" />
+                        <TextBox x:Name="txbOutputFolder" />
+                    </DockPanel>
+                    <Label Content="Package for @types" />
+                    <CheckBox Name="cbPackageForTypes" />
+                </ag:AutoGrid>
+            </DockPanel>
             <DataGrid Name="dtgFiles" DockPanel.Dock="Top" AutoGenerateColumns="False" CanUserAddRows="False">
                 <DataGrid.Columns>
                     <DataGridTextColumn Binding="{Binding Name}" IsReadOnly="True" Header="Name" />
@@ -76,7 +80,6 @@
                     <DataGridCheckBoxColumn Binding="{Binding PackageForTypings}" Header="@types packaging" />
                 </DataGrid.Columns>
             </DataGrid>
-            <Button Name="btnOutput" Content="Output" DockPanel.Dock="Top" />
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                 <TextBox x:Name="tbPreview" Foreground="White" Background="Black" FontSize="16" Text="{Binding SelectedItem.OutputText,ElementName=dtgFiles}" IsReadOnly="True" />
             </ScrollViewer>
