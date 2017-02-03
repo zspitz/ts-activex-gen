@@ -63,8 +63,11 @@ namespace TsActivexGen.Wpf {
                     if (!x.WriteOutput) { return; }
                     if (x.FileName.IsNullOrEmpty()) { return; }
                     if (createFile(x.FullPath)) {
-                        //TODO if (x.PackageForTypings ...
-                        WriteAllText(x.FullPath, x.OutputText);
+                        if (x.PackageForTypings) {
+                            throw new NotImplementedException(); //TODO
+                        } else {
+                            WriteAllText(x.FullPath, x.OutputText);
+                        }
                     }
                 });
                 var firstFilePath = dtgFiles.Items<OutputFileDetails>().FirstOrDefault()?.FullPath;

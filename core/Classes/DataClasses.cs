@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using TsActivexGen.Util;
 using System.Linq;
 using Microsoft.Win32;
-using static TsActivexGen.Util.Functions;
 
 namespace TsActivexGen {
     public abstract class EqualityBase<T> : IEquatable<T> where T : class {
@@ -27,31 +26,23 @@ namespace TsActivexGen {
         public string FullName { get; set; }
         public string Namespace {
             get {
+                if (IsLiteralType) { return ""; }
                 var parts = FullName.Split('.');
                 if (parts.Length == 1) { return ""; }
                 return parts[0];
             }
         }
         public string RelativeName(string currentNamespace) => Functions.RelativeName(FullName, currentNamespace);
-        public string NameOnly => FullName.Split('.').Last();
+        public string NameOnly => Functions.NameOnly(FullName);
         public string Comment { get; set; }
+        public bool IsLiteralType => Functions.IsLiteralTypeName(FullName);
 
-        public override bool Equals(TSTypeName other) {
-            return FullName == other?.FullName;
-        }
-        public override int GetHashCode() {
-            return FullName.GetHashCode();
-        }
-        public override bool Equals(object other) {
-            return base.Equals(other);
-        }
+        public override bool Equals(TSTypeName other) => FullName == other?.FullName;
+        public override int GetHashCode() => FullName.GetHashCode();
+        public override bool Equals(object other) => base.Equals(other);
 
-        public static bool operator ==(TSTypeName x, TSTypeName y) {
-            return OperatorEquals(x, y);
-        }
-        public static bool operator !=(TSTypeName x, TSTypeName y) {
-            return !OperatorEquals(x, y);
-        }
+        public static bool operator ==(TSTypeName x, TSTypeName y) => OperatorEquals(x, y);
+        public static bool operator !=(TSTypeName x, TSTypeName y) => !OperatorEquals(x, y);
 
         public override string ToString() {
             var comment = Comment;
@@ -81,16 +72,10 @@ namespace TsActivexGen {
                 return hash;
             }
         }
-        public override bool Equals(object other) {
-            return base.Equals(other);
-        }
+        public override bool Equals(object other) => base.Equals(other);
 
-        public static bool operator ==(TSParameterDescription x, TSParameterDescription y) {
-            return OperatorEquals(x, y);
-        }
-        public static bool operator !=(TSParameterDescription x, TSParameterDescription y) {
-            return !OperatorEquals(x, y);
-        }
+        public static bool operator ==(TSParameterDescription x, TSParameterDescription y) => OperatorEquals(x, y);
+        public static bool operator !=(TSParameterDescription x, TSParameterDescription y) => !OperatorEquals(x, y);
     }
 
     public class TSMemberDescription {
@@ -98,6 +83,7 @@ namespace TsActivexGen {
         public TSTypeName ReturnTypename { get; set; }
         public string Comment { get; set; }
         public bool? ReadOnly { get; set; }
+        public bool Constructor { get; set; }
     }
 
     public class TSInterfaceDescription {
@@ -146,12 +132,8 @@ namespace TsActivexGen {
 
     public class TSNamespaceSet {
         public Dictionary<string, TSNamespace> Namespaces { get; } = new Dictionary<string, TSNamespace>();
-        public HashSet<string> GetUsedTypes() {
-            return Namespaces.SelectMany(x => x.Value.GetUsedTypes()).ToHashSet();
-        }
-        public HashSet<string> GetKnownTypes() {
-            return Namespaces.SelectMany(x => x.Value.GetKnownTypes()).ToHashSet();
-        }
+        public HashSet<string> GetUsedTypes() => Namespaces.SelectMany(x => x.Value.GetUsedTypes()).ToHashSet();
+        public HashSet<string> GetKnownTypes() => Namespaces.SelectMany(x => x.Value.GetKnownTypes()).ToHashSet();
         public HashSet<string> GetUndefinedTypes() {
             var ret = GetUsedTypes();
             ret.ExceptWith(GetKnownTypes());

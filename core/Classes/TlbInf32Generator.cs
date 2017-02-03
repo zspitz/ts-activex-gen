@@ -210,6 +210,8 @@ VT_NULL	1
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(CoClassInfo c) {
+            var debug = c.Debug();
+
             var ret = new TSInterfaceDescription();
             string enumerableType = null;
             GetMembers(c.DefaultInterface.Members, ref enumerableType).AddRangeTo(ret.Members);
@@ -279,7 +281,7 @@ VT_NULL	1
 
         public TSNamespaceSet Generate() {
             var ret = new TSNamespaceSet();
-            for (int i = 0; i < tlis.Count; i++) {
+            for (int i = 0; i < tlis.Count; i++) {  //don't use foreach here, as additional libraries might have been added in the meantime
                 var toAdd = ToNamespace(tlis[i]);
                 ret.Namespaces.Add(toAdd.Name, toAdd);
             }

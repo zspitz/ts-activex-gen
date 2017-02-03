@@ -83,7 +83,7 @@ namespace TsActivexGen.Util {
             if (varType == VT_EMPTY) {
                 ret.Add(VT_EMPTY);
             } else {
-                var enumValues = Enum.GetValues(typeof(TliVarType)).Cast<TliVarType>().Where(x=>x != VT_EMPTY).OrderedDescending();
+                var enumValues = Enum.GetValues(typeof(TliVarType)).Cast<TliVarType>().Where(x => x != VT_EMPTY).OrderedDescending();
                 foreach (var v in enumValues) {
                     if ((varType & v) == v) {
                         ret.Add(v);
@@ -94,20 +94,26 @@ namespace TsActivexGen.Util {
             return ret.ToHashSet();
         }
 
+        public static object Debug(this CoClassInfo c) {
+            Array strings;
+            var i = c.AttributeStrings[out strings];
+            object DefaultEventInterface = null;
+            try {
+                DefaultEventInterface = c.DefaultEventInterface.Debug();
+            } catch { }
+            return new {
+                c.Name,
+                c.AttributeMask,
+                AttributeStrings = strings?.Cast<string>().Joined(),
+                ITypeInfo = c.ITypeInfo.ToString(),
+                c.TypeKind,
+                c.TypeKindString,
+                DefaultInterface = c.DefaultInterface.Debug(),
+                DefaultEventInterface
+            };
+        }
         public static List<object> Debug(this CoClasses coclasses) {
-            return coclasses.Cast().Select(x => {
-                Array strings;
-                var i = x.AttributeStrings[out strings];
-                return new {
-                    x.Name,
-                    x.AttributeMask,
-                    AttributeStrings = strings?.Cast<string>().Joined(),
-                    ITypeInfo = x.ITypeInfo.ToString(),
-                    x.TypeKind,
-                    x.TypeKindString,
-                    DefaultInterface = x.DefaultInterface.Debug()
-                };
-            }).ToObjectList();
+            return coclasses.Cast().Select(c => c.Debug()).ToObjectList();
         }
         public static List<object> Debug(this Members members) {
             return members.Cast().Debug();
@@ -149,7 +155,7 @@ namespace TsActivexGen.Util {
         public static object Debug(this TypeInfo t) {
             Array strings;
             var i = t.AttributeStrings[out strings];
-            VarTypeInfo resolvedType=null;
+            VarTypeInfo resolvedType = null;
             try {
                 resolvedType = t.ResolvedType;
             } catch (Exception) { }
@@ -178,7 +184,7 @@ namespace TsActivexGen.Util {
                 p.Default,
                 p.Optional,
                 VarTypeInfo = p.VarTypeInfo.Debug()
-            }).OrderBy(x => x.Name).ToObjectList();
+            }).ToObjectList();
         }
         public static List<object> Debug(this IntrinsicAliases aliases) {
             return aliases.Cast().Select(ia => {
