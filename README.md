@@ -24,7 +24,7 @@ generator.AddFromRegistry(args.tlbid, args.majorVersion, args.minorVersion, args
 //Also add a type library from a file
 generator.AddFromFile(@"c:\path\to\file.dll");
 
-//multiple files / registry entries can be added
+//multiple files / registered libraries can be added
 
 //TSNamespaceSet describes a set of Typescript namespaces
 TSNamespaceSet namespaceSet = generator.NSSet;
