@@ -12,6 +12,7 @@ using System.Diagnostics;
 using TsActivexGen.ActiveX;
 using System.Threading.Tasks;
 using System.Threading;
+using static TsActivexGen.Util.KeyConflictResolution;
 
 namespace TsActivexGen {
     public class TlbInf32Generator {
@@ -259,13 +260,16 @@ VT_NULL	1
         Dictionary<string, RecordInfo> allRecords = null;
         Dictionary<string, IntrinsicAliasInfo> allAliases = null;
         Dictionary<string, UnionInfo> allUnions = null;
+        int currentTliCount = 0;
 
         private void AddTLI(TypeLibInfo tli) {
             if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
             tlis.Add(tli);
             tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
                 var fullInterfaceName = $"{tli.Name}.{interfaceName}";
-                interfaceToCoClassMapping[fullInterfaceName] = coclasses.OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
+                var current = Enumerable.Empty<string>();
+                interfaceToCoClassMapping.IfContainsKey(fullInterfaceName, val => current = val);
+                interfaceToCoClassMapping[fullInterfaceName] = coclasses.Concat(current).OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
             });
 
             for (int i = 0; i < tlis.Count; i++) {  //don't use foreach here, as additional libraries might have been added in the meantime
@@ -275,10 +279,11 @@ VT_NULL	1
                 if (NSSet.Namespaces.ContainsKey(name)) { continue; } //because the current tli might have been already added, as part of ToNamespace
                 NSSet.Namespaces.Add(toAdd.Name, toAdd);
             }
+        }
 
+        private void GenerateNSSetParts() {
             var undefinedTypes = NSSet.GetUndefinedTypes();
             if (undefinedTypes.Any()) {
-                var currentTliCount = 0;
                 bool foundTypes;
                 do {
                     foundTypes = false;
@@ -327,10 +332,10 @@ VT_NULL	1
             await sem.WaitAsync();
             try {
                 await Task.Run(() => AddTLI(toAdd));
+                await Task.Run(() => GenerateNSSetParts());
             } finally {
                 sem.Release();
             }
-            
         }
 
         public async Task AddFromFile(string filename) {
@@ -338,6 +343,7 @@ VT_NULL	1
             await sem.WaitAsync();
             try {
                 await Task.Run(() => AddTLI(toAdd));
+                await Task.Run(() => GenerateNSSetParts());
             } finally {
                 sem.Release();
             }
