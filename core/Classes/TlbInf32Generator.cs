@@ -10,9 +10,11 @@ using static TLI.TypeKinds;
 using static TLI.TliVarType;
 using System.Diagnostics;
 using TsActivexGen.ActiveX;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace TsActivexGen {
-    public class TlbInf32Generator : ITSNamespaceGenerator {
+    public class TlbInf32Generator {
         static string AsString(object value) {
             var t = value.GetType().UnderlyingIfNullable();
             if (t == typeof(string)) {
@@ -107,7 +109,7 @@ VT_NULL	1
                 var typename = GetTypeName(x.ReturnType, oValue);
                 if (ret.Typename == null) {
                     ret.Typename = typename;
-                } else if (ret.Typename != TSTypeName.Any &&  ret.Typename != typename) {
+                } else if (ret.Typename != TSTypeName.Any && ret.Typename != typename) {
                     ret.Typename = TSTypeName.Any;
                 }
                 return KVP(x.Name, AsString(oValue));
@@ -149,7 +151,7 @@ VT_NULL	1
             var parameterList = GetSingleParameterList(members);
             var paramType = Standard;
             parameterList.ForEachKVP((name, p) => {
-                if (p.ParameterType==Standard && paramType == Optional) { p.ParameterType = Optional; }
+                if (p.ParameterType == Standard && paramType == Optional) { p.ParameterType = Optional; }
                 paramType = p.ParameterType;
             });
 
@@ -190,7 +192,7 @@ VT_NULL	1
         }
 
         private Dictionary<string, TSMemberDescription> GetMembers(Members members, ref string enumerableType) {
-            var ret = members.Cast().Where(x => !x.IsRestricted() && x.Name!="_NewEnum").ToLookup(x => x.Name).Select(grp => KVP(grp.Key, GetMemberDescriptionForName(grp))).ToDictionary();
+            var ret = members.Cast().Where(x => !x.IsRestricted() && x.Name != "_NewEnum").ToLookup(x => x.Name).Select(grp => KVP(grp.Key, GetMemberDescriptionForName(grp))).ToDictionary();
 
             var enumerableType1 = enumerableType; //because ref parameters cannot be used within lambda expressions
             members.Cast().ToLookup(x => x.Name).IfContainsKey("_NewEnum", mi => {
@@ -203,15 +205,13 @@ VT_NULL	1
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(InterfaceInfo i) {
             var ret = new TSInterfaceDescription();
-            string enumerableType=null;
+            string enumerableType = null;
             GetMembers(i.Members, ref enumerableType).AddRangeTo(ret.Members);
             ret.EnumerableType = enumerableType;
             return KVP($"{i.Parent.Name}.{i.Name}", ret);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(CoClassInfo c) {
-            var debug = c.Debug();
-
             var ret = new TSInterfaceDescription();
             string enumerableType = null;
             GetMembers(c.DefaultInterface.Members, ref enumerableType).AddRangeTo(ret.Members);
@@ -247,69 +247,55 @@ VT_NULL	1
             return ret;
         }
 
-        private KeyValuePair<string, TSTypeName> ToTypeAlias(IntrinsicAliasInfo ia)  => KVP($"{ia.Parent.Name}.{ ia.Name}", GetTypeName(ia.ResolvedType));
+        private KeyValuePair<string, TSTypeName> ToTypeAlias(IntrinsicAliasInfo ia) => KVP($"{ia.Parent.Name}.{ ia.Name}", GetTypeName(ia.ResolvedType));
         private KeyValuePair<string, TSTypeName> ToTypeAlias(UnionInfo u) => KVP($"{u.Parent.Name}.{u.Name}", TSTypeName.Any);
 
         TLIApplication tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime
         List<TypeLibInfo> tlis = new List<TypeLibInfo>();
         Dictionary<string, List<string>> interfaceToCoClassMapping = new Dictionary<string, List<string>>();
+        SemaphoreSlim sem = new SemaphoreSlim(1, 1);
 
-        private void AddTLI(TypeLibInfo tli, string dependencySource=null) {
+        ILookup<string, InterfaceInfo> allInterfaces = null;
+        Dictionary<string, RecordInfo> allRecords = null;
+        Dictionary<string, IntrinsicAliasInfo> allAliases = null;
+        Dictionary<string, UnionInfo> allUnions = null;
+
+        private void AddTLI(TypeLibInfo tli) {
             if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
             tlis.Add(tli);
             tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
                 var fullInterfaceName = $"{tli.Name}.{interfaceName}";
-                if (interfaceToCoClassMapping.ContainsKey(fullInterfaceName)) { throw new Exception($"Interface {fullInterfaceName} already exists in dictionary"); }
                 interfaceToCoClassMapping[fullInterfaceName] = coclasses.OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
             });
-        }
 
-        public void AddFromRegistry(string tlbid, short? majorVersion=null, short? minorVersion=null, int? lcid=null) {
-            var tlb = TypeLibDetails.FromRegistry.Value.Where(x =>
-                x.TypeLibID == tlbid
-                && (majorVersion == null || x.MajorVersion == majorVersion)
-                && (minorVersion == null || x.MinorVersion == minorVersion)
-                && (lcid == null || x.LCID == lcid)).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).ThenBy(x => x.LCID).First();
-            var toAdd = tliApp.TypeLibInfoFromRegistry(tlb.TypeLibID, tlb.MajorVersion, tlb.MinorVersion, tlb.LCID);
-            AddTLI(toAdd);
-        }
-
-        public void AddFromFile(string filename) {
-            var toAdd = tliApp.TypeLibInfoFromFile(filename);
-            AddTLI(toAdd);
-        }
-
-        public TSNamespaceSet Generate() {
-            var ret = new TSNamespaceSet();
             for (int i = 0; i < tlis.Count; i++) {  //don't use foreach here, as additional libraries might have been added in the meantime
+                var name = tlis[i].Name;
+                if (NSSet.Namespaces.ContainsKey(name)) { continue; }
                 var toAdd = ToNamespace(tlis[i]);
-                ret.Namespaces.Add(toAdd.Name, toAdd);
+                if (NSSet.Namespaces.ContainsKey(name)) { continue; } //because the current tli might have been already added, as part of ToNamespace
+                NSSet.Namespaces.Add(toAdd.Name, toAdd);
             }
 
-            var undefinedTypes = ret.GetUndefinedTypes();
+            var undefinedTypes = NSSet.GetUndefinedTypes();
             if (undefinedTypes.Any()) {
-                ILookup<string, InterfaceInfo> allInterfaces = null;
-                Dictionary<string, RecordInfo> allRecords = null;
-                Dictionary<string, IntrinsicAliasInfo> allAliases = null;
-                Dictionary<string, UnionInfo> allUnions = null;
                 var currentTliCount = 0;
                 bool foundTypes;
                 do {
                     foundTypes = false;
                     if (currentTliCount != tlis.Count) {
                         //a previously unused external type was discovered, adding to the list of TypeLibInfos
-                        allInterfaces = tlis.SelectMany(tli => tli.Interfaces.Cast()).ToLookup(x => $"{x.Parent.Name}.{x.Name}");
-                        allRecords = tlis.SelectMany(tli => tli.Records.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
-                        allAliases = tlis.SelectMany(tli => tli.IntrinsicAliases.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
-                        allUnions = tlis.SelectMany(tli => tli.Unions.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
+                        allInterfaces = tlis.SelectMany(x => x.Interfaces.Cast()).ToLookup(x => $"{x.Parent.Name}.{x.Name}");
+                        allRecords = tlis.SelectMany(x => x.Records.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
+                        allAliases = tlis.SelectMany(x => x.IntrinsicAliases.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
+                        allUnions = tlis.SelectMany(x => x.Unions.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
                         currentTliCount = tlis.Count;
                     }
                     undefinedTypes.ForEach(s => {
-                        var ns = ret.Namespaces[s.Split('.')[0]];
+                        var ns = NSSet.Namespaces[s.Split('.')[0]];
 
                         //go pattern matching!!!!
-                        if (allInterfaces.IfContainsKey(s, grp => grp.Select(ToTSInterfaceDescription).AddRangeTo( ns.Interfaces))
-                            || allRecords.IfContainsKey(s, x => ns.Interfaces.Add(ToTSInterfaceDescription(x))) 
+                        if (allInterfaces.IfContainsKey(s, grp => grp.Select(ToTSInterfaceDescription).AddRangeTo(ns.Interfaces))
+                            || allRecords.IfContainsKey(s, x => ns.Interfaces.Add(ToTSInterfaceDescription(x)))
                             || allAliases.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)))
                             || allUnions.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)))
                         ) {
@@ -319,17 +305,44 @@ VT_NULL	1
                         }
                     });
 
-                    undefinedTypes = ret.GetUndefinedTypes();
+                    undefinedTypes = NSSet.GetUndefinedTypes();
                 } while (undefinedTypes.Any() && foundTypes);
             }
 
-            ret.Namespaces.ForEachKVP((name, ns) => {
-                ns.GetUsedTypes().Select(x => x.Split('.')).Where(parts => 
+            NSSet.Namespaces.ForEachKVP((name, ns) => {
+                ns.GetUsedTypes().Select(x => x.Split('.')).Where(parts =>
                     parts.Length > 1  //exclude built-in types (without '.')
-                    && parts[0] != name).Select(parts => parts[0]).AddRangeTo(ns.Depndencies);
+                    && parts[0] != name)
+                    .Select(parts => parts[0]).AddRangeTo(ns.Dependencies);
             });
-
-            return ret;
         }
+
+        public async Task AddFromRegistry(string tlbid, short? majorVersion = null, short? minorVersion = null, int? lcid = null) {
+            var tlb = TypeLibDetails.FromRegistry.Value.Where(x =>
+                x.TypeLibID == tlbid
+                && (majorVersion == null || x.MajorVersion == majorVersion)
+                && (minorVersion == null || x.MinorVersion == minorVersion)
+                && (lcid == null || x.LCID == lcid)).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).ThenBy(x => x.LCID).First();
+            var toAdd = tliApp.TypeLibInfoFromRegistry(tlb.TypeLibID, tlb.MajorVersion, tlb.MinorVersion, tlb.LCID);
+            await sem.WaitAsync();
+            try {
+                await Task.Run(() => AddTLI(toAdd));
+            } finally {
+                sem.Release();
+            }
+            
+        }
+
+        public async Task AddFromFile(string filename) {
+            var toAdd = tliApp.TypeLibInfoFromFile(filename);
+            await sem.WaitAsync();
+            try {
+                await Task.Run(() => AddTLI(toAdd));
+            } finally {
+                sem.Release();
+            }
+        }
+
+        public TSNamespaceSet NSSet { get; } = new TSNamespaceSet();
     }
 }

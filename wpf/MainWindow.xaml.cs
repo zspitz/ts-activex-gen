@@ -119,21 +119,15 @@ namespace TsActivexGen.Wpf {
             ShowNewFolderButton = true
         };
 
+        TlbInf32Generator tlbGenerator = new TlbInf32Generator();
         private async void addFiles() {
-            //TODO this should add to the global generator, instead of creating a new generator each time; this will prevent duplicate libraries in the file list
-            ITSNamespaceGenerator generator = null;
-            TlbInf32Generator tlbGenerator;
             switch (cmbDefinitionType.SelectedIndex) {
                 case 0:
                     var details = dgTypeLibs.SelectedItem<TypeLibDetails>();
-                    tlbGenerator = new TlbInf32Generator();
-                    tlbGenerator.AddFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
-                    generator = tlbGenerator;
+                    await tlbGenerator.AddFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
                     break;
                 case 1:
-                    tlbGenerator = new TlbInf32Generator();
-                    tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
-                    generator = tlbGenerator;
+                    await tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
                     break;
                 case 2:
                     break;
@@ -141,9 +135,8 @@ namespace TsActivexGen.Wpf {
                     throw new InvalidOperationException();
             }
 
-            var nsSet = await Task.Run(() => generator.Generate());
-            var tsSet = await Task.Run(() => new TSBuilder().GetTypescript(nsSet));
-            tsSet.SelectKVP((name, ts) => new OutputFileDetails {
+            fileList.Clear();
+            new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, ts) => new OutputFileDetails {
                 Name = name,
                 FileName = $"activex-{name.ToLower()}.d.ts",
                 OutputFolder = txbOutputFolder.Text,

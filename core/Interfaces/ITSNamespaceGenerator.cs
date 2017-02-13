@@ -1,5 +1,5 @@
-﻿namespace TsActivexGen {
-    public interface ITSNamespaceGenerator {
-        TSNamespaceSet Generate();
-    }
-}
+﻿//namespace TsActivexGen {
+//    public interface ITSNamespaceGenerator {
+//        TSNamespaceSet Generate();
+//    }
+//}

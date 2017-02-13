@@ -104,7 +104,7 @@ namespace TsActivexGen {
         public Dictionary<string, TSInterfaceDescription> Interfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
         public Dictionary<string, TSNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSNamespaceDescription>();
         public Dictionary<string, TSTypeName> Aliases { get; } = new Dictionary<string, TSTypeName>();
-        public HashSet<string> Depndencies { get; } = new HashSet<string>();
+        public HashSet<string> Dependencies { get; } = new HashSet<string>();
 
         public HashSet<string> GetUsedTypes() {
             //parameters, return type, alias mapping
