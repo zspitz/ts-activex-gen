@@ -49,7 +49,7 @@ namespace TsActivexGen {
             return $"{name}: {parameterDescription.Typename.RelativeName(ns)}";
         }
 
-        private void WriteMemberBase(TSMemberDescription m, string ns, string memberIdentifier, string returnPrefix, int indentationLevel) {
+        private void WriteMemberBase(TSMemberDescription m, string ns, string memberIdentifier, int indentationLevel) {
             var returnType = m.ReturnTypename.RelativeName(ns);
 
             var comment = m.Comment;
@@ -63,20 +63,20 @@ namespace TsActivexGen {
                     if (parameterName.In(jsKeywords)) { parameterName = $"{parameterName}_{index}"; }
                     return KVP(parameterName, kvp.Value);
                 }).ToList();
-                parameterList = "(" + parameters.Joined(", ", y => GetParameter(y, ns)) + ")" + returnPrefix + " ";
+                parameterList = "(" + parameters.Joined(", ", y => GetParameter(y, ns)) + ")";
             }
 
-            $"{memberIdentifier}{parameterList}{returnType};{comment}".AppendLineTo(sb, indentationLevel);
+            $"{memberIdentifier}{parameterList}: {returnType}{comment}".AppendLineTo(sb, indentationLevel);
         }
 
         private void WriteMember(KeyValuePair<string, TSMemberDescription> x, string ns, int indentationLevel) {
             var memberDescription = x.Value;
             string @readonly = memberDescription.ReadOnly.GetValueOrDefault() ? "readonly " : "";
-            WriteMemberBase(memberDescription, ns, $"{@readonly}{x.Key}: ", " =>", indentationLevel);
+            WriteMemberBase(memberDescription, ns, $"{@readonly}{x.Key}", indentationLevel);
         }
 
         private void WriteConstructor(TSMemberDescription m, string ns, int indentationLevel) {
-            WriteMemberBase(m, ns, "new ", ":", indentationLevel);
+            WriteMemberBase(m, ns, "new", indentationLevel);
         }
 
         private string ParametersString(TSMemberDescription m) => m.Parameters?.JoinedKVP((name, prm) => $"{name}: {prm.Typename.FullName}");
@@ -85,7 +85,6 @@ namespace TsActivexGen {
             var name = NameOnly(x.Key);
             var @interface = x.Value;
             $"interface {name} {{".AppendLineTo(sb, indentationLevel);
-            //TODO sort members and constructors by parameter lists
             @interface.Members.OrderBy(y => y.Key).ThenBy(y=>ParametersString(y.Value)).ForEach(y => WriteMember(y, ns, indentationLevel + 1));
             @interface.Constructors.OrderBy(ParametersString).ForEach(y => WriteConstructor(y, ns, indentationLevel + 1));
             "}".AppendWithNewSection(sb, indentationLevel);
