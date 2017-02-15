@@ -120,14 +120,14 @@ namespace TsActivexGen.Wpf {
         };
 
         TlbInf32Generator tlbGenerator = new TlbInf32Generator();
-        private async void addFiles() {
+        private void addFiles() {
             switch (cmbDefinitionType.SelectedIndex) {
                 case 0:
                     var details = dgTypeLibs.SelectedItem<TypeLibDetails>();
-                    await tlbGenerator.AddFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
+                    tlbGenerator.AddFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
                     break;
                 case 1:
-                    await tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
+                    tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
                     break;
                 case 2:
                     break;

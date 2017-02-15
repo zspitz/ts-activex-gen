@@ -359,31 +359,21 @@ VT_NULL	1
             });
         }
 
-        public async Task AddFromRegistry(string tlbid, short? majorVersion = null, short? minorVersion = null, int? lcid = null) {
+        public void AddFromRegistry(string tlbid, short? majorVersion = null, short? minorVersion = null, int? lcid = null) {
             var tlb = TypeLibDetails.FromRegistry.Value.Where(x =>
                 x.TypeLibID == tlbid
                 && (majorVersion == null || x.MajorVersion == majorVersion)
                 && (minorVersion == null || x.MinorVersion == minorVersion)
                 && (lcid == null || x.LCID == lcid)).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).ThenBy(x => x.LCID).First();
             var toAdd = tliApp.TypeLibInfoFromRegistry(tlb.TypeLibID, tlb.MajorVersion, tlb.MinorVersion, tlb.LCID);
-            await sem.WaitAsync();
-            try {
-                await Task.Run(() => AddTLI(toAdd));
-                await Task.Run(() => GenerateNSSetParts());
-            } finally {
-                sem.Release();
-            }
+            AddTLI(toAdd);
+            GenerateNSSetParts();
         }
 
-        public async Task AddFromFile(string filename) {
+        public void AddFromFile(string filename) {
             var toAdd = tliApp.TypeLibInfoFromFile(filename);
-            await sem.WaitAsync();
-            try {
-                await Task.Run(() => AddTLI(toAdd));
-                await Task.Run(() => GenerateNSSetParts());
-            } finally {
-                sem.Release();
-            }
+            AddTLI(toAdd);
+            GenerateNSSetParts();
         }
 
         public TSNamespaceSet NSSet { get; } = new TSNamespaceSet();
