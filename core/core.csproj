@@ -48,6 +48,7 @@
     <Compile Include="Classes\DataClasses.cs" />
     <Compile Include="Classes\TlbInf32Generator.cs" />
     <Compile Include="Classes\TSBuilder.cs" />
+    <Compile Include="Classes\TSTypes.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="Extensions\HashSetT.cs" />
     <Compile Include="Extensions\IDictionaryTKeyTValue.cs" />
@@ -59,7 +60,7 @@
     <Compile Include="Extensions\TLIExtensions.cs" />
     <Compile Include="Extensions\Type.cs" />
     <Compile Include="Functions.cs" />
-    <Compile Include="Interfaces\ITSNamespaceGenerator.cs" />
+    <Compile Include="Interfaces\ITSType.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

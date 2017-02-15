@@ -49,39 +49,49 @@ namespace TsActivexGen {
             return $"{name}: {parameterDescription.Typename.RelativeName(ns)}";
         }
 
-        private void WriteMember(KeyValuePair<string, TSMemberDescription> x, string ns) {
-            var name = x.Key;
-            var memberDescription = x.Value;
-            var returnType = memberDescription.ReturnTypename.RelativeName(ns);
+        private void WriteMemberBase(TSMemberDescription m, string ns, string memberIdentifier, string returnPrefix, int indentationLevel) {
+            var returnType = m.ReturnTypename.RelativeName(ns);
 
-            var comment = memberDescription.Comment;
+            var comment = m.Comment;
             if (!comment.IsNullOrEmpty()) { comment = $"   //{comment}"; }
 
             string parameterList = "";
-            if (memberDescription.Parameters != null) {
-                var parameters = memberDescription.Parameters.Select((kvp, index) => {
-                    //this is an issue in ShDocVw
+            if (m.Parameters != null) {
+                var parameters = m.Parameters.Select((kvp, index) => {
+                    //ShDocVw has a Javascript keyword as one of the parameters
                     var parameterName = kvp.Key;
-                    if (parameterName.In(jsKeywords)) { parameterName = $"{parameterName}_{index}"; } 
+                    if (parameterName.In(jsKeywords)) { parameterName = $"{parameterName}_{index}"; }
                     return KVP(parameterName, kvp.Value);
                 }).ToList();
-                parameterList = "(" + parameters.Joined(", ", y => GetParameter(y, ns)) + ") => ";
+                parameterList = "(" + parameters.Joined(", ", y => GetParameter(y, ns)) + ")" + returnPrefix + " ";
             }
 
-            string @readonly = memberDescription.ReadOnly.GetValueOrDefault() ? "readonly " : "";
-
-            $"{@readonly}{name}: {parameterList}{returnType};{comment}".AppendLineTo(sb, 2);
+            $"{memberIdentifier}{parameterList}{returnType};{comment}".AppendLineTo(sb, indentationLevel);
         }
 
-        private void WriteInterface(KeyValuePair<string, TSInterfaceDescription> x, string ns) {
+        private void WriteMember(KeyValuePair<string, TSMemberDescription> x, string ns, int indentationLevel) {
+            var memberDescription = x.Value;
+            string @readonly = memberDescription.ReadOnly.GetValueOrDefault() ? "readonly " : "";
+            WriteMemberBase(memberDescription, ns, $"{@readonly}{x.Key}: ", " =>", indentationLevel);
+        }
+
+        private void WriteConstructor(TSMemberDescription m, string ns, int indentationLevel) {
+            WriteMemberBase(m, ns, "new ", ":", indentationLevel);
+        }
+
+        private string ParametersString(TSMemberDescription m) => m.Parameters?.JoinedKVP((name, prm) => $"{name}: {prm.Typename.FullName}");
+
+        private void WriteInterface(KeyValuePair<string, TSInterfaceDescription> x, string ns, int indentationLevel) {
             var name = NameOnly(x.Key);
             var @interface = x.Value;
-            $"interface {name} {{".AppendLineTo(sb, 1);
-            @interface.Members.OrderBy(y => y.Key).ForEach(y => WriteMember(y, ns));
-            "}".AppendWithNewSection(sb, 1);
+            $"interface {name} {{".AppendLineTo(sb, indentationLevel);
+            //TODO sort members and constructors by parameter lists
+            @interface.Members.OrderBy(y => y.Key).ThenBy(y=>ParametersString(y.Value)).ForEach(y => WriteMember(y, ns, indentationLevel + 1));
+            @interface.Constructors.OrderBy(ParametersString).ForEach(y => WriteConstructor(y, ns, indentationLevel + 1));
+            "}".AppendWithNewSection(sb, indentationLevel);
         }
 
-        private void WriteAlias(KeyValuePair<string, TSTypeName> x, string ns) {
+        private void WriteAlias(KeyValuePair<string, TSSimpleType> x, string ns) {
             $"type {NameOnly(x.Key)} = {x.Value.RelativeName(ns)};".AppendWithNewSection(sb, 1);
         }
 
@@ -116,28 +126,15 @@ namespace TsActivexGen {
 
             if (ns.Interfaces.Any()) {
                 "//Interfaces".AppendLineTo(sb, 1);
-                ns.Interfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, ns.Name));
+                ns.Interfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, ns.Name, 1));
             }
 
             "}".AppendWithNewSection(sb);
 
-            //This functionality is specific to ActiveX definition creation
-            var creatables = ns.Interfaces.WhereKVP((name, interfaceDescription) => interfaceDescription.IsActiveXCreateable).ToList();
-            if (creatables.Any()) {
-                "interface ActiveXObject {".AppendLineTo(sb);
-                creatables.SelectKVP((interfaceName, @interface) => $"new (progID: '{interfaceName}'): {interfaceName};").AppendLinesTo(sb, 1);
-                "}".AppendWithNewSection(sb);
+            if (ns.GlobalInterfaces.Any()) {
+                "//Global interfaces".AppendLineTo(sb, 0);
+                ns.GlobalInterfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, "", 0));
             }
-
-            var enumerables = ns.Interfaces.WhereKVP((name, interfaceDescription) => !interfaceDescription.EnumerableType.IsNullOrEmpty()).ToList();
-            if (enumerables.Any()) {
-                "interface EnumeratorConstructor {".AppendLineTo(sb);
-                enumerables.SelectKVP((interfaceName, @interface) => {
-                    return $"new (col: {interfaceName}): Enumerator<{@interface.EnumerableType}>;";
-                }).AppendLinesTo(sb, 1);
-                "}".AppendWithNewSection(sb);
-            }
-            //end
 
             return sb.ToString();
         }

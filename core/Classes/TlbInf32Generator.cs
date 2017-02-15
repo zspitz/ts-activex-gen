@@ -51,8 +51,8 @@ VT_ERROR	10
 VT_NULL	1
  */
 
-        private TSTypeName GetTypeName(VarTypeInfo vti, object value = null) {
-            var ret = new TSTypeName();
+        private TSSimpleType GetTypeName(VarTypeInfo vti, object value = null) {
+            var ret = new TSSimpleType();
             var splitValues = vti.VarType.SplitValues();
             if (splitValues.SequenceEqual(new[] { VT_EMPTY }) && vti.TypeInfo.TypeKind == TKIND_ALIAS && !vti.IsExternalType) {
                 splitValues = vti.TypeInfo.ResolvedType.VarType.SplitValues();
@@ -110,8 +110,8 @@ VT_NULL	1
                 var typename = GetTypeName(x.ReturnType, oValue);
                 if (ret.Typename == null) {
                     ret.Typename = typename;
-                } else if (ret.Typename != TSTypeName.Any && ret.Typename != typename) {
-                    ret.Typename = TSTypeName.Any;
+                } else if (ret.Typename != TSSimpleType.Any && ret.Typename != typename) {
+                    ret.Typename = TSSimpleType.Any;
                 }
                 return KVP(x.Name, AsString(oValue));
             }).AddRangeTo(ret.Members);
@@ -204,21 +204,22 @@ VT_NULL	1
             return ret;
         }
 
-        private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(InterfaceInfo i) {
+        private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescriptionBase(Members m, string typename) {
             var ret = new TSInterfaceDescription();
             string enumerableType = null;
-            GetMembers(i.Members, ref enumerableType).AddRangeTo(ret.Members);
-            ret.EnumerableType = enumerableType;
-            return KVP($"{i.Parent.Name}.{i.Name}", ret);
+            GetMembers(m, ref enumerableType).AddRangeTo(ret.Members);
+            if (!enumerableType.IsNullOrEmpty()) { enumerableCollectionItemMapping[new TSSimpleType(typename)] = enumerableType; }
+            return KVP(typename, ret);
+        }
+
+        private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(InterfaceInfo i) {
+            var typename = $"{i.Parent.Name}.{i.Name}";
+            return ToTSInterfaceDescriptionBase(i.Members, typename);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(CoClassInfo c) {
-            var ret = new TSInterfaceDescription();
-            string enumerableType = null;
-            GetMembers(c.DefaultInterface.Members, ref enumerableType).AddRangeTo(ret.Members);
-            ret.EnumerableType = enumerableType;
-            ret.IsActiveXCreateable = c.IsCreateable();
-            return KVP($"{c.Parent.Name}.{c.Name}", ret);
+            var typename = $"{c.Parent.Name}.{c.Name}";
+            return ToTSInterfaceDescriptionBase(c.DefaultInterface.Members, typename);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(RecordInfo r) {
@@ -228,11 +229,30 @@ VT_NULL	1
             return KVP($"{r.Parent.Name}.{r.Name}", ret);
         }
 
+        private TSMemberDescription ToActiveXObjectConstructorDescription(CoClassInfo c) {
+            var ret = new TSMemberDescription();
+            var typename = $"{c.Parent.Name}.{c.Name}";
+            ret.AddParameter("progid", new TSSimpleType($"'{typename}'")); //note the string literal type
+            ret.ReturnTypename = new TSSimpleType(typename);
+            return ret;
+        }
+
+        private TSMemberDescription ToEnumeratorConstructorDescription(KeyValuePair<TSSimpleType,string> kvp) {
+            var collectionTypeName = kvp.Key;
+            var itemTypeName = kvp.Value;
+            var ret = new TSMemberDescription();
+            ret.AddParameter("col", collectionTypeName);
+            ret.ReturnTypename = new TSSimpleType($"Enumerator<{itemTypeName}>");
+            return ret;
+        }
+
         private TSNamespace ToNamespace(TypeLibInfo tli) {
+            var coclasses = tli.CoClasses.Cast().ToList();
+
             var ret = new TSNamespace() { Name = tli.Name };
             tli.Constants.Cast().Where(x => x.TypeKind != TKIND_MODULE).Select(ToTSEnumDescription).AddRangeTo(ret.Enums);
             tli.Constants.Cast().Where(x => x.TypeKind == TKIND_MODULE).Select(ToTSNamespaceDescription).AddRangeTo(ret.Namespaces);
-            tli.CoClasses.Cast().Select(ToTSInterfaceDescription).AddRangeTo(ret.Interfaces);
+            coclasses.Select(ToTSInterfaceDescription).AddRangeTo(ret.Interfaces);
 
             //TODO do we need to look at ImpliedInterfaces? Should we use GetMembers instead of manually iterating over Members?
 
@@ -245,15 +265,25 @@ VT_NULL	1
                 //there are a few in the DirectX transforms library
             }
 
+            var activex = new TSInterfaceDescription();
+            coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(ToActiveXObjectConstructorDescription).AddRangeTo(activex.Constructors);
+
+            //TODO implement calls to ActiveXObject.on with appropriate parameters
+
+            if (activex.Constructors.Any()) {
+                ret.GlobalInterfaces["ActiveXObject"] = activex;
+            }            
+
             return ret;
         }
 
-        private KeyValuePair<string, TSTypeName> ToTypeAlias(IntrinsicAliasInfo ia) => KVP($"{ia.Parent.Name}.{ ia.Name}", GetTypeName(ia.ResolvedType));
-        private KeyValuePair<string, TSTypeName> ToTypeAlias(UnionInfo u) => KVP($"{u.Parent.Name}.{u.Name}", TSTypeName.Any);
+        private KeyValuePair<string, TSSimpleType> ToTypeAlias(IntrinsicAliasInfo ia) => KVP($"{ia.Parent.Name}.{ ia.Name}", GetTypeName(ia.ResolvedType));
+        private KeyValuePair<string, TSSimpleType> ToTypeAlias(UnionInfo u) => KVP($"{u.Parent.Name}.{u.Name}", TSSimpleType.Any);
 
         TLIApplication tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime
         List<TypeLibInfo> tlis = new List<TypeLibInfo>();
         Dictionary<string, List<string>> interfaceToCoClassMapping = new Dictionary<string, List<string>>();
+        Dictionary<TSSimpleType, string> enumerableCollectionItemMapping = new Dictionary<TSSimpleType, string>();
         SemaphoreSlim sem = new SemaphoreSlim(1, 1);
 
         ILookup<string, InterfaceInfo> allInterfaces = null;
@@ -319,6 +349,13 @@ VT_NULL	1
                     parts.Length > 1  //exclude built-in types (without '.')
                     && parts[0] != name)
                     .Select(parts => parts[0]).AddRangeTo(ns.Dependencies);
+
+                var enumerables = enumerableCollectionItemMapping.WhereKVP((collectionType, itemType) => collectionType.Namespace == name).ToList();
+                if (enumerables.Any()) {
+                    var enumerable = new TSInterfaceDescription();
+                    enumerables.Select(ToEnumeratorConstructorDescription).AddRangeTo(enumerable.Constructors);
+                    ns.GlobalInterfaces["EnumeratorConstructor"] = enumerable;
+                }
             });
         }
 

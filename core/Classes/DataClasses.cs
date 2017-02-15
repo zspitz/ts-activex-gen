@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TsActivexGen.Util;
 using System.Linq;
 using Microsoft.Win32;
+using static TsActivexGen.TSParameterType;
 
 namespace TsActivexGen {
     public abstract class EqualityBase<T> : IEquatable<T> where T : class {
@@ -21,44 +22,14 @@ namespace TsActivexGen {
         }
     }
 
-    public class TSTypeName : EqualityBase<TSTypeName> {
-        public static TSTypeName Any = new TSTypeName { FullName = "any" };
-        public string FullName { get; set; }
-        public string Namespace {
-            get {
-                if (IsLiteralType) { return ""; }
-                var parts = FullName.Split('.');
-                if (parts.Length == 1) { return ""; }
-                return parts[0];
-            }
-        }
-        public string RelativeName(string currentNamespace) => Functions.RelativeName(FullName, currentNamespace);
-        public string NameOnly => Functions.NameOnly(FullName);
-        public string Comment { get; set; }
-        public bool IsLiteralType => Functions.IsLiteralTypeName(FullName);
-
-        public override bool Equals(TSTypeName other) => FullName == other?.FullName;
-        public override int GetHashCode() => FullName.GetHashCode();
-        public override bool Equals(object other) => base.Equals(other);
-
-        public static bool operator ==(TSTypeName x, TSTypeName y) => OperatorEquals(x, y);
-        public static bool operator !=(TSTypeName x, TSTypeName y) => !OperatorEquals(x, y);
-
-        public override string ToString() {
-            var comment = Comment;
-            if (!comment.IsNullOrEmpty()) { comment = $" /*{comment}*/"; }
-            return $"{FullName}{comment}";
-        }
-    }
-
     public class TSEnumDescription {
-        public TSTypeName Typename { get; set; }
+        public TSSimpleType Typename { get; set; }
         public Dictionary<string, string> Members { get; } = new Dictionary<string, string>(); //values -> string representation of value
     }
 
     public class TSParameterDescription : EqualityBase<TSParameterDescription> {
-        public TSTypeName Typename { get; set; }
-        public TSParameterType ParameterType { get; set; }
+        public TSSimpleType Typename { get; set; }
+        public TSParameterType ParameterType { get; set; } = Standard;
 
         public override bool Equals(TSParameterDescription other) {
             return Typename == other.Typename
@@ -80,17 +51,18 @@ namespace TsActivexGen {
 
     public class TSMemberDescription {
         public List<KeyValuePair<string, TSParameterDescription>> Parameters { get; set; } //(null means a property, empty means empty parameter list); this mut be a list, becaus parameter order is important
-        public TSTypeName ReturnTypename { get; set; }
+        public TSSimpleType ReturnTypename { get; set; }
         public string Comment { get; set; }
         public bool? ReadOnly { get; set; }
-        public bool Constructor { get; set; }
+        public void AddParameter(string name, TSSimpleType typename) {
+            if (Parameters == null) { Parameters = new List<KeyValuePair<string, TSParameterDescription>>(); }
+            Parameters.Add(name, new TSParameterDescription() { Typename = typename });
+        }
     }
 
     public class TSInterfaceDescription {
-        //TODO https://github.com/zspitz/ts-activex-gen/issues/22
-        public bool IsActiveXCreateable { get; set; }
-        public string EnumerableType { get; set; }
         public Dictionary<string, TSMemberDescription> Members { get; } = new Dictionary<string, TSMemberDescription>();
+        public List<TSMemberDescription> Constructors { get; } = new List<TSMemberDescription>();
     }
 
     public class TSNamespaceDescription {
@@ -103,17 +75,17 @@ namespace TsActivexGen {
         public Dictionary<string, TSEnumDescription> Enums { get; } = new Dictionary<string, TSEnumDescription>();
         public Dictionary<string, TSInterfaceDescription> Interfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
         public Dictionary<string, TSNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSNamespaceDescription>();
-        public Dictionary<string, TSTypeName> Aliases { get; } = new Dictionary<string, TSTypeName>();
+        public Dictionary<string, TSSimpleType> Aliases { get; } = new Dictionary<string, TSSimpleType>();
         public HashSet<string> Dependencies { get; } = new HashSet<string>();
+        public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
 
         public HashSet<string> GetUsedTypes() {
-            //parameters, return type, alias mapping
-            var ret = new HashSet<string>();
-            var members = Interfaces.SelectMany(i => i.Value.Members);
-            members.SelectMany(kvp => kvp.Value.Parameters.DefaultIfNull()).SelectKVP((parameterName, p) => p.Typename.FullName).AddRangeTo(ret);
-            members.SelectKVP((memberName, m) => m.ReturnTypename.FullName).AddRangeTo(ret);
-            Aliases.SelectKVP((aliasName, a) => a.FullName).AddRangeTo(ret);
-            return ret;
+            var types = new List<TSSimpleType>();
+            var members = Interfaces.Values.Concat(GlobalInterfaces.Values).SelectMany(i => i.Members).Values().ToList();
+            members.SelectMany(x => x.Parameters.DefaultIfNull().Values().Select(p => p.Typename)).AddRangeTo(types);
+            members.Select(m => m.ReturnTypename).AddRangeTo(types);
+            Aliases.Values().AddRangeTo(types);
+            return types.Where(x => !x.IsLiteralType).Select(x => x.GenericParameter ?? x.FullName).ToHashSet();
         }
         public HashSet<string> GetKnownTypes() {
             var ret = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" }.ToHashSet();
