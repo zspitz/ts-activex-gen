@@ -135,6 +135,12 @@ namespace TsActivexGen {
         }
     }
 
+    public class NamespaceOutput {
+        public string Description { get; set; }
+        public string MainFile { get; set; }
+        public string Constants { get; set; }
+    }
+
     namespace ActiveX {
         public class TypeLibDetails {
             public static Lazy<List<TypeLibDetails>> FromRegistry = new Lazy<List<TypeLibDetails>>(() => {

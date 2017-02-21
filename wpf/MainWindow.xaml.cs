@@ -12,11 +12,8 @@ using static System.Windows.MessageBoxButton;
 using static System.Windows.MessageBoxResult;
 using System.Diagnostics;
 using static System.Reflection.Assembly;
-using static System.Windows.Input.Key;
-using static Microsoft.VisualBasic.Interaction;
 using TsActivexGen.ActiveX;
 using System.Windows.Data;
-using System.Threading.Tasks;
 using System.Collections.ObjectModel;
 
 namespace TsActivexGen.Wpf {
@@ -77,37 +74,6 @@ namespace TsActivexGen.Wpf {
             };
 
             btnClearFiles.Click += (s, e) => fileList.Clear();
-
-            //btnOutput.Click += (s, e) => {
-            //    if (txbFilename.Text.IsNullOrEmpty()) { return; }
-            //    if (txbOutput.Text.IsNullOrEmpty()) {
-            //        var filled = fillFolder();
-            //        if (!filled) { return; }
-            //    }
-            //    if (!Directory.Exists(txbOutput.Text)) {
-            //        Directory.CreateDirectory(txbOutput.Text);
-            //    }
-
-            //    currentTypescript.ForEachKVP((name, ts, index) => {
-            //        var basePath = index == 0 ? txbFilename.Text : InputBox(name, "Enter path for file");
-            //        if (basePath == "") { return; }
-            //        var filepath = Combine(txbOutput.Text, $"{basePath}.d.ts");
-            //        WriteAllText(filepath, ts);
-            //        if (chkOutputTests.IsChecked == true) {
-            //            var testsFilePath = Combine(txbOutput.Text, $"{basePath}-tests.ts");
-            //            if (!Exists(testsFilePath) || MessageBox.Show("Overwrite existing test file?", "", YesNo) == Yes) {
-            //                WriteAllLines(testsFilePath, new[] {
-            //                        $"/// <reference path=\"{filepath}\" />",""
-            //                    });
-            //            }
-            //        }
-            //    });
-
-            //    var firstFilePath = Combine(txbOutput.Text, $"{txbFilename.Text}.d.ts");
-            //    var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + firstFilePath + "\"");
-            //    Process.Start(psi);
-            //};
-
         }
 
         private bool createFile(string path) {

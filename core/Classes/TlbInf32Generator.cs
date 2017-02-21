@@ -10,9 +10,6 @@ using static TLI.TypeKinds;
 using static TLI.TliVarType;
 using System.Diagnostics;
 using TsActivexGen.ActiveX;
-using System.Threading.Tasks;
-using System.Threading;
-using static TsActivexGen.Util.KeyConflictResolution;
 
 namespace TsActivexGen {
     public class TlbInf32Generator {
@@ -120,9 +117,11 @@ VT_NULL	1
             return KVP($"{c.Parent.Name}.{c.Name}", ret);
         }
 
-        private KeyValuePair<string, TSParameterDescription> ToTSParameterDescription(ParameterInfo p, bool isRest) {
+        private KeyValuePair<string, TSParameterDescription> ToTSParameterDescription(ParameterInfo p, bool isRest, List<KeyValuePair<string,string>> jsDoc) {
             var ret = new TSParameterDescription();
-            ret.Type = GetTypeName(p.VarTypeInfo);
+            var name = p.Name;
+            var returnType = GetTypeName(p.VarTypeInfo);
+            ret.Type = returnType;
             if (isRest) {
                 ret.ParameterType = Rest;
             } else if (p.Optional || p.Default) {
@@ -130,16 +129,18 @@ VT_NULL	1
             } else {
                 ret.ParameterType = Standard;
             }
-            var name = p.Name;
+            if (p.Default) {
+                jsDoc.Add("param", $"{returnType.FullName} [{name}={AsString(p.DefaultValue)}]");
+            }
             return KVP(p.Name, ret);
         }
 
-        private List<KeyValuePair<string, TSParameterDescription>> GetSingleParameterList(IEnumerable<MemberInfo> members) {
+        private List<KeyValuePair<string, TSParameterDescription>> GetSingleParameterList(IEnumerable<MemberInfo> members, List<KeyValuePair<string,string>> jsDoc) {
             var parameterLists = members.Select(m => {
                 var parameterCount = m.Parameters.Count;
                 return m.Parameters.Cast().Select((p, index) => {
                     bool isRest = m.Parameters.OptionalCount == -1 && index == parameterCount - 1;
-                    return ToTSParameterDescription(p, isRest);
+                    return ToTSParameterDescription(p, isRest, jsDoc);
                 }).ToList();
             }).Distinct(new TSParameterListComparer()).ToList();
             if (parameterLists.Count > 1) {
@@ -151,7 +152,7 @@ VT_NULL	1
         private TSMemberDescription GetMemberDescriptionForName(IEnumerable<MemberInfo> members) {
             var ret = new TSMemberDescription();
 
-            var parameterList = GetSingleParameterList(members);
+            var parameterList = GetSingleParameterList(members, ret.JsDoc);
             var paramType = Standard;
             parameterList.ForEachKVP((name, p) => {
                 if (p.ParameterType == Standard && paramType == Optional) { p.ParameterType = Optional; }
@@ -302,7 +303,6 @@ VT_NULL	1
         List<TypeLibInfo> tlis = new List<TypeLibInfo>();
         Dictionary<string, List<string>> interfaceToCoClassMapping = new Dictionary<string, List<string>>();
         Dictionary<TSSimpleType, string> enumerableCollectionItemMapping = new Dictionary<TSSimpleType, string>();
-        SemaphoreSlim sem = new SemaphoreSlim(1, 1);
 
         ILookup<string, InterfaceInfo> allInterfaces = null;
         Dictionary<string, RecordInfo> allRecords = null;
