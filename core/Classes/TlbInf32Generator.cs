@@ -100,6 +100,7 @@ VT_NULL	1
         private KeyValuePair<string, TSNamespaceDescription> ToTSNamespaceDescription(ConstantInfo c) {
             var ret = new TSNamespaceDescription();
             c.Members.Cast().Select(x => KVP(x.Name, AsString((object)x.Value))).AddRangeTo(ret.Members);
+            ret.JsDoc.Add("", c.HelpString);
             return KVP($"{c.Parent.Name}.{c.Name}", ret);
         }
 
@@ -115,12 +116,13 @@ VT_NULL	1
                 }
                 return KVP(x.Name, AsString(oValue));
             }).AddRangeTo(ret.Members);
+            ret.JsDoc.Add("", c.HelpString);
             return KVP($"{c.Parent.Name}.{c.Name}", ret);
         }
 
         private KeyValuePair<string, TSParameterDescription> ToTSParameterDescription(ParameterInfo p, bool isRest) {
             var ret = new TSParameterDescription();
-            ret.Typename = GetTypeName(p.VarTypeInfo);
+            ret.Type = GetTypeName(p.VarTypeInfo);
             if (isRest) {
                 ret.ParameterType = Rest;
             } else if (p.Optional || p.Default) {
@@ -185,10 +187,13 @@ VT_NULL	1
                 ret.ReadOnly = !hasSetter;
             }
 
-            ret.ReturnTypename = GetTypeName(members.First().ReturnType);
+            ret.ReturnType = GetTypeName(members.First().ReturnType);
             if (hasSetter && parameterList.Any()) {
                 ret.Comment = "Also has setter with parameters";
             }
+
+            ret.JsDoc.Add("", members.Select(x => x.HelpString).Distinct().Joined(" / "));
+
             return ret;
         }
 
@@ -197,35 +202,37 @@ VT_NULL	1
 
             var enumerableType1 = enumerableType; //because ref parameters cannot be used within lambda expressions
             members.Cast().ToLookup(x => x.Name).IfContainsKey("_NewEnum", mi => {
-                ret.IfContainsKey("Item", itemMI => enumerableType1 = itemMI.ReturnTypename.FullName);
+                ret.IfContainsKey("Item", itemMI => enumerableType1 = (itemMI.ReturnType as TSSimpleType).FullName);
             });
             enumerableType = enumerableType1;
 
             return ret;
         }
 
-        private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescriptionBase(Members m, string typename) {
+        private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescriptionBase(Members m, string typename, string helpString) {
             var ret = new TSInterfaceDescription();
             string enumerableType = null;
             GetMembers(m, ref enumerableType).AddRangeTo(ret.Members);
             if (!enumerableType.IsNullOrEmpty()) { enumerableCollectionItemMapping[new TSSimpleType(typename)] = enumerableType; }
+            ret.JsDoc.Add("", helpString);
             return KVP(typename, ret);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(InterfaceInfo i) {
             var typename = $"{i.Parent.Name}.{i.Name}";
-            return ToTSInterfaceDescriptionBase(i.Members, typename);
+            return ToTSInterfaceDescriptionBase(i.Members, typename,i.HelpString);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(CoClassInfo c) {
             var typename = $"{c.Parent.Name}.{c.Name}";
-            return ToTSInterfaceDescriptionBase(c.DefaultInterface.Members, typename);
+            return ToTSInterfaceDescriptionBase(c.DefaultInterface.Members, typename,c.HelpString);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(RecordInfo r) {
             var ret = new TSInterfaceDescription();
             string enumerableType = null; //this value will be ignored for RecordInfo
             GetMembers(r.Members, ref enumerableType).AddRangeTo(ret.Members);
+            ret.JsDoc.Add("", r.HelpString);
             return KVP($"{r.Parent.Name}.{r.Name}", ret);
         }
 
@@ -233,7 +240,7 @@ VT_NULL	1
             var ret = new TSMemberDescription();
             var typename = $"{c.Parent.Name}.{c.Name}";
             ret.AddParameter("progid", new TSSimpleType($"'{typename}'")); //note the string literal type
-            ret.ReturnTypename = new TSSimpleType(typename);
+            ret.ReturnType = new TSSimpleType(typename);
             return ret;
         }
 
@@ -242,7 +249,7 @@ VT_NULL	1
             var itemTypeName = kvp.Value;
             var ret = new TSMemberDescription();
             ret.AddParameter("col", collectionTypeName);
-            ret.ReturnTypename = new TSSimpleType($"Enumerator<{itemTypeName}>");
+            ret.ReturnType = new TSSimpleType($"Enumerator<{itemTypeName}>");
             return ret;
         }
 
@@ -272,13 +279,24 @@ VT_NULL	1
 
             if (activex.Constructors.Any()) {
                 ret.GlobalInterfaces["ActiveXObject"] = activex;
-            }            
+            }
+
+            var guid = tli.GUID;
+            ret.Description = TypeLibDetails.FromRegistry.Value.FirstOrDefault(x => x.TypeLibID == guid).Name;
 
             return ret;
         }
 
-        private KeyValuePair<string, TSSimpleType> ToTypeAlias(IntrinsicAliasInfo ia) => KVP($"{ia.Parent.Name}.{ ia.Name}", GetTypeName(ia.ResolvedType));
-        private KeyValuePair<string, TSSimpleType> ToTypeAlias(UnionInfo u) => KVP($"{u.Parent.Name}.{u.Name}", TSSimpleType.Any);
+        private KeyValuePair<string, TSSimpleType> ToTypeAlias(IntrinsicAliasInfo ia) {
+            var ret = KVP($"{ia.Parent.Name}.{ ia.Name}", GetTypeName(ia.ResolvedType));
+            ret.Value.JsDoc.Add("", ia.HelpString);
+            return ret;
+        }
+        private KeyValuePair<string, TSSimpleType> ToTypeAlias(UnionInfo u) {
+            var ret= KVP($"{u.Parent.Name}.{u.Name}", TSSimpleType.Any);
+            ret.Value.JsDoc.Add("", u.HelpString);
+            return ret;
+        }
 
         TLIApplication tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime
         List<TypeLibInfo> tlis = new List<TypeLibInfo>();
@@ -365,7 +383,12 @@ VT_NULL	1
                 && (majorVersion == null || x.MajorVersion == majorVersion)
                 && (minorVersion == null || x.MinorVersion == minorVersion)
                 && (lcid == null || x.LCID == lcid)).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).ThenBy(x => x.LCID).First();
-            var toAdd = tliApp.TypeLibInfoFromRegistry(tlb.TypeLibID, tlb.MajorVersion, tlb.MinorVersion, tlb.LCID);
+            TypeLibInfo toAdd;
+            try {
+                toAdd = tliApp.TypeLibInfoFromRegistry(tlb.TypeLibID, tlb.MajorVersion, tlb.MinorVersion, tlb.LCID);
+            } catch (Exception) {
+                return;
+            }
             AddTLI(toAdd);
             GenerateNSSetParts();
         }

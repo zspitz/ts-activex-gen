@@ -21,6 +21,7 @@ namespace TsActivexGen.Util {
             return typename.Split('.').Last();
         }
         public static bool IsLiteralTypeName(string typename) {
+            if (typename.IsNullOrEmpty()) { return false; }
             if (typename.In(new[] { "true", "false", "null", "undefined" }, StringComparison.Ordinal)) { return true; }
             var firstChar = typename[0];
             if (char.IsLetter(firstChar) || firstChar == '_') { return false; }
@@ -29,6 +30,7 @@ namespace TsActivexGen.Util {
 
         static Regex re= new Regex("^.*<(.*)>$");
         public static string GenericParameter(string fullName) {
+            //HACK The only generic types used in this code base are Enumerator<T>, which has a single parameter; this code really should do a full parse, but YAGNI
             if (IsLiteralTypeName(fullName)) { return null; }
             var match = re.Match(fullName);
             var ret = match.Groups[1].Value;
@@ -37,5 +39,14 @@ namespace TsActivexGen.Util {
         }
 
         public static bool IsGenericTypeName(string fullName) => !IsLiteralTypeName(fullName) && fullName.Contains("<");
+
+        public static bool ExecIfType<T>(object toTest, Action<T> action, Action @else = null) where T: class {
+            if (toTest is T) {
+                action?.Invoke(toTest as T);
+                return true;
+            }
+            @else?.Invoke();
+            return false;
+        }
     }
 }

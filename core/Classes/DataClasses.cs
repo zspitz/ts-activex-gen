@@ -25,20 +25,21 @@ namespace TsActivexGen {
     public class TSEnumDescription {
         public TSSimpleType Typename { get; set; }
         public Dictionary<string, string> Members { get; } = new Dictionary<string, string>(); //values -> string representation of value
+        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
     }
 
     public class TSParameterDescription : EqualityBase<TSParameterDescription> {
-        public TSSimpleType Typename { get; set; }
+        public ITSType Type { get; set; }
         public TSParameterType ParameterType { get; set; } = Standard;
 
         public override bool Equals(TSParameterDescription other) {
-            return Typename == other.Typename
+            return Type.Equals(other.Type)
                 && ParameterType == other.ParameterType;
         }
         public override int GetHashCode() {
             unchecked {
                 int hash = 17;
-                hash = hash * 486187739 + Typename.GetHashCode();
+                hash = hash * 486187739 + Type.GetHashCode();
                 hash = hash * 486187739 + ParameterType.GetHashCode();
                 return hash;
             }
@@ -51,22 +52,32 @@ namespace TsActivexGen {
 
     public class TSMemberDescription {
         public List<KeyValuePair<string, TSParameterDescription>> Parameters { get; set; } //(null means a property, empty means empty parameter list); this mut be a list, becaus parameter order is important
-        public TSSimpleType ReturnTypename { get; set; }
+        public ITSType ReturnType { get; set; }
         public string Comment { get; set; }
         public bool? ReadOnly { get; set; }
-        public void AddParameter(string name, TSSimpleType typename) {
+        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
+
+        public void AddParameter(string name, ITSType type) {
             if (Parameters == null) { Parameters = new List<KeyValuePair<string, TSParameterDescription>>(); }
-            Parameters.Add(name, new TSParameterDescription() { Typename = typename });
+            Parameters.Add(name, new TSParameterDescription() { Type = type });
+        }
+        public string[] TypeParts() {
+            var ret = new List<string>();
+            Parameters.DefaultIfNull().Values().SelectMany(x => x.Type.TypeParts()).AddRangeTo(ret);
+            ReturnType.TypeParts().AddRangeTo(ret);
+            return ret.ToArray();
         }
     }
 
     public class TSInterfaceDescription {
-        public Dictionary<string, TSMemberDescription> Members { get; } = new Dictionary<string, TSMemberDescription>();
+        public List<KeyValuePair<string, TSMemberDescription>> Members { get; } = new List<KeyValuePair<string,TSMemberDescription>>();
         public List<TSMemberDescription> Constructors { get; } = new List<TSMemberDescription>();
+        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
     }
 
     public class TSNamespaceDescription {
         public Dictionary<string, string> Members { get; } = new Dictionary<string, string>();
+        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
     }
 
     public class TSNamespace {
@@ -80,12 +91,10 @@ namespace TsActivexGen {
         public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
 
         public HashSet<string> GetUsedTypes() {
-            var types = new List<TSSimpleType>();
-            var members = Interfaces.Values.Concat(GlobalInterfaces.Values).SelectMany(i => i.Members).Values().ToList();
-            members.SelectMany(x => x.Parameters.DefaultIfNull().Values().Select(p => p.Typename)).AddRangeTo(types);
-            members.Select(m => m.ReturnTypename).AddRangeTo(types);
-            Aliases.Values().AddRangeTo(types);
-            return types.Where(x => !x.IsLiteralType).Select(x => x.GenericParameter ?? x.FullName).ToHashSet();
+            var types = new List<string>();
+            Interfaces.Values.Concat(GlobalInterfaces.Values).SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).AddRangeTo(types);
+            Aliases.Values().NamedTypes().AddRangeTo(types);
+            return types.ToHashSet();
         }
         public HashSet<string> GetKnownTypes() {
             var ret = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" }.ToHashSet();
@@ -100,6 +109,7 @@ namespace TsActivexGen {
             ret.ExceptWith(GetKnownTypes());
             return ret;
         }
+        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
     }
 
     public class TSNamespaceSet {
