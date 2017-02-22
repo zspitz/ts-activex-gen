@@ -73,16 +73,13 @@
             <DataGrid Name="dtgFiles" DockPanel.Dock="Top" AutoGenerateColumns="False" CanUserAddRows="False">
                 <DataGrid.Columns>
                     <DataGridTextColumn Binding="{Binding Name}" IsReadOnly="True" Header="Name" />
-                    <DataGridTextColumn Binding="{Binding Description}" IsReadOnly="True" Header="Description" />
+                    <my:DataGridTextColumnExt Binding="{Binding Output.Description}" IsReadOnly="True" Header="Description" TextTrimming="CharacterEllipsis" />
                     <DataGridTextColumn Binding="{Binding FileName}" Header="Filename" />
                     <DataGridCheckBoxColumn Binding="{Binding Exists, Mode=OneWay}" IsReadOnly="True" Header="Exists" />
                     <DataGridCheckBoxColumn Binding="{Binding WriteOutput}" Header="Output" />
                     <DataGridCheckBoxColumn Binding="{Binding PackageForTypings}" Header="@types packaging" />
                 </DataGrid.Columns>
             </DataGrid>
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                <TextBox x:Name="tbPreview" Foreground="White" Background="Black" FontSize="16" Text="{Binding SelectedItem.OutputText,ElementName=dtgFiles}" IsReadOnly="True" />
-            </ScrollViewer>
         </DockPanel>
     </DockPanel>
 </Window>

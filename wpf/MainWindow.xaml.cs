@@ -63,7 +63,7 @@ namespace TsActivexGen.Wpf {
                         if (x.PackageForTypings) {
                             throw new NotImplementedException(); //TODO
                         } else {
-                            WriteAllText(x.FullPath, x.OutputText);
+                            WriteAllText(x.FullPath, x.Output.MainFile);
                         }
                     }
                 });
@@ -102,13 +102,13 @@ namespace TsActivexGen.Wpf {
             }
 
             fileList.Clear();
-            new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, ts) => new OutputFileDetails {
+            new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, x) => new OutputFileDetails {
                 Name = name,
                 FileName = $"activex-{name.ToLower()}.d.ts",
                 OutputFolder = txbOutputFolder.Text,
                 WriteOutput = true,
                 PackageForTypings = cbPackageForTypes.IsChecked.Value,
-                OutputText = ts
+                Output = x
             }).AddRangeTo(fileList);
         }
 

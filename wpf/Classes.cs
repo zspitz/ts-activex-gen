@@ -2,6 +2,7 @@
 using System.IO;
 using System.Windows.Controls;
 using TsActivexGen.Util;
+using System.Windows;
 
 namespace TsActivexGen.Wpf {
     [ImplementPropertyChanged]
@@ -13,7 +14,7 @@ namespace TsActivexGen.Wpf {
         public bool Exists => File.Exists(FullPath);
         public bool PackageForTypings { get; set; }
         public bool WriteOutput { get; set; }
-        public string OutputText { get; set; }
+        public NamespaceOutput Output { get; set; }
         public string FullPath => Path.Combine(OutputFolder, FileName.ForceEndsWith(".d.ts"));
         public bool EmitModuleConstants { get; set; }
     }
@@ -22,6 +23,22 @@ namespace TsActivexGen.Wpf {
         public DefinitionTypesComboBox() {
             ItemsSource = new[] { "Type lib from registry", "Type lib from file", "WMI class" };
             SelectedIndex = 0;
+        }
+    }
+
+    public class DataGridTextColumnExt : DataGridTextColumn {
+        public TextTrimming? TextTrimming { get; set; }
+
+        protected override FrameworkElement GenerateElement(DataGridCell cell, object dataItem) {
+            var tb = (TextBlock)base.GenerateElement(cell, dataItem);
+            if (TextTrimming != null) {
+                if (MaxWidth == 0) { MaxWidth = 250; }
+                tb.MaxWidth = MaxWidth;
+                tb.TextTrimming = TextTrimming.Value;
+                var bnd = tb.GetBindingExpression(TextBlock.TextProperty).ParentBinding;
+                tb.SetBinding(FrameworkElement.ToolTipProperty, bnd.Path.Path);
+            }
+            return tb;
         }
     }
 }

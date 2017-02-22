@@ -138,7 +138,7 @@ namespace TsActivexGen {
     public class NamespaceOutput {
         public string Description { get; set; }
         public string MainFile { get; set; }
-        public string Constants { get; set; }
+        public string RuntimeFile { get; set; }
     }
 
     namespace ActiveX {
