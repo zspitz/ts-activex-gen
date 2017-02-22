@@ -15,6 +15,7 @@ namespace TsActivexGen.Util {
         static string[] builtins = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" };
         public static string[] NamedTypes(this ITSType type) => type.TypeParts().Except(builtins).Where(x => !IsLiteralTypeName(x)).ToArray();
         public static HashSet<string> NamedTypes(this IEnumerable<ITSType> types) => types.SelectMany(x => x.NamedTypes()).ToHashSet();
+        public static string[] NamedTypes(this IEnumerable<string> types) => types.Except(builtins).Where(x => !IsLiteralTypeName(x)).ToArray();
         public static bool IsLiteralType(this ITSType type) => IsLiteralTypeName((type as TSSimpleType)?.FullName);
     }
 }

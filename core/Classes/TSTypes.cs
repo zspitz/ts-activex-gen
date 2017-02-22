@@ -6,7 +6,8 @@ using TsActivexGen.Util;
 namespace TsActivexGen {
     /// <summary>Describes namespace+name types, as well as built-in and literal types</summary>
     public class TSSimpleType : EqualityBase<TSSimpleType>, ITSType {
-        public static TSSimpleType Any = new TSSimpleType { FullName = "any" };
+        public static TSSimpleType Any = new TSSimpleType("any");
+        public static TSSimpleType Void = new TSSimpleType("void");
         public string FullName { get; set; }
         public string Namespace {
             get {
@@ -40,6 +41,10 @@ namespace TsActivexGen {
     public class TSTupleType : ITSType {
         public List<ITSType> Members { get; } = new List<ITSType>();
         public string[] TypeParts() => Members.SelectMany(x => x.TypeParts()).ToArray();
+        public TSTupleType() {}
+        public TSTupleType(IEnumerable<string> members)  {
+            members.Select(x => new TSSimpleType(x)).AddRangeTo(Members);
+        }
     }
 
     public class TSObjectType : ITSType {
@@ -48,7 +53,7 @@ namespace TsActivexGen {
     }
 
     public class TSFunctionType : ITSType {
-        public TSMemberDescription FunctionDescription { get; set; }
+        public TSMemberDescription FunctionDescription { get; } = new TSMemberDescription();
         public string[] TypeParts() => FunctionDescription.TypeParts();
     }
 }

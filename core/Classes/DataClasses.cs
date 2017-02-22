@@ -4,6 +4,7 @@ using TsActivexGen.Util;
 using System.Linq;
 using Microsoft.Win32;
 using static TsActivexGen.TSParameterType;
+using static TsActivexGen.Util.Functions;
 
 namespace TsActivexGen {
     public abstract class EqualityBase<T> : IEquatable<T> where T : class {
@@ -61,6 +62,7 @@ namespace TsActivexGen {
             if (Parameters == null) { Parameters = new List<KeyValuePair<string, TSParameterDescription>>(); }
             Parameters.Add(name, new TSParameterDescription() { Type = type });
         }
+        public void AddParameter(string name, string type)  => AddParameter(name, new TSSimpleType(type));
         public string[] TypeParts() {
             var ret = new List<string>();
             Parameters.DefaultIfNull().Values().SelectMany(x => x.Type.TypeParts()).AddRangeTo(ret);
@@ -92,7 +94,7 @@ namespace TsActivexGen {
 
         public HashSet<string> GetUsedTypes() {
             var types = new List<string>();
-            Interfaces.Values.Concat(GlobalInterfaces.Values).SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).AddRangeTo(types);
+            Interfaces.Values.Concat(GlobalInterfaces.Values).SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).NamedTypes().AddRangeTo(types);
             Aliases.Values().NamedTypes().AddRangeTo(types);
             return types.ToHashSet();
         }

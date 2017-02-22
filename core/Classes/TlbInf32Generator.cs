@@ -130,7 +130,11 @@ VT_NULL	1
                 ret.ParameterType = Standard;
             }
             if (p.Default) {
-                jsDoc.Add("param", $"{returnType.FullName} [{name}={AsString(p.DefaultValue)}]");
+                var defaultValue = p.DefaultValue;
+                if (defaultValue != null) {
+                    var kvp = KVP("param", $"{returnType.FullName} [{name}={AsString(p.DefaultValue)}]");
+                    if (!jsDoc.Contains(kvp)) { jsDoc.Add(kvp); }
+                }
             }
             return KVP(p.Name, ret);
         }
@@ -226,6 +230,8 @@ VT_NULL	1
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(CoClassInfo c) {
             var typename = $"{c.Parent.Name}.{c.Name}";
+            //scripting environments can only use the default interface, because they don't have variable types
+            //we can thus ignore everything else in c.Interfaces
             return ToTSInterfaceDescriptionBase(c.DefaultInterface.Members, typename,c.HelpString);
         }
 
@@ -240,8 +246,31 @@ VT_NULL	1
         private TSMemberDescription ToActiveXObjectConstructorDescription(CoClassInfo c) {
             var ret = new TSMemberDescription();
             var typename = $"{c.Parent.Name}.{c.Name}";
-            ret.AddParameter("progid", new TSSimpleType($"'{typename}'")); //note the string literal type
+            ret.AddParameter("progid", $"'{typename}'"); //note the string literal type
             ret.ReturnType = new TSSimpleType(typename);
+            return ret;
+        }
+
+        //ActiveXObject.on(obj: 'Word.Application', 'BeforeDocumentSave', ['Doc','SaveAsUI','Cancel'], function (params) {});
+        private TSMemberDescription ToActiveXEventMember(MemberInfo m, CoClassInfo c) {
+            var args = m.Parameters.Cast().Select(x => KVP<string,ITSType>(x.Name, GetTypeName(x.VarTypeInfo)));
+            var typename = $"{c.Parent.Name}.{c.Name}";
+
+            var ret = new TSMemberDescription();
+            ret.AddParameter("obj", $"{typename}");
+            ret.AddParameter("eventName", $"'{m.Name}'");
+            if (args.Keys().Any()) {ret.AddParameter("eventArgs", new TSTupleType(args.Keys().Select(x => $"'{x}'")));}
+
+            var parameterType = new TSObjectType();
+            args.AddRangeTo(parameterType.Members);
+            var fnType = new TSFunctionType();
+            fnType.FunctionDescription.AddParameter("this", typename);
+            fnType.FunctionDescription.AddParameter("parameter", parameterType);
+            fnType.FunctionDescription.ReturnType = TSSimpleType.Void;
+            ret.AddParameter("handler", fnType);
+
+            ret.ReturnType = TSSimpleType.Void;
+
             return ret;
         }
 
@@ -262,8 +291,6 @@ VT_NULL	1
             tli.Constants.Cast().Where(x => x.TypeKind == TKIND_MODULE).Select(ToTSNamespaceDescription).AddRangeTo(ret.Namespaces);
             coclasses.Select(ToTSInterfaceDescription).AddRangeTo(ret.Interfaces);
 
-            //TODO do we need to look at ImpliedInterfaces? Should we use GetMembers instead of manually iterating over Members?
-
             if (tli.Declarations.Cast().Any()) {
                 //not sure what these are, if they are accessible from JScript
                 //there is one in the Excel object library
@@ -275,8 +302,10 @@ VT_NULL	1
 
             var activex = new TSInterfaceDescription();
             coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(ToActiveXObjectConstructorDescription).AddRangeTo(activex.Constructors);
-
-            //TODO implement calls to ActiveXObject.on with appropriate parameters
+            coclasses.Select(x => new {
+                coclass = x,
+                eventInterface = x.DefaultEventInterface
+            }).Where(x => x.eventInterface != null).SelectMany(x => x.eventInterface.Members.Cast().Select(y => KVP("on", ToActiveXEventMember(y, x.coclass)))).AddRangeTo(activex.Members);
 
             if (activex.Constructors.Any()) {
                 ret.GlobalInterfaces["ActiveXObject"] = activex;

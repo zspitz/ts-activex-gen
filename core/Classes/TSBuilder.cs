@@ -92,7 +92,7 @@ namespace TsActivexGen {
 
             WriteJsDoc(m.JsDoc, indentationLevel, true);
 
-            $"{memberIdentifier}{parameterList}: {returnType}{comment}".AppendLineTo(sb, indentationLevel);
+            $"{memberIdentifier}{parameterList}: {returnType};{comment}".AppendLineTo(sb, indentationLevel);
         }
 
         private void WriteMember(KeyValuePair<string, TSMemberDescription> x, string ns, int indentationLevel) {
@@ -109,8 +109,12 @@ namespace TsActivexGen {
             //go pattern matching!!!
             if (ExecIfType<TSSimpleType>(type, x => ret = RelativeName(x.GenericParameter ?? x.FullName, ns))) {
             } else if (ExecIfType<TSTupleType>(type, x => ret = $"[{x.Members.Joined(",", y => GetTypeString(y, ns))}]")) {
-            } else if (ExecIfType<TSObjectType>(type, x => ret = $"{x.Members.JoinedKVP((key, val) => $"{key}: {GetTypeString(val, ns)}")}")) {
-            } else if (ExecIfType<TSFunctionType>(type, x => ret = $"({x.FunctionDescription.Parameters.Select(y => GetParameterString(y, ns))}: {GetTypeString(x.FunctionDescription.ReturnType, ns)}")) {
+            } else if (ExecIfType<TSObjectType>(type, x => ret = $"{{{x.Members.JoinedKVP((key, val) => $"{key}: {GetTypeString(val, ns)}")}}}")) {
+            } else if (ExecIfType<TSFunctionType>(type, x => {
+                //the only way to define a function type is with the fat arrow
+                //e.g. () => void and not (): void
+                ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => GetParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}"; 
+            })) {
             } else {
                 throw new NotImplementedException();
             }
