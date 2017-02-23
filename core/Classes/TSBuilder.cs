@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using TsActivexGen.Util;
@@ -32,7 +31,8 @@ namespace TsActivexGen {
             }
         }
 
-        private void WriteEnum(KeyValuePair<string, TSEnumDescription> x) {
+        //https://github.com/zspitz/ts-activex-gen/issues/25#issue-204161318
+        private void WriteEnumDeclaration(KeyValuePair<string, TSEnumDescription> x) {
             var name = NameOnly(x.Key);
             var @enum = x.Value;
             var members = @enum.Members.OrderBy(y => y.Key);
@@ -51,16 +51,18 @@ namespace TsActivexGen {
             }
         }
 
-        private void WriteNamespace(KeyValuePair<string, TSNamespaceDescription> x) {
-            var name = NameOnly(x.Key);
-            var members = x.Value.Members.OrderBy(y => y.Key);
+        private void WriteNamespace(string name, Dictionary<string,string> members) {
+            name = NameOnly(name);
+            var orderedMembers = members.OrderBy(y => y.Key);
 
-            WriteJsDoc(x.Value.JsDoc, 2);
-
-            $"namespace {name} {{".AppendLineTo(sb, 1);
-            members.AppendLinesTo(sb, (memberName, value) => $"var {memberName}: {value};", 2);
+            $"export namespace {name} {{".AppendLineTo(sb, 1);
+            orderedMembers.AppendLinesTo(sb, (memberName, value) => $"export const {memberName} = {value};", 2);
             "}".AppendWithNewSection(sb, 1);
         }
+
+        private void WriteEnumValues(KeyValuePair<string, TSEnumDescription> x)  => WriteNamespace(x.Key, x.Value.Members);
+
+        private void WriteNamespace(KeyValuePair<string, TSNamespaceDescription> x)  => WriteNamespace(x.Key, x.Value.Members);
 
         private string GetParameterString(KeyValuePair<string, TSParameterDescription> x, string ns) {
             var name = x.Key;
@@ -152,20 +154,13 @@ namespace TsActivexGen {
             var numericEnums = ns.Enums.Where(x => x.Value.Typename.FullName == "number");
             if (numericEnums.Any()) {
                 "//Numeric enums".AppendLineTo(sb, 1);
-                numericEnums.OrderBy(x => x.Key).ForEach(WriteEnum);
+                numericEnums.OrderBy(x => x.Key).ForEach(WriteEnumDeclaration);
             }
 
             var nonnumericEnums = ns.Enums.Where(x => x.Value.Typename.FullName != "number");
             if (nonnumericEnums.Any()) {
                 "//Nonnumeric enums".AppendLineTo(sb, 1);
-                numericEnums.OrderBy(x => x.Key).ForEach(WriteEnum);
-
-                //TODO add values to runtime file https://github.com/zspitz/ts-activex-gen/issues/25
-            }
-
-            if (ns.Namespaces.Any() && Debugger.IsAttached) {
-                //TODO add these to runtime file, not .d.ts -- https://github.com/zspitz/ts-activex-gen/issues/25
-                //use the WriteNamespace method
+                numericEnums.OrderBy(x => x.Key).ForEach(WriteEnumDeclaration);
             }
 
             if (ns.Interfaces.Any()) {
@@ -185,7 +180,26 @@ namespace TsActivexGen {
                 Description = ns.Description
             };
 
-            //TODO build constants file here
+
+            //Build the runtime constants file
+
+            sb = new StringBuilder();
+            if (nonnumericEnums.Any() || ns.Namespaces.Any()) {
+                $"namespace {ns.Name} {{".AppendWithNewSection(sb);
+
+                if (nonnumericEnums.Any()) {
+                    "//Non-numeric enums".AppendLineTo(sb, 1);
+                    nonnumericEnums.OrderBy(x=>x.Key).ForEach(WriteEnumValues);
+                }
+
+                if (ns.Namespaces.Any()) {
+                    "//Modules".AppendLineTo(sb, 1);
+                    ns.Namespaces.OrderBy(x=>x.Key).ForEach(WriteNamespace);
+                }
+
+                "}".AppendWithNewSection(sb);
+            }
+            ret.RuntimeFile = sb.ToString();
 
             return ret;
         }

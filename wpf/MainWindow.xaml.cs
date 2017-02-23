@@ -58,22 +58,33 @@ namespace TsActivexGen.Wpf {
                 }
                 dtgFiles.Items<OutputFileDetails>().ForEach(x => {
                     if (!x.WriteOutput) { return; }
-                    if (x.FileName.IsNullOrEmpty()) { return; }
-                    if (createFile(x.FullPath)) {
+                    if (x.DeclarationFileName.IsNullOrEmpty()) { return; }
+                    if (createFile(x.FullDeclarationPath)) {
                         if (x.PackageForTypings) {
                             throw new NotImplementedException(); //TODO
                         } else {
-                            WriteAllText(x.FullPath, x.Output.MainFile);
+                            WriteAllText(x.FullDeclarationPath, x.Output.MainFile);
+                        }
+                    }
+
+                    if (!x.Output.RuntimeFile.IsNullOrEmpty() && createFile(x.FullRuntimePath)) {
+                        if (x.PackageForTypings) {
+                            throw new NotImplementedException(); //TODO
+                        } else {
+                            WriteAllText(x.FullRuntimePath, x.Output.RuntimeFile);
                         }
                     }
                 });
-                var firstFilePath = dtgFiles.Items<OutputFileDetails>().FirstOrDefault()?.FullPath;
+                var firstFilePath = dtgFiles.Items<OutputFileDetails>().FirstOrDefault()?.FullDeclarationPath;
                 if (firstFilePath.IsNullOrEmpty()) { return; }
                 var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + firstFilePath + "\"");
                 Process.Start(psi);
             };
 
-            btnClearFiles.Click += (s, e) => fileList.Clear();
+            btnClearFiles.Click += (s, e) => {
+                tlbGenerator = new TlbInf32Generator();
+                fileList.Clear();
+            };
         }
 
         private bool createFile(string path) {
@@ -104,7 +115,8 @@ namespace TsActivexGen.Wpf {
             fileList.Clear();
             new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, x) => new OutputFileDetails {
                 Name = name,
-                FileName = $"activex-{name.ToLower()}.d.ts",
+                DeclarationFileName = $"activex-{name.ToLower()}.d.ts",
+                RuntimeFileName = $"activex-{name.ToLower()}-runtime.ts",
                 OutputFolder = txbOutputFolder.Text,
                 WriteOutput = true,
                 PackageForTypings = cbPackageForTypes.IsChecked.Value,

@@ -9,13 +9,18 @@ namespace TsActivexGen.Wpf {
     public class OutputFileDetails {
         public string Name { get; set; }
         public string Description { get; set; }
-        public string FileName { get; set; }
+        public string DeclarationFileName { get; set; }
+        public bool DeclarationExists => File.Exists(FullDeclarationPath);
+        public string FullDeclarationPath => Path.Combine(OutputFolder, DeclarationFileName.ForceEndsWith(".d.ts"));
+        public string RuntimeFileName { get; set; }
+        public bool RuntimeExists => File.Exists(FullRuntimePath);
+        public string FullRuntimePath => Path.Combine(OutputFolder, RuntimeFileName.ForceEndsWith(".ts"));
         public string OutputFolder { get; set; }
-        public bool Exists => File.Exists(FullPath);
+        
         public bool PackageForTypings { get; set; }
         public bool WriteOutput { get; set; }
         public NamespaceOutput Output { get; set; }
-        public string FullPath => Path.Combine(OutputFolder, FileName.ForceEndsWith(".d.ts"));
+        
         public bool EmitModuleConstants { get; set; }
     }
 
