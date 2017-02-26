@@ -13,6 +13,13 @@ using TsActivexGen.ActiveX;
 
 namespace TsActivexGen {
     public class TlbInf32Generator {
+        private class ParameterizedSetterInfo {
+            public TSSimpleType objectType { get; set; }
+            public string propertyName { get; set; }
+            public TSTupleType parameterTypes { get; set; }
+            public TSSimpleType valueType { get; set; }
+        }
+
         static string AsString(object value) {
             var t = value.GetType().UnderlyingIfNullable();
             if (t == typeof(string)) {
@@ -153,7 +160,7 @@ VT_NULL	1
             return parameterLists.FirstOrDefault();
         }
 
-        private TSMemberDescription GetMemberDescriptionForName(IEnumerable<MemberInfo> members) {
+        private TSMemberDescription GetMemberDescriptionForName(IEnumerable<MemberInfo> members, string typename) {
             var ret = new TSMemberDescription();
 
             var parameterList = GetSingleParameterList(members, ret.JsDoc);
@@ -194,7 +201,14 @@ VT_NULL	1
 
             ret.ReturnType = GetTypeName(members.First().ReturnType);
             if (hasSetter && parameterList.Any()) {
-                ret.Comment = "Also has setter with parameters";
+                var parameterTypes = new TSTupleType();
+                parameterList.SelectKVP((name, parameterDescription) => parameterDescription.Type).AddRangeTo(parameterTypes.Members);
+                parameterizedSetters.Add(new ParameterizedSetterInfo() {
+                    objectType = new TSSimpleType(typename),
+                    propertyName = members.First().Name,
+                    parameterTypes = parameterTypes,
+                    valueType = ret.ReturnType as TSSimpleType
+                });
             }
 
             ret.JsDoc.Add("", members.Select(x => x.HelpString).Distinct().Joined(" / "));
@@ -202,8 +216,8 @@ VT_NULL	1
             return ret;
         }
 
-        private Dictionary<string, TSMemberDescription> GetMembers(Members members, ref string enumerableType) {
-            var ret = members.Cast().Where(x => !x.IsRestricted() && x.Name != "_NewEnum").ToLookup(x => x.Name).Select(grp => KVP(grp.Key, GetMemberDescriptionForName(grp))).ToDictionary();
+        private Dictionary<string, TSMemberDescription> GetMembers(Members members, ref string enumerableType, string typename) {
+            var ret = members.Cast().Where(x => !x.IsRestricted() && x.Name != "_NewEnum").ToLookup(x => x.Name).Select(grp => KVP(grp.Key, GetMemberDescriptionForName(grp, typename))).ToDictionary();
 
             var enumerableType1 = enumerableType; //because ref parameters cannot be used within lambda expressions
             members.Cast().ToLookup(x => x.Name).IfContainsKey("_NewEnum", mi => {
@@ -217,7 +231,7 @@ VT_NULL	1
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescriptionBase(Members m, string typename, string helpString) {
             var ret = new TSInterfaceDescription();
             string enumerableType = null;
-            GetMembers(m, ref enumerableType).AddRangeTo(ret.Members);
+            GetMembers(m, ref enumerableType, typename).AddRangeTo(ret.Members);
             if (!enumerableType.IsNullOrEmpty()) { enumerableCollectionItemMapping[new TSSimpleType(typename)] = enumerableType; }
             ret.JsDoc.Add("", helpString);
             return KVP(typename, ret);
@@ -237,10 +251,11 @@ VT_NULL	1
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(RecordInfo r) {
             var ret = new TSInterfaceDescription();
+            var typename = $"{r.Parent.Name}.{r.Name}";
             string enumerableType = null; //this value will be ignored for RecordInfo
-            GetMembers(r.Members, ref enumerableType).AddRangeTo(ret.Members);
+            GetMembers(r.Members, ref enumerableType, typename).AddRangeTo(ret.Members);
             ret.JsDoc.Add("", r.HelpString);
-            return KVP($"{r.Parent.Name}.{r.Name}", ret);
+            return KVP(typename, ret);
         }
 
         private TSMemberDescription ToActiveXObjectConstructorDescription(CoClassInfo c) {
@@ -274,6 +289,16 @@ VT_NULL	1
             return ret;
         }
 
+        private TSMemberDescription ToMemberDescription(ParameterizedSetterInfo x) {
+            var ret = new TSMemberDescription();
+            ret.AddParameter("obj", x.objectType);
+            ret.AddParameter("propertyName", new TSSimpleType($"'{x.propertyName}'"));
+            ret.AddParameter("parameterTypes", x.parameterTypes);
+            ret.AddParameter("newValue", x.valueType);
+            ret.ReturnType = TSSimpleType.Void;
+            return ret;
+        }
+
         private TSMemberDescription ToEnumeratorConstructorDescription(KeyValuePair<TSSimpleType,string> kvp) {
             var collectionTypeName = kvp.Key;
             var itemTypeName = kvp.Value;
@@ -301,11 +326,14 @@ VT_NULL	1
             }
 
             var activex = new TSInterfaceDescription();
+
             coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(ToActiveXObjectConstructorDescription).AddRangeTo(activex.Constructors);
             coclasses.Select(x => new {
                 coclass = x,
                 eventInterface = x.DefaultEventInterface
             }).Where(x => x.eventInterface != null).SelectMany(x => x.eventInterface.Members.Cast().Select(y => KVP("on", ToActiveXEventMember(y, x.coclass)))).AddRangeTo(activex.Members);
+
+            parameterizedSetters.Select(x=>KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
 
             if (activex.Constructors.Any()) {
                 ret.GlobalInterfaces["ActiveXObject"] = activex;
@@ -332,6 +360,7 @@ VT_NULL	1
         List<TypeLibInfo> tlis = new List<TypeLibInfo>();
         Dictionary<string, List<string>> interfaceToCoClassMapping = new Dictionary<string, List<string>>();
         Dictionary<TSSimpleType, string> enumerableCollectionItemMapping = new Dictionary<TSSimpleType, string>();
+        List<ParameterizedSetterInfo> parameterizedSetters = new List<ParameterizedSetterInfo>();
 
         ILookup<string, InterfaceInfo> allInterfaces = null;
         Dictionary<string, RecordInfo> allRecords = null;
