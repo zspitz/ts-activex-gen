@@ -18,6 +18,8 @@ namespace TsActivexGen.Wpf {
         public string OutputFolder { get; set; }
         
         public bool PackageForTypings { get; set; }
+        public string LibraryUrl { get; set; }
+
         public bool WriteOutput { get; set; }
         public NamespaceOutput Output { get; set; }
         

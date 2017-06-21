@@ -64,6 +64,7 @@
     <Compile Include="Extensions\Type.cs" />
     <Compile Include="Functions.cs" />
     <Compile Include="Interfaces\ITSType.cs" />
+    <Compile Include="Methods.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

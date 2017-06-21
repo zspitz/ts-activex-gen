@@ -5,7 +5,6 @@ using System.Windows;
 using TsActivexGen.Util;
 using Ookii.Dialogs;
 using Forms = System.Windows.Forms;
-using System.IO;
 using static System.IO.Path;
 using static System.IO.File;
 using static System.Windows.MessageBoxButton;
@@ -15,26 +14,33 @@ using static System.Reflection.Assembly;
 using TsActivexGen.ActiveX;
 using System.Windows.Data;
 using System.Collections.ObjectModel;
+using static TsActivexGen.Util.Methods;
+using static TsActivexGen.Wpf.Functions;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
         ObservableCollection<OutputFileDetails> fileList = new ObservableCollection<OutputFileDetails>();
+
         public MainWindow() {
             InitializeComponent();
 
             dgTypeLibs.ItemsSource = TypeLibDetails.FromRegistry.Value;
 
-            txbFilter.TextChanged += (s, e) => ApplyFilter();
+            txbFilter.TextChanged += (s, e) => applyFilter();
 
             dgTypeLibs.SelectionChanged += (s, e) => {
+                //List<int> lst = null;
+                //Debug.WriteLine(lst.Count);
+
                 if (e.AddedItems.Count == 0) { return; }
                 addFiles();
             };
 
-            var fileDlg = new VistaOpenFileDialog();
-            fileDlg.CheckFileExists = true;
-            fileDlg.CheckPathExists = true;
-            fileDlg.Multiselect = false;
+            var fileDlg = new VistaOpenFileDialog() {
+                CheckFileExists = true,
+                CheckPathExists = true,
+                Multiselect = false
+            };
             btnBrowseTypeLibFile.Click += (s, e) => {
                 if (!txbTypeLibFromFile.Text.IsNullOrEmpty()) { fileDlg.FileName = txbTypeLibFromFile.Text; }
                 if (fileDlg.ShowDialog() == Forms.DialogResult.Cancel) { return; }
@@ -43,7 +49,7 @@ namespace TsActivexGen.Wpf {
             };
 
             txbOutputFolder.Text = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
-            txbOutputFolder.TextChanged += (s, e) => ((List<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.OutputFolder = txbOutputFolder.Text);
+            txbOutputFolder.TextChanged += (s, e) => ((IList<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.OutputFolder = txbOutputFolder.Text);
             btnBrowseOutputFolder.Click += (s, e) => fillFolder();
 
             Action onCheckToggled = () => ((IEnumerable<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.PackageForTypings = cbPackageForTypes.IsChecked.Value);
@@ -53,15 +59,32 @@ namespace TsActivexGen.Wpf {
             dtgFiles.ItemsSource = fileList;
 
             btnOutput.Click += (s, e) => {
-                if (!Directory.Exists(txbOutputFolder.Text)) {
-                    Directory.CreateDirectory(txbOutputFolder.Text);
-                }
+                ForceCreateDirectory(txbOutputFolder.Text);
                 dtgFiles.Items<OutputFileDetails>().ForEach(x => {
                     if (!x.WriteOutput) { return; }
                     if (x.DeclarationFileName.IsNullOrEmpty()) { return; }
                     if (createFile(x.FullDeclarationPath)) {
                         if (x.PackageForTypings) {
-                            throw new NotImplementedException(); //TODO
+                            var subfolder = Combine(txbOutputFolder.Text, x.DeclarationFileName);
+
+                            //create subdirectory for all files
+                            ForceCreateDirectory(subfolder);
+
+                            //create tsconfig.json
+                            WriteAllText(Combine(subfolder, "tsconfig.json"), GetTsConfig(x.DeclarationFileName));
+
+                            //create index.d.ts
+                            var s1 = GetHeaders(x.Name, x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text);
+                            s1 += Environment.NewLine;
+                            s1 += ReferenceDirectives(x.Output.Dependencies);
+                            s1 += x.Output.MainFile;
+                            WriteAllText(Combine(subfolder, "index.d.ts"), s1);
+
+                            //create tests file
+                            if (!x.Output.TestsFile.IsNullOrEmpty()) {
+                                s1 = ReferenceDirectives(new[] { x.Name }) + x.Output.TestsFile;
+                                WriteAllText(Combine(subfolder, $"{x.DeclarationFileName}-tests.ts"), s1);
+                            }
                         } else {
                             WriteAllText(x.FullDeclarationPath, x.Output.MainFile);
                         }
@@ -69,7 +92,7 @@ namespace TsActivexGen.Wpf {
 
                     if (!x.Output.RuntimeFile.IsNullOrEmpty() && createFile(x.FullRuntimePath)) {
                         if (x.PackageForTypings) {
-                            throw new NotImplementedException(); //TODO
+                            //TODO export as an NPM package?
                         } else {
                             WriteAllText(x.FullRuntimePath, x.Output.RuntimeFile);
                         }
@@ -132,7 +155,7 @@ namespace TsActivexGen.Wpf {
             return true;
         }
 
-        private void ApplyFilter() {
+        private void applyFilter() {
             CollectionViewSource.GetDefaultView(dgTypeLibs.ItemsSource).Filter = x => (((TypeLibDetails)x).Name ?? "").Contains(txbFilter.Text, StringComparison.OrdinalIgnoreCase);
         }
     }
