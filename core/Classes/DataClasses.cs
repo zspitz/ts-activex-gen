@@ -4,7 +4,8 @@ using TsActivexGen.Util;
 using System.Linq;
 using Microsoft.Win32;
 using static TsActivexGen.TSParameterType;
-using static TsActivexGen.Util.Functions;
+using TLI;
+using System.Diagnostics;
 
 namespace TsActivexGen {
     public abstract class EqualityBase<T> : IEquatable<T> where T : class {
@@ -62,7 +63,7 @@ namespace TsActivexGen {
             if (Parameters == null) { Parameters = new List<KeyValuePair<string, TSParameterDescription>>(); }
             Parameters.Add(name, new TSParameterDescription() { Type = type });
         }
-        public void AddParameter(string name, string type)  => AddParameter(name, new TSSimpleType(type));
+        public void AddParameter(string name, string type) => AddParameter(name, new TSSimpleType(type));
         public string[] TypeParts() {
             var ret = new List<string>();
             Parameters.DefaultIfNull().Values().SelectMany(x => x.Type.TypeParts()).AddRangeTo(ret);
@@ -72,7 +73,7 @@ namespace TsActivexGen {
     }
 
     public class TSInterfaceDescription {
-        public List<KeyValuePair<string, TSMemberDescription>> Members { get; } = new List<KeyValuePair<string,TSMemberDescription>>();
+        public List<KeyValuePair<string, TSMemberDescription>> Members { get; } = new List<KeyValuePair<string, TSMemberDescription>>();
         public List<TSMemberDescription> Constructors { get; } = new List<TSMemberDescription>();
         public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
     }
@@ -140,12 +141,15 @@ namespace TsActivexGen {
     public class NamespaceOutput {
         public string Description { get; set; }
         public string MainFile { get; set; }
+        public HashSet<string> Dependencies { get; set; }
         public string RuntimeFile { get; set; }
+        public string TestsFile { get; set; }
     }
 
     namespace ActiveX {
         public class TypeLibDetails {
             public static Lazy<List<TypeLibDetails>> FromRegistry = new Lazy<List<TypeLibDetails>>(() => {
+                var tliapp = new TLIApplication();
                 var ret = new List<TypeLibDetails>();
 
                 using (var key = Registry.ClassesRoot.OpenSubKey("TypeLib")) {
@@ -164,7 +168,7 @@ namespace TsActivexGen {
                                         if (!short.TryParse(lcid, out lcidParsed)) { continue; } //exclude non-numeric keys such as FLAGS and HELPDIR
                                         using (var lcidKey = versionKey.OpenSubKey(lcid)) {
                                             var names = lcidKey.GetSubKeyNames();
-                                            ret.Add(new TypeLibDetails() {
+                                            var td = new TypeLibDetails() {
                                                 TypeLibID = tlbid,
                                                 Name = libraryName,
                                                 Version = version,
@@ -174,7 +178,23 @@ namespace TsActivexGen {
                                                 Is32bit = names.Contains("win32"),
                                                 Is64bit = names.Contains("win64"),
                                                 RegistryKey = lcidKey.ToString()
-                                            });
+                                            };
+                                            if (!char.IsDigit(td.Version[0])) {
+                                                var paths = new HashSet<string>();
+                                                if (td.Is32bit) {
+                                                    paths.Add((string)lcidKey.OpenSubKey("win32").GetValue(""));
+                                                }
+                                                if (td.Is64bit) {
+                                                    paths.Add((string)lcidKey.OpenSubKey("win64").GetValue(""));
+                                                }
+                                                if (paths.Count > 1) {
+                                                    continue;
+                                                }
+                                                var tli = tliapp.TypeLibInfoFromFile(paths.First());
+                                                td.MajorVersion = tli.MajorVersion;
+                                                td.MinorVersion = tli.MinorVersion;
+                                            }
+                                            ret.Add(td);
                                         }
                                     }
                                 }
