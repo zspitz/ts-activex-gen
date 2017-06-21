@@ -12,32 +12,32 @@ namespace TsActivexGen {
 
         private StringBuilder sb;
 
-        private string JsDocLine(KeyValuePair<string, string> entry) {
+        private string jsDocLine(KeyValuePair<string, string> entry) {
             var key = entry.Key;
             if (key != "") { key = $"@{key} "; }
             return $" {key}{entry.Value}";
         }
 
-        private void WriteJsDoc(List<KeyValuePair<string, string>> JsDoc, int indentationLevel, bool newLine = false) {
+        private void writeJsDoc(List<KeyValuePair<string, string>> JsDoc, int indentationLevel, bool newLine = false) {
             JsDoc = JsDoc.WhereKVP((key, value) => !key.IsNullOrEmpty() || !value.IsNullOrEmpty()).ToList();
             if (JsDoc.Count == 0) { return; }
             if (newLine) { "".AppendLineTo(sb, indentationLevel); }
             if (JsDoc.Count == 1) {
-                $"/**{JsDocLine(JsDoc[0])} */".AppendLineTo(sb, indentationLevel);
+                $"/**{jsDocLine(JsDoc[0])} */".AppendLineTo(sb, indentationLevel);
             } else {
                 "/**".AppendLineTo(sb, indentationLevel);
-                JsDoc.OrderByKVP((key, value) => key).Select(x => "*" + JsDocLine(x)).AppendLinesTo(sb, indentationLevel);
+                JsDoc.OrderByKVP((key, value) => key).Select(x => "*" + jsDocLine(x)).AppendLinesTo(sb, indentationLevel);
                 "*/".AppendLineTo(sb, indentationLevel);
             }
         }
 
         //https://github.com/zspitz/ts-activex-gen/issues/25#issue-204161318
-        private void WriteEnumDeclaration(KeyValuePair<string, TSEnumDescription> x) {
+        private void writeEnumDeclaration(KeyValuePair<string, TSEnumDescription> x) {
             var name = NameOnly(x.Key);
             var @enum = x.Value;
             var members = @enum.Members.OrderBy(y => y.Key);
 
-            WriteJsDoc(@enum.JsDoc, 2);
+            writeJsDoc(@enum.JsDoc, 2);
 
             //https://github.com/zspitz/ts-activex-gen/issues/25
             if (@enum.Typename.FullName == "number") {
@@ -51,7 +51,7 @@ namespace TsActivexGen {
             }
         }
 
-        private void WriteNamespace(string name, Dictionary<string,string> members) {
+        private void writeNamespace(string name, Dictionary<string, string> members) {
             name = NameOnly(name);
             var orderedMembers = members.OrderBy(y => y.Key);
 
@@ -60,11 +60,11 @@ namespace TsActivexGen {
             "}".AppendWithNewSection(sb, 1);
         }
 
-        private void WriteEnumValues(KeyValuePair<string, TSEnumDescription> x)  => WriteNamespace(x.Key, x.Value.Members);
+        private void writeEnumValues(KeyValuePair<string, TSEnumDescription> x) => writeNamespace(x.Key, x.Value.Members);
 
-        private void WriteNamespace(KeyValuePair<string, TSNamespaceDescription> x)  => WriteNamespace(x.Key, x.Value.Members);
+        private void writeNamespace(KeyValuePair<string, TSNamespaceDescription> x) => writeNamespace(x.Key, x.Value.Members);
 
-        private string GetParameterString(KeyValuePair<string, TSParameterDescription> x, string ns) {
+        private string getParameterString(KeyValuePair<string, TSParameterDescription> x, string ns) {
             var name = x.Key;
             var parameterDescription = x.Value;
             if (parameterDescription.ParameterType == Rest) {
@@ -75,7 +75,7 @@ namespace TsActivexGen {
             return $"{name}: {GetTypeString(parameterDescription.Type, ns)}";
         }
 
-        private void WriteMemberBase(TSMemberDescription m, string ns, string memberIdentifier, int indentationLevel) {
+        private void writeMemberBase(TSMemberDescription m, string ns, string memberIdentifier, int indentationLevel) {
             var returnType = GetTypeString(m.ReturnType, ns);
 
             var comment = m.Comment;
@@ -89,10 +89,10 @@ namespace TsActivexGen {
                     if (parameterName.In(jsKeywords)) { parameterName = $"{parameterName}_{index}"; }
                     return KVP(parameterName, kvp.Value);
                 }).ToList();
-                parameterList = "(" + parameters.Joined(", ", y => GetParameterString(y, ns)) + ")";
+                parameterList = "(" + parameters.Joined(", ", y => getParameterString(y, ns)) + ")";
             }
 
-            WriteJsDoc(m.JsDoc, indentationLevel, true);
+            writeJsDoc(m.JsDoc, indentationLevel, true);
 
             $"{memberIdentifier}{parameterList}: {returnType};{comment}".AppendLineTo(sb, indentationLevel);
         }
@@ -100,26 +100,31 @@ namespace TsActivexGen {
         private void WriteMember(KeyValuePair<string, TSMemberDescription> x, string ns, int indentationLevel) {
             var memberDescription = x.Value;
             string @readonly = memberDescription.ReadOnly.GetValueOrDefault() ? "readonly " : "";
-            WriteMemberBase(memberDescription, ns, $"{@readonly}{x.Key}", indentationLevel);
+            writeMemberBase(memberDescription, ns, $"{@readonly}{x.Key}", indentationLevel);
         }
 
-        private void WriteConstructor(TSMemberDescription m, string ns, int indentationLevel) => WriteMemberBase(m, ns, "new", indentationLevel);
+        private void WriteConstructor(TSMemberDescription m, string ns, int indentationLevel) => writeMemberBase(m, ns, "new", indentationLevel);
 
         private string GetTypeString(ITSType type, string ns) { //this is not in each individual class, because the only purpose is for emitting
             string ret = null;
 
-            //go pattern matching!!!
-            if (ExecIfType<TSSimpleType>(type, x => ret = RelativeName(x.GenericParameter ?? x.FullName, ns))) {
-            } else if (ExecIfType<TSTupleType>(type, x => ret = $"[{x.Members.Joined(",", y => GetTypeString(y, ns))}]")) {
-            } else if (ExecIfType<TSObjectType>(type, x => ret = $"{{{x.Members.JoinedKVP((key, val) => $"{key}: {GetTypeString(val, ns)}")}}}")) {
-            } else if (ExecIfType<TSFunctionType>(type, x => {
-                //the only way to define a function type is with the fat arrow
-                //e.g. () => void and not (): void
-                ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => GetParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}"; 
-            })) {
-            } else {
-                throw new NotImplementedException();
+            switch (type) {
+                case TSSimpleType x:
+                    ret = RelativeName(x.GenericParameter ?? x.FullName, ns);
+                    break;
+                case TSTupleType x:
+                    ret = $"[{x.Members.Joined(",", y => GetTypeString(y, ns))}]";
+                    break;
+                case TSObjectType x:
+                    ret = $"{{{x.Members.JoinedKVP((key, val) => $"{key}: {GetTypeString(val, ns)}")}}}";
+                    break;
+                case TSFunctionType x:
+                    ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => getParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}";
+                    break;
+                default:
+                    throw new NotImplementedException();
             }
+
             return ret;
         }
 
@@ -129,7 +134,7 @@ namespace TsActivexGen {
         private void WriteInterface(KeyValuePair<string, TSInterfaceDescription> x, string ns, int indentationLevel) {
             var name = NameOnly(x.Key);
             var @interface = x.Value;
-            WriteJsDoc(@interface.JsDoc, indentationLevel);
+            writeJsDoc(@interface.JsDoc, indentationLevel);
             $"interface {name} {{".AppendLineTo(sb, indentationLevel);
             @interface.Members.OrderBy(y => y.Key).ThenBy(y => ParametersString(y.Value)).ForEach(y => WriteMember(y, ns, indentationLevel + 1));
             @interface.Constructors.OrderBy(ParametersString).ForEach(y => WriteConstructor(y, ns, indentationLevel + 1));
@@ -143,7 +148,7 @@ namespace TsActivexGen {
         public NamespaceOutput GetTypescript(TSNamespace ns) {
             sb = new StringBuilder();
 
-            WriteJsDoc(ns.JsDoc, 0);
+            writeJsDoc(ns.JsDoc, 0);
             $"declare namespace {ns.Name} {{".AppendWithNewSection(sb);
 
             if (ns.Aliases.Any()) {
@@ -154,13 +159,13 @@ namespace TsActivexGen {
             var numericEnums = ns.Enums.Where(x => x.Value.Typename.FullName == "number");
             if (numericEnums.Any()) {
                 "//Numeric enums".AppendLineTo(sb, 1);
-                numericEnums.OrderBy(x => x.Key).ForEach(WriteEnumDeclaration);
+                numericEnums.OrderBy(x => x.Key).ForEach(writeEnumDeclaration);
             }
 
             var nonnumericEnums = ns.Enums.Where(x => x.Value.Typename.FullName != "number");
             if (nonnumericEnums.Any()) {
                 "//Nonnumeric enums".AppendLineTo(sb, 1);
-                numericEnums.OrderBy(x => x.Key).ForEach(WriteEnumDeclaration);
+                numericEnums.OrderBy(x => x.Key).ForEach(writeEnumDeclaration);
             }
 
             if (ns.Interfaces.Any()) {
@@ -177,7 +182,8 @@ namespace TsActivexGen {
 
             var ret = new NamespaceOutput() {
                 MainFile = sb.ToString(),
-                Description = ns.Description
+                Description = ns.Description,
+                Dependencies = ns.Dependencies
             };
 
 
@@ -189,17 +195,22 @@ namespace TsActivexGen {
 
                 if (nonnumericEnums.Any()) {
                     "//Non-numeric enums".AppendLineTo(sb, 1);
-                    nonnumericEnums.OrderBy(x=>x.Key).ForEach(WriteEnumValues);
+                    nonnumericEnums.OrderBy(x => x.Key).ForEach(writeEnumValues);
                 }
 
                 if (ns.Namespaces.Any()) {
                     "//Modules".AppendLineTo(sb, 1);
-                    ns.Namespaces.OrderBy(x=>x.Key).ForEach(WriteNamespace);
+                    ns.Namespaces.OrderBy(x => x.Key).ForEach(writeNamespace);
                 }
 
                 "}".AppendWithNewSection(sb);
             }
             ret.RuntimeFile = sb.ToString();
+
+            //Build the tests file
+            ns.GlobalInterfaces.IfContainsKey("ActiveXObject", x => {
+                ret.TestsFile = x.Constructors.Joined(Environment.NewLine + Environment.NewLine, (y, index) => $"let obj{index} = new ActiveXObject({GetTypeString(y.Parameters[0].Value.Type, "")})");
+            });
 
             return ret;
         }
