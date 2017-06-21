@@ -75,7 +75,7 @@ VT_NULL	1
             } else if (splitValues.ContainsAny(VT_EMPTY)) {
                 var ti = vti.TypeInfo;
                 ret.FullName = $"{ti.Parent.Name}.{ti.Name}";
-                if (vti.IsExternalType) { AddTLI(vti.TypeLibInfoExternal); }
+                if (vti.IsExternalType) { AddTLI(vti.TypeLibInfoExternal,true); }
                 interfaceToCoClassMapping.IfContainsKey(ret.FullName, val => ret.FullName = val.FirstOrDefault());
             } else if (splitValues.ContainsAny(VT_VARIANT, VT_DISPATCH)) {
                 ret.FullName = "any";
@@ -259,9 +259,11 @@ VT_NULL	1
         }
 
         private TSMemberDescription ToActiveXObjectConstructorDescription(CoClassInfo c) {
+            var progid = GetProgIDFromCLSID(c.GUID);
+            if (progid == null) { return null; }
             var ret = new TSMemberDescription();
             var typename = $"{c.Parent.Name}.{c.Name}";
-            ret.AddParameter("progid", $"'{typename}'"); //note the string literal type
+            ret.AddParameter("progid", $"'{progid}'"); //note the string literal type
             ret.ReturnType = new TSSimpleType(typename);
             return ret;
         }
@@ -327,15 +329,15 @@ VT_NULL	1
 
             var activex = new TSInterfaceDescription();
 
-            coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(ToActiveXObjectConstructorDescription).AddRangeTo(activex.Constructors);
+            coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(ToActiveXObjectConstructorDescription).Where(x=>x != null).AddRangeTo(activex.Constructors);
             coclasses.Select(x => new {
                 coclass = x,
                 eventInterface = x.DefaultEventInterface
             }).Where(x => x.eventInterface != null).SelectMany(x => x.eventInterface.Members.Cast().Select(y => KVP("on", ToActiveXEventMember(y, x.coclass)))).AddRangeTo(activex.Members);
 
-            parameterizedSetters.Select(x=>KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
+            parameterizedSetters.Where(x => x.objectType.Namespace == ret.Name).Select(x=>KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
 
-            if (activex.Constructors.Any()) {
+            if (activex.Constructors.Any() || activex.Members.Any()) {
                 ret.GlobalInterfaces["ActiveXObject"] = activex;
             }
 
@@ -368,7 +370,11 @@ VT_NULL	1
         Dictionary<string, UnionInfo> allUnions = null;
         int currentTliCount = 0;
 
-        private void AddTLI(TypeLibInfo tli) {
+        private void AddTLI(TypeLibInfo tli, bool fromExternal = false) {
+            if (fromExternal) {
+                var maxVersion = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == tli.GUID).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).FirstOrDefault();
+                tli = tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
+            }
             if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
             tlis.Add(tli);
             tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
