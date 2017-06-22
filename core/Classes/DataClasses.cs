@@ -25,7 +25,6 @@ namespace TsActivexGen {
     }
 
     public class TSEnumDescription {
-        public TSSimpleType Typename { get; set; }
         public Dictionary<string, string> Members { get; } = new Dictionary<string, string>(); //values -> string representation of value
         public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
     }
@@ -88,7 +87,6 @@ namespace TsActivexGen {
         public string Description { get; set; }
         public Dictionary<string, TSEnumDescription> Enums { get; } = new Dictionary<string, TSEnumDescription>();
         public Dictionary<string, TSInterfaceDescription> Interfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
-        public Dictionary<string, TSNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSNamespaceDescription>();
         public Dictionary<string, TSSimpleType> Aliases { get; } = new Dictionary<string, TSSimpleType>();
         public HashSet<string> Dependencies { get; } = new HashSet<string>();
         public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
@@ -142,7 +140,6 @@ namespace TsActivexGen {
         public string Description { get; set; }
         public string MainFile { get; set; }
         public HashSet<string> Dependencies { get; set; }
-        public string RuntimeFile { get; set; }
         public string TestsFile { get; set; }
     }
 

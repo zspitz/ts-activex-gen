@@ -89,14 +89,6 @@ namespace TsActivexGen.Wpf {
                             WriteAllText(x.FullDeclarationPath, x.Output.MainFile);
                         }
                     }
-
-                    if (!x.Output.RuntimeFile.IsNullOrEmpty() && createFile(x.FullRuntimePath)) {
-                        if (x.PackageForTypings) {
-                            //TODO export as an NPM package?
-                        } else {
-                            WriteAllText(x.FullRuntimePath, x.Output.RuntimeFile);
-                        }
-                    }
                 });
                 var firstFilePath = dtgFiles.Items<OutputFileDetails>().FirstOrDefault()?.FullDeclarationPath;
                 if (firstFilePath.IsNullOrEmpty()) { return; }
@@ -139,7 +131,6 @@ namespace TsActivexGen.Wpf {
             new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, x) => new OutputFileDetails {
                 Name = name,
                 DeclarationFileName = $"activex-{name.ToLower()}.d.ts",
-                RuntimeFileName = $"activex-{name.ToLower()}-runtime.ts",
                 OutputFolder = txbOutputFolder.Text,
                 WriteOutput = true,
                 PackageForTypings = cbPackageForTypes.IsChecked.Value,

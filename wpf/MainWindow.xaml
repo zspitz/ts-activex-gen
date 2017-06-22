@@ -80,8 +80,6 @@
                     <my:DataGridTextColumnExt Binding="{Binding Output.Description}" IsReadOnly="True" Header="Description" TextTrimming="CharacterEllipsis" />
                     <DataGridTextColumn Binding="{Binding DeclarationFileName}" Header="Filename" />
                     <DataGridCheckBoxColumn Binding="{Binding DeclarationExists, Mode=OneWay}" IsReadOnly="True" Header="Exists" />
-                    <DataGridTextColumn Binding="{Binding RuntimeFileName}" Header="Filename" />
-                    <DataGridCheckBoxColumn Binding="{Binding RuntimeExists, Mode=OneWay}" IsReadOnly="True" Header="Exists" />
                     <DataGridCheckBoxColumn Binding="{Binding WriteOutput}" Header="Output" />
                     <DataGridCheckBoxColumn Binding="{Binding PackageForTypings}" Header="@types packaging" />
                 </DataGrid.Columns>

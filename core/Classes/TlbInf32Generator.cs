@@ -100,26 +100,9 @@ VT_NULL	1
             return ret;
         }
 
-        //https://github.com/zspitz/ts-activex-gen/issues/25
-        private KeyValuePair<string, TSNamespaceDescription> ToTSNamespaceDescription(ConstantInfo c) {
-            var ret = new TSNamespaceDescription();
-            c.Members.Cast().Select(x => KVP(x.Name, AsString((object)x.Value))).AddRangeTo(ret.Members);
-            ret.JsDoc.Add("", c.HelpString);
-            return KVP($"{c.Parent.Name}.{c.Name}", ret);
-        }
-
         private KeyValuePair<string, TSEnumDescription> ToTSEnumDescription(ConstantInfo c) {
             var ret = new TSEnumDescription();
-            c.Members.Cast().Select(x => {
-                var oValue = (object)x.Value;
-                var typename = GetTypeName(x.ReturnType, oValue);
-                if (ret.Typename == null) {
-                    ret.Typename = typename;
-                } else if (ret.Typename != TSSimpleType.Any && ret.Typename != typename) {
-                    ret.Typename = TSSimpleType.Any;
-                }
-                return KVP(x.Name, AsString(oValue));
-            }).AddRangeTo(ret.Members);
+            c.Members.Cast().Select(x => KVP(x.Name, AsString((object)x.Value))).AddRangeTo(ret.Members);
             ret.JsDoc.Add("", c.HelpString);
             return KVP($"{c.Parent.Name}.{c.Name}", ret);
         }
@@ -314,8 +297,7 @@ VT_NULL	1
             var coclasses = tli.CoClasses.Cast().ToList();
 
             var ret = new TSNamespace() { Name = tli.Name };
-            tli.Constants.Cast().Where(x => x.TypeKind != TKIND_MODULE).Select(ToTSEnumDescription).AddRangeTo(ret.Enums);
-            tli.Constants.Cast().Where(x => x.TypeKind == TKIND_MODULE).Select(ToTSNamespaceDescription).AddRangeTo(ret.Namespaces);
+            tli.Constants.Cast().Select(ToTSEnumDescription).AddRangeTo(ret.Enums);
             coclasses.Select(ToTSInterfaceDescription).AddInterfacesTo(ret);
 
             if (tli.Declarations.Cast().Any()) {

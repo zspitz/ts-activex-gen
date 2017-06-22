@@ -12,9 +12,6 @@ namespace TsActivexGen.Wpf {
         public string DeclarationFileName { get; set; }
         public bool DeclarationExists => File.Exists(FullDeclarationPath);
         public string FullDeclarationPath => Path.Combine(OutputFolder, DeclarationFileName.ForceEndsWith(".d.ts"));
-        public string RuntimeFileName { get; set; }
-        public bool RuntimeExists => File.Exists(FullRuntimePath);
-        public string FullRuntimePath => Path.Combine(OutputFolder, RuntimeFileName.ForceEndsWith(".ts"));
         public string OutputFolder { get; set; }
         
         public bool PackageForTypings { get; set; }

@@ -39,30 +39,10 @@ namespace TsActivexGen {
 
             writeJsDoc(@enum.JsDoc, 2);
 
-            //https://github.com/zspitz/ts-activex-gen/issues/25
-            if (@enum.Typename.FullName == "number") {
-                $"const enum {name} {{".AppendLineTo(sb, 1);
-                members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", 2, ",");
-                "}".AppendWithNewSection(sb, 1);
-            } else {
-                $"type {name} = ".AppendLineTo(sb, 1);
-                members.AppendLinesTo(sb, (memberName, value) => $"\"{value}\" //{memberName}", 2, null, "| ");
-                sb.AppendLine();
-            }
-        }
-
-        private void writeNamespace(string name, Dictionary<string, string> members) {
-            name = NameOnly(name);
-            var orderedMembers = members.OrderBy(y => y.Key);
-
-            $"export namespace {name} {{".AppendLineTo(sb, 1);
-            orderedMembers.AppendLinesTo(sb, (memberName, value) => $"export const {memberName} = {value};", 2);
+            $"const enum {name} {{".AppendLineTo(sb, 1);
+            members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", 2, ",");
             "}".AppendWithNewSection(sb, 1);
         }
-
-        private void writeEnumValues(KeyValuePair<string, TSEnumDescription> x) => writeNamespace(x.Key, x.Value.Members);
-
-        private void writeNamespace(KeyValuePair<string, TSNamespaceDescription> x) => writeNamespace(x.Key, x.Value.Members);
 
         private string getParameterString(KeyValuePair<string, TSParameterDescription> x, string ns) {
             var name = x.Key;
@@ -156,16 +136,9 @@ namespace TsActivexGen {
                 ns.Aliases.OrderBy(x => x.Key).ForEach(x => WriteAlias(x, ns.Name));
             }
 
-            var numericEnums = ns.Enums.Where(x => x.Value.Typename.FullName == "number");
-            if (numericEnums.Any()) {
-                "//Numeric enums".AppendLineTo(sb, 1);
-                numericEnums.OrderBy(x => x.Key).ForEach(writeEnumDeclaration);
-            }
-
-            var nonnumericEnums = ns.Enums.Where(x => x.Value.Typename.FullName != "number");
-            if (nonnumericEnums.Any()) {
-                "//Nonnumeric enums".AppendLineTo(sb, 1);
-                numericEnums.OrderBy(x => x.Key).ForEach(writeEnumDeclaration);
+            if (ns.Enums.Any()) {
+                "//Enums".AppendLineTo(sb, 1);
+                ns.Enums.OrderBy(x => x.Key).ForEach(writeEnumDeclaration);
             }
 
             if (ns.Interfaces.Any()) {
@@ -185,27 +158,6 @@ namespace TsActivexGen {
                 Description = ns.Description,
                 Dependencies = ns.Dependencies
             };
-
-
-            //Build the runtime constants file
-
-            sb = new StringBuilder();
-            if (nonnumericEnums.Any() || ns.Namespaces.Any()) {
-                $"namespace {ns.Name} {{".AppendWithNewSection(sb);
-
-                if (nonnumericEnums.Any()) {
-                    "//Non-numeric enums".AppendLineTo(sb, 1);
-                    nonnumericEnums.OrderBy(x => x.Key).ForEach(writeEnumValues);
-                }
-
-                if (ns.Namespaces.Any()) {
-                    "//Modules".AppendLineTo(sb, 1);
-                    ns.Namespaces.OrderBy(x => x.Key).ForEach(writeNamespace);
-                }
-
-                "}".AppendWithNewSection(sb);
-            }
-            ret.RuntimeFile = sb.ToString();
 
             //Build the tests file
             ns.GlobalInterfaces.IfContainsKey("ActiveXObject", x => {
