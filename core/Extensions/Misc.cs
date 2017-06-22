@@ -17,5 +17,15 @@ namespace TsActivexGen.Util {
         public static HashSet<string> NamedTypes(this IEnumerable<ITSType> types) => types.SelectMany(x => x.NamedTypes()).ToHashSet();
         public static string[] NamedTypes(this IEnumerable<string> types) => types.Except(builtins).Where(x => !IsLiteralTypeName(x)).ToArray();
         public static bool IsLiteralType(this ITSType type) => IsLiteralTypeName((type as TSSimpleType)?.FullName);
+
+        //https://github.com/zspitz/ts-activex-gen/issues/32
+        public static void AddInterfaceTo(this KeyValuePair<string, TSInterfaceDescription> x, TSNamespace ns) {
+            if (x.Value.Members.Any()) {
+                ns.Interfaces.Add(x);
+            } else {
+                ns.Aliases.Add(x.Key, TSSimpleType.Any);
+            }
+        }
+        public static void AddInterfacesTo(this IEnumerable<KeyValuePair<string, TSInterfaceDescription>> src, TSNamespace ns) => src.ForEach(x => x.AddInterfaceTo(ns));
     }
 }

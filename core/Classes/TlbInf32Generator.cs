@@ -316,7 +316,7 @@ VT_NULL	1
             var ret = new TSNamespace() { Name = tli.Name };
             tli.Constants.Cast().Where(x => x.TypeKind != TKIND_MODULE).Select(ToTSEnumDescription).AddRangeTo(ret.Enums);
             tli.Constants.Cast().Where(x => x.TypeKind == TKIND_MODULE).Select(ToTSNamespaceDescription).AddRangeTo(ret.Namespaces);
-            coclasses.Select(ToTSInterfaceDescription).AddRangeTo(ret.Interfaces);
+            coclasses.Select(ToTSInterfaceDescription).AddInterfacesTo(ret);
 
             if (tli.Declarations.Cast().Any()) {
                 //not sure what these are, if they are accessible from JScript
@@ -417,12 +417,12 @@ VT_NULL	1
                         var ns = NSSet.Namespaces[s.Split('.')[0]];
 
                         //go pattern matching!!!!
-                        if (allInterfaces.IfContainsKey(s, grp => {
+                        foundTypes = allInterfaces.IfContainsKey(s, grp => {
                             foreach (var x in grp) {
                                 switch (x.TypeKind) {
                                     case TKIND_INTERFACE:
                                     case TKIND_DISPATCH:
-                                        ns.Interfaces.Add(ToTSInterfaceDescription(x));
+                                        ToTSInterfaceDescription(x).AddInterfaceTo(ns);
                                         break;
                                     case TKIND_ALIAS: // handles https://github.com/zspitz/ts-activex-gen/issues/33
                                         ns.Aliases.Add(ToTypeAlias(x));
@@ -431,15 +431,12 @@ VT_NULL	1
                                         throw new Exception($"Unhandled TypeKind '{x.TypeKind}'");
                                 }
                             }
-                        })
-                            || allRecords.IfContainsKey(s, x => ns.Interfaces.Add(ToTSInterfaceDescription(x)))
-                            || allAliases.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)))
-                            || allUnions.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)))
-                        ) {
-                            foundTypes = true;
-                        } else if (Debugger.IsAttached) {
-                            Debugger.Break();
-                        }
+                        }) 
+                        || allRecords.IfContainsKey(s, x => ToTSInterfaceDescription(x).AddInterfaceTo(ns))
+                        || allAliases.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)))
+                        || allUnions.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)));
+
+                        if (!foundTypes && Debugger.IsAttached) { Debugger.Break(); }
                     });
 
                     undefinedTypes = NSSet.GetUndefinedTypes();
