@@ -342,7 +342,7 @@ VT_NULL	1
             }
 
             var guid = tli.GUID;
-            ret.Description = TypeLibDetails.FromRegistry.Value.FirstOrDefault(x => x.TypeLibID == guid).Name;
+            ret.Description = TypeLibDetails.FromRegistry.Value.Where(x=>x.TypeLibID == guid).OrderByDescending(x=>x.MajorVersion).ThenBy(x=>x.MinorVersion).FirstOrDefault()?.Name;
 
             return ret;
         }
@@ -355,6 +355,11 @@ VT_NULL	1
         private KeyValuePair<string, TSSimpleType> ToTypeAlias(UnionInfo u) {
             var ret= KVP($"{u.Parent.Name}.{u.Name}", TSSimpleType.Any);
             ret.Value.JsDoc.Add("", u.HelpString);
+            return ret;
+        }
+        private KeyValuePair<string, TSSimpleType> ToTypeAlias(InterfaceInfo ii) {
+            var ret = KVP($"{ii.Parent.Name}.{ ii.Name}", GetTypeName(ii.ResolvedType));
+            ret.Value.JsDoc.Add("", ii.HelpString);
             return ret;
         }
 
@@ -370,8 +375,8 @@ VT_NULL	1
         Dictionary<string, UnionInfo> allUnions = null;
         int currentTliCount = 0;
 
-        private void AddTLI(TypeLibInfo tli, bool fromExternal = false) {
-            if (fromExternal) {
+        private void AddTLI(TypeLibInfo tli, bool resolveMaxVersion = false) {
+            if (resolveMaxVersion) {
                 var maxVersion = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == tli.GUID).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).FirstOrDefault();
                 tli = tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
             }
@@ -406,12 +411,27 @@ VT_NULL	1
                         allAliases = tlis.SelectMany(x => x.IntrinsicAliases.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
                         allUnions = tlis.SelectMany(x => x.Unions.Cast()).ToDictionary(x => $"{x.Parent.Name}.{x.Name}");
                         currentTliCount = tlis.Count;
+
                     }
                     undefinedTypes.ForEach(s => {
                         var ns = NSSet.Namespaces[s.Split('.')[0]];
 
                         //go pattern matching!!!!
-                        if (allInterfaces.IfContainsKey(s, grp => grp.Select(ToTSInterfaceDescription).AddRangeTo(ns.Interfaces))
+                        if (allInterfaces.IfContainsKey(s, grp => {
+                            foreach (var x in grp) {
+                                switch (x.TypeKind) {
+                                    case TKIND_INTERFACE:
+                                    case TKIND_DISPATCH:
+                                        ns.Interfaces.Add(ToTSInterfaceDescription(x));
+                                        break;
+                                    case TKIND_ALIAS: // handles https://github.com/zspitz/ts-activex-gen/issues/33
+                                        ns.Aliases.Add(ToTypeAlias(x));
+                                        break;
+                                    default:
+                                        throw new Exception($"Unhandled TypeKind '{x.TypeKind}'");
+                                }
+                            }
+                        })
                             || allRecords.IfContainsKey(s, x => ns.Interfaces.Add(ToTSInterfaceDescription(x)))
                             || allAliases.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)))
                             || allUnions.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)))
@@ -453,7 +473,7 @@ VT_NULL	1
             } catch (Exception) {
                 return;
             }
-            AddTLI(toAdd);
+            AddTLI(toAdd, true);
             GenerateNSSetParts();
         }
 
