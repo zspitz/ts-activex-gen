@@ -1,9 +1,11 @@
 # ts-activex-gen
-Library and WPF UI for generating Typescript definitions from COM type libraries or WMI classes
+Library and WPF UI for generating Typescript definitions from COM type libraries, either from the Windows Registry, or from files on disk.
+
+Optionally, definitions can be packaged for publication DefinitelyTyped, as outlined [here](https://github.com/DefinitelyTyped/DefinitelyTyped) and [here](http://www.typescriptlang.org/docs/handbook/declaration-files/publishing.html).
 
 ### UI
 
-![Choosing a registerd COM library, and previewing the definitions](https://raw.githubusercontent.com/zspitz/ts-activex-gen/master/screenshot.png)
+![Choosing a registerd COM library](https://raw.githubusercontent.com/zspitz/ts-activex-gen/master/screenshot.png)
 
 ### Library
 
@@ -30,71 +32,23 @@ generator.AddFromFile(@"c:\path\to\file.dll");
 TSNamespaceSet namespaceSet = generator.NSSet;
 
 var builder = new TSBuilder();
-string ts = builder.GetTypescript(namespaceSet);
+NamespaceOutput output = builder.GetTypescript(namespaceSet);
+string typescriptDefinitions = output.MainFile;
+string typescriptTestsFileStub = output.TestsFile;
 ```
 
-### Some caveats
-1. ActiveX objects can have parameterized properties, both getters and setters:
+### Event handlers and parameterized setters
 
-  ```javascript
-  var dict = new ActiveXObject('Scripting.Dictionary');
-  dict.Add('a',1);
-  dict.Add('b',2);
-  
-  //getter with parameters
-  WScript.Echo(dict.Item('a')); //prints 1
-  
-  //setter with parameters
-  dict.Item('a') = 1;
-  ```
+Standard Javascript doesn't support the Microsoft JScript-specific syntax used for registering event handlers (`objectname::eventname`) and property setters with parameters (`object.Item(1) = 1`). [This library](https://github.com/zspitz/activex-js-helpers) allows the use pf standard JS for these tasks. Generated definitions include overloads that leverage the library.
 
-  The syntax for using property setters with parameters is not valid Typescript, and thus are not included in the definitions. (Parameterized property getters use invocation syntax, which is not a problem.) See [here](https://github.com/Microsoft/TypeScript/issues/956#issuecomment-230396498) for a possible workaround.
-
-2. There is no simple, environment-independent technique for handling Automation events in JScript, and so this is also not reflected in the generated definitions. See [Scripting Events](https://msdn.microsoft.com/en-us/library/ms974564.aspx?f=255&MSPPError=-2147217396) for further details, and [here](https://github.com/zspitz/activex-js-events) for a summary of the issues and a library to work around them.
-
-3. Enum values (and constants in modules) are not really accessible via Javascript; only instance members of an object created via `new ActiveXObject(progID)` are accessible. When writing code in Javascript, the actual values must be used:
-
-  ```javascript
-  var dict=new ActiveXObject('Scripting.Dictionary');
-  //The CompareMode property is defined as type CompareMethod, with values BinaryCompare = 0, DatabaseCompare = 2 and TextCompare = 1
-  //However, there is no way to access these values from Javascript; we have to use the numeric literals instead
-  dict.CompareMode=1;
-  ```
-
-  For numeric types we can work around this with `const enum`, which can be assigned values in ambient contexts. The actual values will be used on compilation:
-
-  ```typescript
-  //microsoft-scripting-runtime.d.ts
-  declare namespace Scripting {
-    const enum CompareMethod {
-      BinaryCompare = 0;
-      DatabaseCompare = 2;
-      TextCompare = 1;
-    }
-  }
-  //test.ts
-  dict.CompareMode = Scripting.CompareMethod.TextCompare;
-  ```
-
-  will compile to Javascript as:
-
-  ```javascript
-  dict.CompareMode = 1;
-  ```
-
-  Currently, for other enum types, and modules with constants, the cloeset we can come is a union type:
-
-  ```typescript
-  //declaration
-  type CommandID = 
-    "{04E725B0-ACAE-11D2-A093-00C04F72DC3C}" //wiaCommandChangeDocument
-    | "{E208C170-ACAD-11D2-A093-00C04F72DC3C}" //wiaCommandDeleteAllItems
-    | "{9B26B7B2-ACAD-11D2-A093-00C04F72DC3C}" //wiaCommandSynchronize
-    | "{AF933CAC-ACAD-11D2-A093-00C04F72DC3C}" //wiaCommandTakePicture
-    | "{1F3B3D8E-ACAE-11D2-A093-00C04F72DC3C}"; //wiaCommandUnloadDocument
-  
-  //if cmd is not one of the values, the code will not compile
-  var cmd: CommandID = "{E208C170-ACAD-11D2-A093-00C04F72DC3C}";
-  ```
-  
-  See https://github.com/zspitz/ts-activex-gen/issues/25
+```
+interface ActiveXObject {
+    ...
+    on(obj: Word.Application, eventName: 'DocumentBeforeClose', eventArgs: ['Doc','Cancel'], handler: (this: Word.Application, parameter: {Doc: Word.Document,Cancel: boolean}) => void): void;
+    on(obj: Word.Application, eventName: 'DocumentBeforeSave', eventArgs: ['Doc','SaveAsUI','Cancel'], handler: (this: Word.Application, parameter: {Doc: Word.Document,SaveAsUI: boolean,Cancel: boolean}) => void): void;
+    on(obj: Word.Application, eventName: 'DocumentChange', handler: (this: Word.Application, parameter: {}) => void): void;
+    on(obj: Word.Application, eventName: 'DocumentOpen', eventArgs: ['Doc'], handler: (this: Word.Application, parameter: {Doc: Word.Document}) => void): void;
+    ...
+    set(obj: Word.Document, propertyName: 'ActiveWritingStyle', parameterTypes: [any], newValue: string): void;
+    ...
+```
