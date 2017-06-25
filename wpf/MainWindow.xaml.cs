@@ -59,7 +59,6 @@ namespace TsActivexGen.Wpf {
 
                 string selectedPath;
 
-                //TODO define values on the listbox, so if the order of the items changes, this won't break
                 if (lbPackaging.SelectedValue<bool>()) {
                     //package for DefinitelyTyped
                     toOutput.ForEach(x=> {
