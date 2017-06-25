@@ -14,8 +14,8 @@ using static System.Reflection.Assembly;
 using TsActivexGen.ActiveX;
 using System.Windows.Data;
 using System.Collections.ObjectModel;
-using static TsActivexGen.Util.Methods;
 using static TsActivexGen.Wpf.Functions;
+using System.IO;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -29,9 +29,6 @@ namespace TsActivexGen.Wpf {
             txbFilter.TextChanged += (s, e) => applyFilter();
 
             dgTypeLibs.SelectionChanged += (s, e) => {
-                //List<int> lst = null;
-                //Debug.WriteLine(lst.Count);
-
                 if (e.AddedItems.Count == 0) { return; }
                 addFiles();
             };
@@ -49,50 +46,53 @@ namespace TsActivexGen.Wpf {
             };
 
             txbOutputFolder.Text = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
-            txbOutputFolder.TextChanged += (s, e) => ((IList<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.OutputFolder = txbOutputFolder.Text);
+            txbOutputFolder.TextChanged += (s, e) => ((IList<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.OutputFolderRoot = txbOutputFolder.Text);
             btnBrowseOutputFolder.Click += (s, e) => fillFolder();
-
-            Action onCheckToggled = () => ((IEnumerable<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.PackageForTypings = cbPackageForTypes.IsChecked.Value);
-            cbPackageForTypes.Checked += (s, e) => onCheckToggled();
-            cbPackageForTypes.Unchecked += (s, e) => onCheckToggled();
 
             dtgFiles.ItemsSource = fileList;
 
             btnOutput.Click += (s, e) => {
-                ForceCreateDirectory(txbOutputFolder.Text);
-                dtgFiles.Items<OutputFileDetails>().ForEach(x => {
-                    if (!x.WriteOutput) { return; }
-                    if (x.DeclarationFileName.IsNullOrEmpty()) { return; }
-                    if (createFile(x.FullDeclarationPath)) {
-                        if (x.PackageForTypings) {
-                            var subfolder = Combine(txbOutputFolder.Text, x.DeclarationFileName);
+                var toOutput = dtgFiles.Items<OutputFileDetails>().Where(x => x.WriteOutput && !x.Name.IsNullOrEmpty()).ToList();
+                if (toOutput.None()) { return; }
 
-                            //create subdirectory for all files
-                            ForceCreateDirectory(subfolder);
+                Directory.CreateDirectory(txbOutputFolder.Text);
 
-                            //create tsconfig.json
-                            WriteAllText(Combine(subfolder, "tsconfig.json"), GetTsConfig(x.DeclarationFileName));
+                string selectedPath;
 
-                            //create index.d.ts
-                            var s1 = GetHeaders(x.Name, x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text);
-                            s1 += Environment.NewLine;
-                            s1 += ReferenceDirectives(x.Output.Dependencies);
-                            s1 += x.Output.MainFile;
-                            WriteAllText(Combine(subfolder, "index.d.ts"), s1);
+                //TODO define values on the listbox, so if the order of the items changes, this won't break
+                if (lbPackaging.SelectedValue<bool>()) {
+                    //package for DefinitelyTyped
+                    toOutput.ForEach(x=> {
+                        //create subdirectory for all files
+                        Directory.CreateDirectory(x.PackagedFolderPath);
 
-                            //create tests file
-                            if (!x.Output.TestsFile.IsNullOrEmpty()) {
-                                s1 = ReferenceDirectives(new[] { x.Name }) + x.Output.TestsFile;
-                                WriteAllText(Combine(subfolder, $"{x.DeclarationFileName}-tests.ts"), s1);
-                            }
-                        } else {
-                            WriteAllText(x.FullDeclarationPath, x.Output.MainFile);
-                        }
-                    }
-                });
-                var firstFilePath = dtgFiles.Items<OutputFileDetails>().FirstOrDefault()?.FullDeclarationPath;
-                if (firstFilePath.IsNullOrEmpty()) { return; }
-                var psi = new ProcessStartInfo("explorer.exe", "/n /e,/select,\"" + firstFilePath + "\"");
+                        //create tsconfig.json
+                        x.WritePackageFile("tsconfig.json", GetTsConfig(x.FormattedName));
+
+                        //create index.d.ts
+                        var s1 = GetHeaders(x.Name,x.Description,x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text);
+                        s1 += Environment.NewLine;
+                        s1 += ReferenceDirectives(x.Output.Dependencies);
+                        s1 += x.Output.MainFile;
+                        WriteAllText(x.PackagedFilePath, s1);
+
+                        //create tests file
+                        x.WriteTestsFile(x.Output.TestsFile);
+
+                        //create tslint.json
+                        x.WritePackageFile("tslint.json", @"{ ""extends"": ""dtslint / dt.json"" }");
+
+                        //create package.json
+                        x.WritePackageFile("package.json", @"{ ""dependencies"": { ""activex-helpers"": ""*""}}");
+                    });
+                    selectedPath = toOutput.First().PackagedFolderPath;
+                } else {
+                    //single file
+                    toOutput.ForEach(x => WriteAllText(x.SingleFilePath, x.Output.MainFile));
+                    selectedPath = toOutput.First().SingleFilePath;
+                }
+
+                var psi = new ProcessStartInfo("explorer.exe", $"/n /e,/select,\"{selectedPath}\"");
                 Process.Start(psi);
             };
 
@@ -130,10 +130,8 @@ namespace TsActivexGen.Wpf {
             fileList.Clear();
             new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, x) => new OutputFileDetails {
                 Name = name,
-                DeclarationFileName = $"activex-{name.ToLower()}.d.ts",
-                OutputFolder = txbOutputFolder.Text,
+                OutputFolderRoot = txbOutputFolder.Text,
                 WriteOutput = true,
-                PackageForTypings = cbPackageForTypes.IsChecked.Value,
                 Output = x
             }).AddRangeTo(fileList);
         }

@@ -1,26 +1,31 @@
 ﻿using PropertyChanged;
-using System.IO;
 using System.Windows.Controls;
-using TsActivexGen.Util;
 using System.Windows;
+using static System.IO.File;
+using static System.IO.Path;
 
 namespace TsActivexGen.Wpf {
     [ImplementPropertyChanged]
     public class OutputFileDetails {
         public string Name { get; set; }
         public string Description { get; set; }
-        public string DeclarationFileName { get; set; }
-        public bool DeclarationExists => File.Exists(FullDeclarationPath);
-        public string FullDeclarationPath => Path.Combine(OutputFolder, DeclarationFileName.ForceEndsWith(".d.ts"));
-        public string OutputFolder { get; set; }
-        
-        public bool PackageForTypings { get; set; }
+        public string OutputFolderRoot { get; set; }
+
+        public string FormattedName => $"activex-{Name.ToLower()}";
+
+        public string SingleFilePath  => Combine(OutputFolderRoot, FormattedName + ".d.ts");
+        public string PackagedFolderPath => Combine(OutputFolderRoot, FormattedName);
+        public string PackagedFilePath  => Combine(OutputFolderRoot, FormattedName, "index.d.ts");
+
         public string LibraryUrl { get; set; }
 
+        /// <summary>Allows user to control whether to output this specific library</summary>
         public bool WriteOutput { get; set; }
+
         public NamespaceOutput Output { get; set; }
-        
-        public bool EmitModuleConstants { get; set; }
+
+        public void WritePackageFile(string fileName, string contents) => WriteAllText(Combine(PackagedFolderPath, fileName), contents);
+        public void WriteTestsFile(string contents) => WritePackageFile(Combine(PackagedFolderPath, $"{FormattedName}-tests.ts"), contents);
     }
 
     public class DefinitionTypesComboBox : ComboBox {
