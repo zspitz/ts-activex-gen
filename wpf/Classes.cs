@@ -7,6 +7,7 @@ using static System.IO.Path;
 namespace TsActivexGen.Wpf {
     [ImplementPropertyChanged]
     public class OutputFileDetails {
+        public readonly string InitialName;
         public string Name { get; set; }
         public string Description { get; set; }
         public string OutputFolderRoot { get; set; }
@@ -26,6 +27,12 @@ namespace TsActivexGen.Wpf {
 
         public void WritePackageFile(string fileName, string contents) => WriteAllText(Combine(PackagedFolderPath, fileName), contents);
         public void WriteTestsFile(string contents) => WritePackageFile(Combine(PackagedFolderPath, $"{FormattedName}-tests.ts"), contents);
+
+        public OutputFileDetails(string initialName) {
+            InitialName = initialName;
+            Name = initialName;
+            WriteOutput = true;
+        }
     }
 
     public class DefinitionTypesComboBox : ComboBox {

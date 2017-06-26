@@ -16,6 +16,8 @@ using System.Windows.Data;
 using System.Collections.ObjectModel;
 using static TsActivexGen.Wpf.Functions;
 using System.IO;
+using static TsActivexGen.Util.Functions;
+using static System.Environment;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -70,7 +72,7 @@ namespace TsActivexGen.Wpf {
 
                         //create index.d.ts
                         var s1 = GetHeaders(x.Name,x.Description,x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text);
-                        s1 += Environment.NewLine;
+                        s1 += NewLine + NewLine;
                         s1 += ReferenceDirectives(x.Output.Dependencies);
                         s1 += x.Output.MainFile;
                         WriteAllText(x.PackagedFilePath, s1);
@@ -79,7 +81,7 @@ namespace TsActivexGen.Wpf {
                         x.WriteTestsFile(x.Output.TestsFile);
 
                         //create tslint.json
-                        x.WritePackageFile("tslint.json", @"{ ""extends"": ""dtslint / dt.json"" }");
+                        x.WritePackageFile("tslint.json", @"{ ""extends"": ""dtslint/dt.json"" }");
 
                         //create package.json
                         x.WritePackageFile("package.json", @"{ ""dependencies"": { ""activex-helpers"": ""*""}}");
@@ -126,12 +128,15 @@ namespace TsActivexGen.Wpf {
                     throw new InvalidOperationException();
             }
 
+            var old = fileList.Select(x => KVP(x.InitialName, x)).ToDictionary();
             fileList.Clear();
-            new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, x) => new OutputFileDetails {
-                Name = name,
-                OutputFolderRoot = txbOutputFolder.Text,
-                WriteOutput = true,
-                Output = x
+            new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, x) => {
+                if (!old.TryGetValue(name, out var ret)) {
+                    ret = new OutputFileDetails(name);
+                }
+                ret.Output = x;
+                ret.OutputFolderRoot = txbOutputFolder.Text;
+                return ret;
             }).AddRangeTo(fileList);
         }
 
