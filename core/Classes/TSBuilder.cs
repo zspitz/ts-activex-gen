@@ -143,7 +143,7 @@ namespace TsActivexGen {
             ns.GlobalInterfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, "", 0));
 
             //writeJsdoc inserts a blank line before the jsdoc; if the member is the first after an opening brace, tslint doesn't like it
-            var mainFile = sb.ToString().Replace("{" + NewLine + NewLine, "{" + NewLine).Trim();
+            var mainFile = sb.ToString().Replace("{" + NewLine + NewLine, "{" + NewLine).Trim() + NewLine;
 
             var ret = new NamespaceOutput() {
                 MainFile = mainFile,

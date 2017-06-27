@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using TsActivexGen.Util;
+using static System.Environment;
 
 namespace TsActivexGen.Wpf {
     public static class Functions {
@@ -28,12 +29,12 @@ namespace TsActivexGen.Wpf {
 }".Trim();
 
         public static string GetHeaders(string name, string description, string libraryUrl, string authorName, string authorUrl) => $@"
-// Type definitions for {name} - {description}
+// Type definitions for {description.IfNullOrEmpty(name)}
 // Project: {libraryUrl}
 // Definitions by: {authorName} <{authorUrl}>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
 ".Trim();
 
-        public static string ReferenceDirectives(IEnumerable<string> types) => types.Joined("", y => $"/// <reference types=\"activex-{y.ToLower()}\" />" + Environment.NewLine);
+        public static string ReferenceDirectives(IEnumerable<string> types) => types.Joined("", y => $"/// <reference types=\"activex-{y.ToLower()}\" />" + NewLine);
     }
 }
