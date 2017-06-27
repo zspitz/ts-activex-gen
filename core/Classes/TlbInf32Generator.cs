@@ -258,8 +258,8 @@ VT_NULL	1
 
             var ret = new TSMemberDescription();
             ret.AddParameter("obj", $"{typename}");
-            ret.AddParameter("eventName", $"'{m.Name}'");
-            if (args.Keys().Any()) {ret.AddParameter("eventArgs", new TSTupleType(args.Keys().Select(x => $"'{x}'")));}
+            ret.AddParameter("event", $"'{m.Name}'");
+            if (args.Keys().Any()) {ret.AddParameter("argNames", new TSTupleType(args.Keys().Select(x => $"'{x}'")));}
 
             var parameterType = new TSObjectType();
             args.AddRangeTo(parameterType.Members);

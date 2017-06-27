@@ -9,6 +9,9 @@ namespace TsActivexGen.Wpf {
     ""compilerOptions"": {
         ""module"": ""commonjs"",
         ""lib"": [""scripthost""],
+        ""noImplicitAny"": true,
+        ""noImplicitThis"": true,
+        ""strictNullChecks"": true,
         ""strict"": true,
         ""baseUrl"": ""../"",
         ""typeRoots"": [
@@ -27,7 +30,7 @@ namespace TsActivexGen.Wpf {
         public static string GetHeaders(string name, string description, string libraryUrl, string authorName, string authorUrl) => $@"
 // Type definitions for {name} - {description}
 // Project: {libraryUrl}
-// Defintions by: {authorName} <{authorUrl}>
+// Definitions by: {authorName} <{authorUrl}>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
 ".Trim();
 

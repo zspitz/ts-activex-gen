@@ -5,6 +5,7 @@ using System.Text;
 using TsActivexGen.Util;
 using static TsActivexGen.TSParameterType;
 using static TsActivexGen.Util.Functions;
+using static System.Environment;
 
 namespace TsActivexGen {
     public class TSBuilder {
@@ -26,8 +27,8 @@ namespace TsActivexGen {
                 $"/**{jsDocLine(JsDoc[0])} */".AppendLineTo(sb, indentationLevel);
             } else {
                 "/**".AppendLineTo(sb, indentationLevel);
-                JsDoc.OrderByKVP((key, value) => key).Select(x => "*" + jsDocLine(x)).AppendLinesTo(sb, indentationLevel);
-                "*/".AppendLineTo(sb, indentationLevel);
+                JsDoc.OrderByKVP((key, value) => key).Select(x => " *" + jsDocLine(x)).AppendLinesTo(sb, indentationLevel);
+                " */".AppendLineTo(sb, indentationLevel);
             }
         }
 
@@ -37,7 +38,7 @@ namespace TsActivexGen {
             var @enum = x.Value;
             var members = @enum.Members.OrderBy(y => y.Key);
 
-            writeJsDoc(@enum.JsDoc, 2);
+            writeJsDoc(@enum.JsDoc, 1);
 
             $"const enum {name} {{".AppendLineTo(sb, 1);
             members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", 2, ",");
@@ -96,7 +97,7 @@ namespace TsActivexGen {
                     ret = $"[{x.Members.Joined(", ", y => GetTypeString(y, ns))}]";
                     break;
                 case TSObjectType x:
-                    ret = $"{{{x.Members.JoinedKVP((key, val) => $"{key}: {GetTypeString(val, ns)}",", ")}}}";
+                    ret = $"{{{x.Members.JoinedKVP((key, val) => $"{key}: {GetTypeString(val, ns)}", ", ")}}}";
                     break;
                 case TSFunctionType x:
                     ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => getParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}";
@@ -129,39 +130,30 @@ namespace TsActivexGen {
             sb = new StringBuilder();
 
             writeJsDoc(ns.JsDoc, 0);
-            $"declare namespace {ns.Name} {{".AppendWithNewSection(sb);
+            $"declare namespace {ns.Name} {{".AppendLineTo(sb);
 
-            if (ns.Aliases.Any()) {
-                "//Type aliases".AppendLineTo(sb, 1);
-                ns.Aliases.OrderBy(x => x.Key).ForEach(x => WriteAlias(x, ns.Name));
-            }
+            ns.Aliases.OrderBy(x => x.Key).ForEach(x => WriteAlias(x, ns.Name));
 
-            if (ns.Enums.Any()) {
-                "//Enums".AppendLineTo(sb, 1);
-                ns.Enums.OrderBy(x => x.Key).ForEach(writeEnumDeclaration);
-            }
+            ns.Enums.OrderBy(x => x.Key).ForEach(writeEnumDeclaration);
 
-            if (ns.Interfaces.Any()) {
-                "//Interfaces".AppendLineTo(sb, 1);
-                ns.Interfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, ns.Name, 1));
-            }
+            ns.Interfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, ns.Name, 1));
 
             "}".AppendWithNewSection(sb);
 
-            if (ns.GlobalInterfaces.Any()) {
-                "//Global interfaces".AppendLineTo(sb, 0);
-                ns.GlobalInterfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, "", 0));
-            }
+            ns.GlobalInterfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, "", 0));
+
+            //writeJsdoc inserts a blank line before the jsdoc; if the member is the first after an opening brace, tslint doesn't like it
+            var mainFile = sb.ToString().Replace("{" + NewLine + NewLine, "{" + NewLine).Trim();
 
             var ret = new NamespaceOutput() {
-                MainFile = sb.ToString(),
+                MainFile = mainFile,
                 Description = ns.Description,
                 Dependencies = ns.Dependencies
             };
 
             //Build the tests file
             ns.GlobalInterfaces.IfContainsKey("ActiveXObject", x => {
-                ret.TestsFile = x.Constructors.Joined(Environment.NewLine + Environment.NewLine, (y, index) => $"let obj{index} = new ActiveXObject({GetTypeString(y.Parameters[0].Value.Type, "")})");
+                ret.TestsFile = x.Constructors.Joined(NewLine + NewLine, (y, index) => $"let obj{index} = new ActiveXObject({GetTypeString(y.Parameters[0].Value.Type, "")});");
             });
 
             return ret;

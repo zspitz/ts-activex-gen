@@ -10,12 +10,22 @@ namespace TsActivexGen.Util {
         public static string RegexReplace(this string s, Regex re, string replacement) => re.Replace(s, replacement);
         public static string RegexReplace(this string s, string pattern, string replacement) => Regex.Replace(s, pattern, replacement);
         public static bool IsNullOrEmpty(this string s) => string.IsNullOrEmpty(s);
+
+        private static Regex shortLineRegex = new Regex("^.{0,180}(,|{|$)");
         public static void AppendLineTo(this string s, StringBuilder sb, int indentationLevel = 0) {
-            sb.Append(new string(' ', indentationLevel * 4));
-            sb.AppendLine(s);
-        }
-        public static void AppendTo(this string s, StringBuilder sb) {
-            sb.Append(s);
+            var toAppend = (new string(' ', indentationLevel * 4) + s).TrimEnd();
+            if (toAppend.Length<=200) {
+                sb.AppendLine(toAppend);
+                return;
+            }
+
+            while (toAppend.Length > 200) {
+                var match = shortLineRegex.Match(toAppend);
+                if (!match.Success) { throw new Exception("Unable to split long line"); }
+                sb.AppendLine(match.Value);
+                toAppend = new string(' ', (indentationLevel + 1) * 4) + toAppend.Substring(match.Length);
+            }
+            if (toAppend.Length>0) { sb.AppendLine(toAppend); }
         }
 
         /// <summary>Appends the passed-in string as a line, followed by another empty line</summary>
@@ -23,24 +33,18 @@ namespace TsActivexGen.Util {
             s.AppendLineTo(sb, indentationLevel);
             sb.AppendLine();
         }
-        public static void AppendLinesTo(this IEnumerable<string> lines, StringBuilder sb, int indentationLevel = 0, string endOfLine = null, string startOfLine = null) {
+        public static void AppendLinesTo(this IEnumerable<string> lines, StringBuilder sb, int indentationLevel = 0, string endOfLine = null) {
             var indentation = new string(' ', indentationLevel * 4);
-            if (lines.Any()) { sb.Append(indentation); }
-            lines.Joined(endOfLine + Environment.NewLine + indentation + startOfLine).AppendLineTo(sb);
+            lines.Select((x, index, atEnd) => {
+                var actualEndOfLine = atEnd ? "" : endOfLine;
+                return $"{x}{actualEndOfLine}";
+            }).ForEach(line => line.AppendLineTo(sb,indentationLevel));
         }
-        public static void AppendLinesTo<T>(this IEnumerable<T> lines, StringBuilder sb, Func<T, string> selector, int indentationLevel = 0, string endOfLine = null, string startOfLine = null) {
-            lines.Select(selector).AppendLinesTo(sb, indentationLevel, endOfLine, startOfLine);
-        }
-        public static void AppendLinesTo<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> lines, StringBuilder sb, Func<TKey, TValue, string> selector, int indentationLevel = 0, string endOfLine = null, string startOfLine = null) {
-            lines.SelectKVP(selector).AppendLinesTo(sb, indentationLevel, endOfLine, startOfLine);
+        public static void AppendLinesTo<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> lines, StringBuilder sb, Func<TKey, TValue, string> selector, int indentationLevel = 0, string endOfLine = null) {
+            lines.SelectKVP(selector).AppendLinesTo(sb, indentationLevel, endOfLine);
         }
 
         public static bool Contains(this string source, string toCheck, StringComparison comp) => source.IndexOf(toCheck, comp) >= 0;
-
-        public static string FirstLine(this string s) {
-            var index = s.IndexOfAny(new char[] { '\r', '\n' });
-            return index == -1 ? s : s.Substring(0, index);
-        }
 
         public static string ForceEndsWith(this string s, string end, StringComparison comparisonType = OrdinalIgnoreCase) {
             var ret = s;

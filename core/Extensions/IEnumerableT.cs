@@ -60,5 +60,18 @@ namespace TsActivexGen.Util {
             return src;
         }
         public static IEnumerable<T> DefaultIfNull<T>(this IEnumerable<T> src) => src ?? Enumerable.Empty<T>();
+
+        public static IEnumerable<TResult> Select<T, TResult>(this IEnumerable<T> src, Func<T, int, bool, TResult> selector) {
+            int counter = 0;
+            T previous = default(T);
+            foreach (var x in src) {
+                if (counter > 0) {
+                    yield return selector(previous, counter - 1, false);
+                }
+                counter += 1;
+                previous = x;
+            }
+            if (counter > 0) { yield return selector(previous, counter - 1, true); }
+        }
     }
 }
