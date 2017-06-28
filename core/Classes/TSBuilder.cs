@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TsActivexGen.Util;
-using static TsActivexGen.TSParameterType;
 using static TsActivexGen.Util.Functions;
 using static System.Environment;
+using System.Text.RegularExpressions;
 
 namespace TsActivexGen {
     public class TSBuilder {
@@ -19,10 +19,22 @@ namespace TsActivexGen {
             return $" {key}{entry.Value}";
         }
 
+        private Regex spaceBreaker = new Regex(@".{0,150}(?:\S|$)");
         private void writeJsDoc(List<KeyValuePair<string, string>> JsDoc, int indentationLevel, bool newLine = false) {
-            JsDoc = JsDoc.WhereKVP((key, value) => !key.IsNullOrEmpty() || !value.IsNullOrEmpty()).ToList();
+            JsDoc = JsDoc.WhereKVP((key, value) => !key.IsNullOrEmpty() || !value.IsNullOrEmpty()).SelectMany(kvp => {
+                if (kvp.Value.Length <= 150) { return new[] { kvp }; }
+                var lines = new List<KeyValuePair<string, string>>();
+                if (!kvp.Key.IsNullOrEmpty()) { throw new Exception("Unhandled long line in JSDoc parameter defaults"); }
+                var matches = spaceBreaker.Matches(kvp.Value);
+                if (matches.Count == 0) { throw new Exception("Unhandled long line in JSDoc"); }
+                foreach (Match match in matches) {
+                    if (match.Length == 0) { continue; }
+                    lines.Add("", match.Value);
+                }
+                return lines.ToArray();
+            }).ToList();
             if (JsDoc.Count == 0) { return; }
-            if (newLine) { "".AppendLineTo(sb, indentationLevel); }
+            if (newLine) { "".AppendLineTo(sb); }
             if (JsDoc.Count == 1) {
                 $"/**{jsDocLine(JsDoc[0])} */".AppendLineTo(sb, indentationLevel);
             } else {
@@ -45,17 +57,6 @@ namespace TsActivexGen {
             "}".AppendWithNewSection(sb, 1);
         }
 
-        private string getParameterString(KeyValuePair<string, TSParameterDescription> x, string ns) {
-            var name = x.Key;
-            var parameterDescription = x.Value;
-            if (parameterDescription.ParameterType == Rest) {
-                name = "..." + name;
-            } else if (parameterDescription.ParameterType == Optional) {
-                name += "?";
-            }
-            return $"{name}: {GetTypeString(parameterDescription.Type, ns)}";
-        }
-
         private void writeMemberBase(TSMemberDescription m, string ns, string memberIdentifier, int indentationLevel) {
             var returnType = GetTypeString(m.ReturnType, ns);
 
@@ -70,7 +71,7 @@ namespace TsActivexGen {
                     if (parameterName.In(jsKeywords)) { parameterName = $"{parameterName}_{index}"; }
                     return KVP(parameterName, kvp.Value);
                 }).ToList();
-                parameterList = "(" + parameters.Joined(", ", y => getParameterString(y, ns)) + ")";
+                parameterList = "(" + parameters.Joined(", ", y => GetParameterString(y, ns)) + ")";
             }
 
             writeJsDoc(m.JsDoc, indentationLevel, true);
@@ -85,29 +86,6 @@ namespace TsActivexGen {
         }
 
         private void WriteConstructor(TSMemberDescription m, string ns, int indentationLevel) => writeMemberBase(m, ns, "new", indentationLevel);
-
-        private string GetTypeString(ITSType type, string ns) { //this is not in each individual class, because the only purpose is for emitting
-            string ret = null;
-
-            switch (type) {
-                case TSSimpleType x:
-                    ret = RelativeName(x.GenericParameter ?? x.FullName, ns);
-                    break;
-                case TSTupleType x:
-                    ret = $"[{x.Members.Joined(", ", y => GetTypeString(y, ns))}]";
-                    break;
-                case TSObjectType x:
-                    ret = $"{{{x.Members.JoinedKVP((key, val) => $"{key}: {GetTypeString(val, ns)}", ", ")}}}";
-                    break;
-                case TSFunctionType x:
-                    ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => getParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}";
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
-
-            return ret;
-        }
 
         /// <summary>Provides a simple way to order members by the set of parameters</summary>
         private string ParametersString(TSMemberDescription m) => m.Parameters?.JoinedKVP((name, prm) => $"{name}: {GetTypeString(prm.Type, "")}");
@@ -142,8 +120,10 @@ namespace TsActivexGen {
 
             ns.GlobalInterfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, "", 0));
 
-            //writeJsdoc inserts a blank line before the jsdoc; if the member is the first after an opening brace, tslint doesn't like it
-            var mainFile = sb.ToString().Replace("{" + NewLine + NewLine, "{" + NewLine).Trim() + NewLine;
+            var mainFile = sb.ToString()
+                .Replace("{" + NewLine + NewLine, "{" + NewLine) //writeJsdoc inserts a blank line before the jsdoc; if the member is the first after an opening brace, tslint doesn't like it
+                .Replace("}" + NewLine + NewLine + "}", "}" + NewLine + "}") //removes the blank line after the last interface in the namespace
+                .Trim() + NewLine;
 
             var ret = new NamespaceOutput() {
                 MainFile = mainFile,
