@@ -33,18 +33,15 @@ namespace TsActivexGen {
 
         public string[] TypeParts() => new string[] { GenericParameter ?? FullName };
 
-        public TSSimpleType(string fullName = null) {
-            FullName = fullName;
-        }
+        public TSSimpleType(string fullName = null) => FullName = fullName;
     }
 
     public class TSTupleType : ITSType {
         public List<ITSType> Members { get; } = new List<ITSType>();
         public string[] TypeParts() => Members.SelectMany(x => x.TypeParts()).ToArray();
+
         public TSTupleType() {}
-        public TSTupleType(IEnumerable<string> members)  {
-            members.Select(x => new TSSimpleType(x)).AddRangeTo(Members);
-        }
+        public TSTupleType(IEnumerable<string> members)  => members.Select(x => new TSSimpleType(x)).AddRangeTo(Members);
     }
 
     public class TSObjectType : ITSType {
@@ -55,5 +52,10 @@ namespace TsActivexGen {
     public class TSFunctionType : ITSType {
         public TSMemberDescription FunctionDescription { get; } = new TSMemberDescription();
         public string[] TypeParts() => FunctionDescription.TypeParts();
+    }
+
+    public class TSUnionType : ITSType {
+        public List<ITSType> Parts { get; } = new List<ITSType>();
+        public string[] TypeParts() => Parts.SelectMany(x=>x.TypeParts()).ToArray();
     }
 }

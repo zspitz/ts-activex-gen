@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
+using static TsActivexGen.TSParameterType;
 
 namespace TsActivexGen.Util {
     public static class Functions {
@@ -47,6 +48,43 @@ namespace TsActivexGen.Util {
                     return (string)subkey?.GetValue("");
                 }
             }
+        }
+
+        public static string GetTypeString(ITSType type, string ns) {
+            string ret = null;
+
+            switch (type) {
+                case TSSimpleType x:
+                    ret = RelativeName(x.GenericParameter ?? x.FullName, ns);
+                    break;
+                case TSTupleType x:
+                    ret = $"[{x.Members.Joined(", ", y => GetTypeString(y, ns))}]";
+                    break;
+                case TSObjectType x:
+                    ret = $"{{{x.Members.JoinedKVP((key, val) => $"{key}: {GetTypeString(val, ns)}", ", ")}}}";
+                    break;
+                case TSFunctionType x:
+                    ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => GetParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}";
+                    break;
+                case TSUnionType x:
+                    ret = x.Parts.Select(y=>GetTypeString(y,ns)).Joined(" | ");
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+
+            return ret;
+        }
+
+        public static string GetParameterString(KeyValuePair<string, TSParameterDescription> x, string ns) {
+            var name = x.Key;
+            var parameterDescription = x.Value;
+            if (parameterDescription.ParameterType == Rest) {
+                name = "..." + name;
+            } else if (parameterDescription.ParameterType == Optional) {
+                name += "?";
+            }
+            return $"{name}: {GetTypeString(parameterDescription.Type, ns)}";
         }
     }
 }

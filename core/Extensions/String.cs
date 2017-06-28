@@ -30,7 +30,7 @@ namespace TsActivexGen.Util {
             var matches = linebreakAfter.Matches(toAppend);
             if (matches.Count == 0) { throw new Exception("Unable to split long line"); }
             foreach (Match match in matches) {
-                if (match.Length == 0) { continue; }
+                if (match.Length == 0) { continue; } //the last match in the regex is always an empty string
                 var line = toAppend.Substring(match.Index, match.Length).TrimEnd();
                 if (match.Index > 0) { line = new string(' ', (indentationLevel + 1) * 4) + line; }
                 if (line.Length <= 200) {
@@ -40,6 +40,7 @@ namespace TsActivexGen.Util {
                 var commaMatches = comma.Matches(line);
                 if (commaMatches.Count == 0) { throw new Exception("Unable to split long line"); }
                 foreach (Match commaMatch in commaMatches) {
+                    if (commaMatch.Length==0) { continue; } //the last match in the regex is always an empty string
                     var line1 = line.Substring(commaMatch.Index, commaMatch.Length).TrimEnd();
                     if (commaMatch.Index > 0) { line1 = new string(' ', (indentationLevel + 1) * 4) + line1; }
                     if (line1.Length > 200) { throw new Exception("Unable to split long line"); }

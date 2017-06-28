@@ -61,5 +61,7 @@ namespace TsActivexGen.Util {
         public static ILookup<TKey, TValue> ToLookup<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> src) => src.ToLookup(x => x.Key, x => x.Value);
 
         public static bool AnyKVP<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> src, Func<TKey, TValue, bool> predicate) => src.WhereKVP(predicate).Any();
+
+        public static TValue Get<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> src, TKey key) => src.WhereKVP((k, v) =>  key.Equals(k)).FirstOrDefault().Value;
     }
 }
