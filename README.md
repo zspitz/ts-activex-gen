@@ -41,7 +41,7 @@ string typescriptTestsFileStub = output.TestsFile;
 
 Standard Javascript doesn't support the Microsoft JScript-specific syntax used for registering event handlers on ActiveX objects (`objectname::eventname`) and for property setters with parameters (`object.Item(1) = 1`). [activex-js-helpers](https://github.com/zspitz/activex-js-helpers) allows the use of standard JS for these tasks. Generated definitions include overloads that leverage the library.
 
-```
+```typescript
 interface ActiveXObject {
     ...
     on(obj: Word.Application, eventName: 'DocumentBeforeClose', eventArgs: ['Doc','Cancel'], handler: (
