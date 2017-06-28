@@ -44,10 +44,14 @@ Standard Javascript doesn't support the Microsoft JScript-specific syntax used f
 ```
 interface ActiveXObject {
     ...
-    on(obj: Word.Application, eventName: 'DocumentBeforeClose', eventArgs: ['Doc','Cancel'], handler: (this: Word.Application, parameter: {Doc: Word.Document,Cancel: boolean}) => void): void;
-    on(obj: Word.Application, eventName: 'DocumentBeforeSave', eventArgs: ['Doc','SaveAsUI','Cancel'], handler: (this: Word.Application, parameter: {Doc: Word.Document,SaveAsUI: boolean,Cancel: boolean}) => void): void;
-    on(obj: Word.Application, eventName: 'DocumentChange', handler: (this: Word.Application, parameter: {}) => void): void;
-    on(obj: Word.Application, eventName: 'DocumentOpen', eventArgs: ['Doc'], handler: (this: Word.Application, parameter: {Doc: Word.Document}) => void): void;
+    on(obj: Word.Application, eventName: 'DocumentBeforeClose', eventArgs: ['Doc','Cancel'], handler: (
+        this: Word.Application, parameter: {Doc: Word.Document,Cancel: boolean}) => void): void;
+    on(obj: Word.Application, eventName: 'DocumentBeforeSave', eventArgs: ['Doc','SaveAsUI','Cancel'], handler: (
+        this: Word.Application, parameter: {Doc: Word.Document,SaveAsUI: boolean,Cancel: boolean}) => void): void;
+    on(obj: Word.Application, eventName: 'DocumentChange', handler: (
+        this: Word.Application, parameter: {}) => void): void;
+    on(obj: Word.Application, eventName: 'DocumentOpen', eventArgs: ['Doc'], handler: (
+        this: Word.Application, parameter: {Doc: Word.Document}) => void): void;
     ...
     set(obj: Word.Document, propertyName: 'ActiveWritingStyle', parameterTypes: [any], newValue: string): void;
     ...
