@@ -312,10 +312,26 @@ VT_NULL	1
             var activex = new TSInterfaceDescription();
 
             coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(ToActiveXObjectConstructorDescription).Where(x=>x != null).AddRangeTo(activex.Constructors);
-            coclasses.Select(x => new {
+            var eventRegistrations = coclasses.Select(x => new {
                 coclass = x,
                 eventInterface = x.DefaultEventInterface
-            }).Where(x => x.eventInterface != null).SelectMany(x => x.eventInterface.Members.Cast().Select(y => KVP("on", ToActiveXEventMember(y, x.coclass)))).AddRangeTo(activex.Members);
+            }).Where(x => x.eventInterface != null).SelectMany(x => x.eventInterface.Members.Cast().Select(y => KVP("on", ToActiveXEventMember(y, x.coclass)))).ToList();
+
+            var lookup = eventRegistrations.ToLookup(x => new {
+                objectType = GetTypeString(x.Value.Parameters.Get("obj").Type, ""),
+                argNamesType = GetTypeString(x.Value.Parameters.Get("argNames").Type,""),
+                handlerType = GetTypeString(x.Value.Parameters.Get("handler").Type,"")
+            }).Where(grp => grp.Count() >1);
+            foreach (var grp in lookup) {
+                var eventType = new TSUnionType();
+                grp.Select(x => x.Value.Parameters.Get("event").Type).AddRangeTo(eventType.Parts);
+                grp.First().Value.Parameters.Get("event").Type = eventType;
+                foreach (var toRemove in grp.Skip(1)) {
+                    eventRegistrations.Remove(toRemove);
+                }
+            }
+
+            eventRegistrations.AddRangeTo(activex.Members);
 
             parameterizedSetters.Where(x => x.objectType.Namespace == ret.Name).Select(x=>KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
 
