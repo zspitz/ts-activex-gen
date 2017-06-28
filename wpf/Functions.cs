@@ -9,7 +9,7 @@ namespace TsActivexGen.Wpf {
 {
     ""compilerOptions"": {
         ""module"": ""commonjs"",
-        ""lib"": [""scripthost""],
+        ""lib"": [""es5"", ""scripthost""],
         ""noImplicitAny"": true,
         ""noImplicitThis"": true,
         ""strictNullChecks"": true,
@@ -32,9 +32,12 @@ namespace TsActivexGen.Wpf {
 // Type definitions for {description.IfNullOrEmpty(name)}
 // Project: {libraryUrl}
 // Definitions by: {authorName} <{authorUrl}>
-// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
-".Trim();
+// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped".Trim() + NewLine + NewLine;
 
-        public static string ReferenceDirectives(IEnumerable<string> types) => types.Joined("", y => $"/// <reference types=\"activex-{y.ToLower()}\" />" + NewLine);
+        public static string ReferenceDirectives(IEnumerable<string> types) {
+            var ret = types.Joined("", y => $"/// <reference types=\"activex-{y.ToLower()}\" />" + NewLine);
+            if (!ret.IsNullOrEmpty()) { ret += NewLine; }
+            return ret;
+        }
     }
 }

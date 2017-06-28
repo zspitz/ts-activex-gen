@@ -72,9 +72,7 @@ namespace TsActivexGen.Wpf {
 
                         //create index.d.ts
                         var s1 = GetHeaders(x.Name,x.Description,x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text);
-                        s1 += NewLine + NewLine;
                         s1 += ReferenceDirectives(x.Output.Dependencies);
-                        s1 += NewLine;
                         s1 += x.Output.MainFile;
                         WriteAllText(x.PackagedFilePath, s1);
 
