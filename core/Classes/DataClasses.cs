@@ -85,6 +85,8 @@ namespace TsActivexGen {
     public class TSNamespace {
         public string Name { get; set; }
         public string Description { get; set; }
+        public int MajorVersion { get; set; }
+        public int MinorVersion { get; set; }
         public Dictionary<string, TSEnumDescription> Enums { get; } = new Dictionary<string, TSEnumDescription>();
         public Dictionary<string, TSInterfaceDescription> Interfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
         public Dictionary<string, TSSimpleType> Aliases { get; } = new Dictionary<string, TSSimpleType>();
@@ -138,6 +140,8 @@ namespace TsActivexGen {
 
     public class NamespaceOutput {
         public string Description { get; set; }
+        public int MajorVersion { get; set; }
+        public int MinorVersion { get; set; }
         public string MainFile { get; set; }
         public HashSet<string> Dependencies { get; set; }
         public string TestsFile { get; set; }

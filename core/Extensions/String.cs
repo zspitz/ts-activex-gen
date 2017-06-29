@@ -13,15 +13,28 @@ namespace TsActivexGen.Util {
         public static bool IsNullOrEmpty(this string s) => string.IsNullOrEmpty(s);
         public static string IfNullOrEmpty(this string s, string replacement) => s.IsNullOrEmpty() ? replacement : s;
 
-        private static Regex linebreakAfter = new Regex(@".*?(?:$|: (?:\(|\{))");
-        private static Regex comma = new Regex(@".{0,170}(?:,\s+|$)"); // TODO 170 depends on the indentaition level
+        private static Regex linebreakers = new Regex(@".*?(?:\(|\{)");
+        public static Regex linebreakers2 = new Regex(@".{1,170}(?:\||,(?= \w*\??:))");
+        public static void AppendLineTo(this string s, StringBuilder sb, int indentationLevel=0) {
+            var toAppend = (new string(' ', indentationLevel * 4) + s).TrimEnd();
+            while (toAppend.Length>200) {
+                var match = toAppend.ShortestMatch(linebreakers, linebreakers2);
+                if (match == null) { throw new Exception("Unable to split long line"); }
+                if (match.Value.EndsWithAny(new[] { "(", "{" })) { indentationLevel += 1; }
+                sb.AppendLine(match.Value);
+                toAppend = new string(' ', indentationLevel * 4) + toAppend.Substring(match.Length).TrimStart();
+            }
+            if (!toAppend.IsNullOrEmpty()) { sb.AppendLine(toAppend); }
+        }
+
+        /*private static Regex linebreakAfter = new Regex(@".*?(?:$|: (?:\(|\{))");
+        private static Regex secondaryLinebreaker = new Regex(@".{0,170}(?:(?:,|\|)\s+|$)"); // TODO 170 depends on the indentaition level
         public static void AppendLineTo(this string s, StringBuilder sb, int indentationLevel = 0) {
             var toAppend = (new string(' ', indentationLevel * 4) + s).TrimEnd();
             if (toAppend.Length <= 200) {
                 sb.AppendLine(toAppend);
                 return;
             }
-
 
             var lines = new List<string>();
 
@@ -37,7 +50,7 @@ namespace TsActivexGen.Util {
                     lines.Add(line);
                     continue;
                 }
-                var commaMatches = comma.Matches(line);
+                var commaMatches = secondaryLinebreaker.Matches(line);
                 if (commaMatches.Count == 0) { throw new Exception("Unable to split long line"); }
                 foreach (Match commaMatch in commaMatches) {
                     if (commaMatch.Length==0) { continue; } //the last match in the regex is always an empty string
@@ -51,7 +64,7 @@ namespace TsActivexGen.Util {
             foreach (var line in lines) {
                 sb.AppendLine(line);
             }
-        }
+        }*/
 
         /// <summary>Appends the passed-in string as a line, followed by another empty line</summary>
         public static void AppendWithNewSection(this string s, StringBuilder sb, int indentationLevel = 0) {
@@ -78,12 +91,14 @@ namespace TsActivexGen.Util {
         }
 
         public static bool StartsWithAny(this string s, IEnumerable<string> tests, StringComparison comparisonType = OrdinalIgnoreCase) => tests.Any(x => s.StartsWith(x, comparisonType));
+        public static bool EndsWithAny(this string s, IEnumerable<string> tests, StringComparison comparisonType = OrdinalIgnoreCase) => tests.Any(x => s.EndsWith(x, comparisonType));
         public static bool In(this string s, IEnumerable<string> vals, StringComparison comparisonType = OrdinalIgnoreCase) => vals.Any(x => string.Equals(s, x, comparisonType));
-        public static string SubstringIndexes(this string s, int start, int stop) {
-            var absoluteStart = start < 0 ? s.Length + start : start;
-            var absoluteStop = stop < 0 ? s.Length + stop : stop;
-            var length = Math.Max(absoluteStop - absoluteStart, 0);
-            return s.Substring(absoluteStart, length);
+
+        public static Match ShortestMatch(this string s, params Regex[] regexes) {
+            var matches = regexes.Select(re => re.Match(s)).Where(x => x.Success).ToList();
+            if (matches.None()) { return null; }
+            var earliestPos = matches.Min(x => x.Length);
+            return matches.FirstOrDefault(x => x.Length == earliestPos);
         }
     }
 }

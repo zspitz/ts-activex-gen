@@ -67,10 +67,11 @@ namespace TsActivexGen.Util {
                     ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => GetParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}";
                     break;
                 case TSUnionType x:
-                    ret = x.Parts.Select(y=>GetTypeString(y,ns)).Joined(" | ");
+                    ret = x.Parts.Select(y=>GetTypeString(y,ns)).OrderBy(y=>y).Joined(" | ");
                     break;
                 default:
-                    throw new NotImplementedException();
+                    if (type != null) { throw new NotImplementedException(); }
+                    break;
             }
 
             return ret;

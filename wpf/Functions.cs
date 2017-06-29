@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using TsActivexGen.Util;
 using static System.Environment;
@@ -28,8 +29,8 @@ namespace TsActivexGen.Wpf {
     ]
 }".Trim();
 
-        public static string GetHeaders(string name, string description, string libraryUrl, string authorName, string authorUrl) => $@"
-// Type definitions for {description.IfNullOrEmpty(name)}
+        public static string GetHeaders(string name, string description, string libraryUrl, string authorName, string authorUrl, int majorVerion, int minorVersion) => $@"
+// Type definitions for {new[] { description, name }.Where(x=>!x.IsNullOrEmpty()).Joined(" - ")} {majorVerion}.{minorVersion}
 // Project: {libraryUrl}
 // Definitions by: {authorName} <{authorUrl}>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped".Trim() + NewLine + NewLine;

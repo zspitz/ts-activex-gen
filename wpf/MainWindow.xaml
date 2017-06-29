@@ -91,9 +91,9 @@
                             <TextBlock>Package for DefinitelyTyped</TextBlock>
                             <ag:AutoGrid RowCount="2" ColumnCount="2" Columns="*,300">
                                 <Label Content="Author name" />
-                                <TextBox x:Name="txbAuthorName" />
+                                <TextBox x:Name="txbAuthorName" Text="Zev Spitz" />
                                 <Label Content="Author URL" />
-                                <TextBox x:Name="txbAuthorURL" />
+                                <TextBox x:Name="txbAuthorURL" Text="https://github.com/zspitz" />
                             </ag:AutoGrid>
                         </StackPanel>
                     </ListBoxItem>

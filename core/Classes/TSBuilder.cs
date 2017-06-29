@@ -128,12 +128,14 @@ namespace TsActivexGen {
             var ret = new NamespaceOutput() {
                 MainFile = mainFile,
                 Description = ns.Description,
+                MajorVersion=ns.MajorVersion,
+                MinorVersion=ns.MinorVersion,
                 Dependencies = ns.Dependencies
             };
 
             //Build the tests file
             ns.GlobalInterfaces.IfContainsKey("ActiveXObject", x => {
-                ret.TestsFile = x.Constructors.Joined(NewLine + NewLine, (y, index) => $"let obj{index} = new ActiveXObject({GetTypeString(y.Parameters[0].Value.Type, "")});");
+                ret.TestsFile = x.Constructors.Joined(NewLine + NewLine, (y, index) => $"let obj{index} = new ActiveXObject({GetTypeString(y.Parameters[0].Value.Type, "")});") + NewLine;
             });
 
             return ret;

@@ -18,6 +18,7 @@ using static TsActivexGen.Wpf.Functions;
 using System.IO;
 using static TsActivexGen.Util.Functions;
 using static System.Environment;
+using static TsActivexGen.Wpf.Misc;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -71,7 +72,7 @@ namespace TsActivexGen.Wpf {
                         x.WritePackageFile("tsconfig.json", GetTsConfig(x.FormattedName));
 
                         //create index.d.ts
-                        var s1 = GetHeaders(x.Name,x.Description,x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text);
+                        var s1 = GetHeaders(x.Name,x.Description,x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text, x.MajorVersion, x.MinorVersion);
                         s1 += ReferenceDirectives(x.Output.Dependencies);
                         s1 += x.Output.MainFile;
                         WriteAllText(x.PackagedFilePath, s1);
@@ -132,6 +133,7 @@ namespace TsActivexGen.Wpf {
             new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, x) => {
                 if (!old.TryGetValue(name, out var ret)) {
                     ret = new OutputFileDetails(name);
+                     ProjectURL.IfContainsKey(name.ToLower(), url => ret.LibraryUrl = url);
                 }
                 ret.Output = x;
                 ret.OutputFolderRoot = txbOutputFolder.Text;

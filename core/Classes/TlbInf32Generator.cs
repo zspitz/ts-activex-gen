@@ -75,7 +75,7 @@ VT_NULL	1
             } else if (splitValues.ContainsAny(VT_EMPTY)) {
                 var ti = vti.TypeInfo;
                 ret.FullName = $"{ti.Parent.Name}.{ti.Name}";
-                if (vti.IsExternalType) { AddTLI(vti.TypeLibInfoExternal,true); }
+                if (vti.IsExternalType) { AddTLI(vti.TypeLibInfoExternal, true); }
                 interfaceToCoClassMapping.IfContainsKey(ret.FullName, val => ret.FullName = val.FirstOrDefault());
             } else if (splitValues.ContainsAny(VT_VARIANT, VT_DISPATCH)) {
                 ret.FullName = "any";
@@ -107,7 +107,7 @@ VT_NULL	1
             return KVP($"{c.Parent.Name}.{c.Name}", ret);
         }
 
-        private KeyValuePair<string, TSParameterDescription> ToTSParameterDescription(ParameterInfo p, bool isRest, List<KeyValuePair<string,string>> jsDoc) {
+        private KeyValuePair<string, TSParameterDescription> ToTSParameterDescription(ParameterInfo p, bool isRest, List<KeyValuePair<string, string>> jsDoc) {
             var ret = new TSParameterDescription();
             var name = p.Name;
             var returnType = GetTypeName(p.VarTypeInfo);
@@ -129,7 +129,7 @@ VT_NULL	1
             return KVP(p.Name, ret);
         }
 
-        private List<KeyValuePair<string, TSParameterDescription>> GetSingleParameterList(IEnumerable<MemberInfo> members, List<KeyValuePair<string,string>> jsDoc) {
+        private List<KeyValuePair<string, TSParameterDescription>> GetSingleParameterList(IEnumerable<MemberInfo> members, List<KeyValuePair<string, string>> jsDoc) {
             var parameterLists = members.Select(m => {
                 var parameterCount = m.Parameters.Count;
                 return m.Parameters.Cast().Select((p, index) => {
@@ -222,14 +222,14 @@ VT_NULL	1
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(InterfaceInfo i) {
             var typename = $"{i.Parent.Name}.{i.Name}";
-            return ToTSInterfaceDescriptionBase(i.Members, typename,i.HelpString);
+            return ToTSInterfaceDescriptionBase(i.Members, typename, i.HelpString);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(CoClassInfo c) {
             var typename = $"{c.Parent.Name}.{c.Name}";
             //scripting environments can only use the default interface, because they don't have variable types
             //we can thus ignore everything else in c.Interfaces
-            return ToTSInterfaceDescriptionBase(c.DefaultInterface.Members, typename,c.HelpString);
+            return ToTSInterfaceDescriptionBase(c.DefaultInterface.Members, typename, c.HelpString);
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(RecordInfo r) {
@@ -253,13 +253,13 @@ VT_NULL	1
 
         //ActiveXObject.on(obj: 'Word.Application', 'BeforeDocumentSave', ['Doc','SaveAsUI','Cancel'], function (params) {});
         private TSMemberDescription ToActiveXEventMember(MemberInfo m, CoClassInfo c) {
-            var args = m.Parameters.Cast().Select(x => KVP<string,ITSType>(x.Name, GetTypeName(x.VarTypeInfo)));
+            var args = m.Parameters.Cast().Select(x => KVP<string, ITSType>(x.Name, GetTypeName(x.VarTypeInfo)));
             var typename = $"{c.Parent.Name}.{c.Name}";
 
             var ret = new TSMemberDescription();
             ret.AddParameter("obj", $"{typename}");
             ret.AddParameter("event", $"'{m.Name}'");
-            if (args.Keys().Any()) {ret.AddParameter("argNames", new TSTupleType(args.Keys().Select(x => $"'{x}'")));}
+            if (args.Keys().Any()) { ret.AddParameter("argNames", new TSTupleType(args.Keys().Select(x => $"'{x}'"))); }
 
             var parameterType = new TSObjectType();
             args.AddRangeTo(parameterType.Members);
@@ -284,7 +284,7 @@ VT_NULL	1
             return ret;
         }
 
-        private TSMemberDescription ToEnumeratorConstructorDescription(KeyValuePair<TSSimpleType,string> kvp) {
+        private TSMemberDescription ToEnumeratorConstructorDescription(KeyValuePair<TSSimpleType, string> kvp) {
             var collectionTypeName = kvp.Key;
             var itemTypeName = kvp.Value;
             var ret = new TSMemberDescription();
@@ -311,7 +311,7 @@ VT_NULL	1
 
             var activex = new TSInterfaceDescription();
 
-            coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(ToActiveXObjectConstructorDescription).Where(x=>x != null).AddRangeTo(activex.Constructors);
+            coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(ToActiveXObjectConstructorDescription).Where(x => x != null).AddRangeTo(activex.Constructors);
             var eventRegistrations = coclasses.Select(x => new {
                 coclass = x,
                 eventInterface = x.DefaultEventInterface
@@ -319,9 +319,9 @@ VT_NULL	1
 
             var lookup = eventRegistrations.ToLookup(x => new {
                 objectType = GetTypeString(x.Value.Parameters.Get("obj").Type, ""),
-                argNamesType = GetTypeString(x.Value.Parameters.Get("argNames").Type,""),
-                handlerType = GetTypeString(x.Value.Parameters.Get("handler").Type,"")
-            }).Where(grp => grp.Count() >1);
+                argNamesType = GetTypeString(x.Value.Parameters.Get("argNames")?.Type, ""),
+                handlerType = GetTypeString(x.Value.Parameters.Get("handler").Type, "")
+            }).Where(grp => grp.Count() > 1);
             foreach (var grp in lookup) {
                 var eventType = new TSUnionType();
                 grp.Select(x => x.Value.Parameters.Get("event").Type).AddRangeTo(eventType.Parts);
@@ -333,14 +333,19 @@ VT_NULL	1
 
             eventRegistrations.AddRangeTo(activex.Members);
 
-            parameterizedSetters.Where(x => x.objectType.Namespace == ret.Name).Select(x=>KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
+            parameterizedSetters.Where(x => x.objectType.Namespace == ret.Name).Select(x => KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
 
             if (activex.Constructors.Any() || activex.Members.Any()) {
                 ret.GlobalInterfaces["ActiveXObject"] = activex;
             }
 
             var guid = tli.GUID;
-            ret.Description = TypeLibDetails.FromRegistry.Value.Where(x=>x.TypeLibID == guid).OrderByDescending(x=>x.MajorVersion).ThenBy(x=>x.MinorVersion).FirstOrDefault()?.Name;
+            var tld = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == guid).OrderByDescending(x => x.MajorVersion).ThenBy(x => x.MinorVersion).FirstOrDefault();
+            if (tld != null) {
+                ret.Description = tld.Name;
+                ret.MajorVersion = tld.MajorVersion;
+                ret.MinorVersion = tld.MinorVersion;
+            }
 
             return ret;
         }
@@ -351,7 +356,7 @@ VT_NULL	1
             return ret;
         }
         private KeyValuePair<string, TSSimpleType> ToTypeAlias(UnionInfo u) {
-            var ret= KVP($"{u.Parent.Name}.{u.Name}", TSSimpleType.Any);
+            var ret = KVP($"{u.Parent.Name}.{u.Name}", TSSimpleType.Any);
             ret.Value.JsDoc.Add("", u.HelpString);
             return ret;
         }
@@ -429,7 +434,7 @@ VT_NULL	1
                                         throw new Exception($"Unhandled TypeKind '{x.TypeKind}'");
                                 }
                             }
-                        }) 
+                        })
                         || allRecords.IfContainsKey(s, x => ToTSInterfaceDescription(x).AddInterfaceTo(ns))
                         || allAliases.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)))
                         || allUnions.IfContainsKey(s, x => ns.Aliases.Add(ToTypeAlias(x)));

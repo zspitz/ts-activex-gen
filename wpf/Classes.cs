@@ -10,6 +10,8 @@ namespace TsActivexGen.Wpf {
         public readonly string InitialName;
         public string Name { get; set; }
         public string Description { get; set; }
+        public int MajorVersion { get; set; }
+        public int MinorVersion { get; set; }
         public string OutputFolderRoot { get; set; }
 
         public string FormattedName => $"activex-{Name.ToLower()}";
