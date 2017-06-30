@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq;
 using static System.StringComparison;
-using System.Diagnostics;
 
 namespace TsActivexGen.Util {
     public static class StringExtensions {
@@ -15,56 +14,31 @@ namespace TsActivexGen.Util {
 
         private static Regex linebreakers = new Regex(@".*?(?:\(|\{)");
         public static Regex linebreakers2 = new Regex(@".{1,170}(?:\||,(?= \w*\??:))");
+        public static Regex comma = new Regex(@",(?= \w*\??:)");
         public static void AppendLineTo(this string s, StringBuilder sb, int indentationLevel=0) {
             var toAppend = (new string(' ', indentationLevel * 4) + s).TrimEnd();
+            var isAfterPipeBreak = false;
             while (toAppend.Length>200) {
+                isAfterPipeBreak = false;
                 var match = toAppend.ShortestMatch(linebreakers, linebreakers2);
                 if (match == null) { throw new Exception("Unable to split long line"); }
                 if (match.Value.EndsWithAny(new[] { "(", "{" })) { indentationLevel += 1; }
                 sb.AppendLine(match.Value);
                 toAppend = new string(' ', indentationLevel * 4) + toAppend.Substring(match.Length).TrimStart();
+
+                if (match.Value.EndsWith("|")) { isAfterPipeBreak = true; }
             }
+
+            if (isAfterPipeBreak) {
+                var match = comma.Match(toAppend);
+                if (match.Success) {
+                    sb.AppendLine(toAppend.Substring(0, match.Index+1));
+                    toAppend = new string(' ', indentationLevel * 4) + toAppend.Substring(match.Index+1).TrimStart();
+                }
+            }
+
             if (!toAppend.IsNullOrEmpty()) { sb.AppendLine(toAppend); }
         }
-
-        /*private static Regex linebreakAfter = new Regex(@".*?(?:$|: (?:\(|\{))");
-        private static Regex secondaryLinebreaker = new Regex(@".{0,170}(?:(?:,|\|)\s+|$)"); // TODO 170 depends on the indentaition level
-        public static void AppendLineTo(this string s, StringBuilder sb, int indentationLevel = 0) {
-            var toAppend = (new string(' ', indentationLevel * 4) + s).TrimEnd();
-            if (toAppend.Length <= 200) {
-                sb.AppendLine(toAppend);
-                return;
-            }
-
-            var lines = new List<string>();
-
-            // first break at ( or {
-            // then break after a , if needed -- can only by done once it has already been broken after a ( or a {
-            var matches = linebreakAfter.Matches(toAppend);
-            if (matches.Count == 0) { throw new Exception("Unable to split long line"); }
-            foreach (Match match in matches) {
-                if (match.Length == 0) { continue; } //the last match in the regex is always an empty string
-                var line = toAppend.Substring(match.Index, match.Length).TrimEnd();
-                if (match.Index > 0) { line = new string(' ', (indentationLevel + 1) * 4) + line; }
-                if (line.Length <= 200) {
-                    lines.Add(line);
-                    continue;
-                }
-                var commaMatches = secondaryLinebreaker.Matches(line);
-                if (commaMatches.Count == 0) { throw new Exception("Unable to split long line"); }
-                foreach (Match commaMatch in commaMatches) {
-                    if (commaMatch.Length==0) { continue; } //the last match in the regex is always an empty string
-                    var line1 = line.Substring(commaMatch.Index, commaMatch.Length).TrimEnd();
-                    if (commaMatch.Index > 0) { line1 = new string(' ', (indentationLevel + 1) * 4) + line1; }
-                    if (line1.Length > 200) { throw new Exception("Unable to split long line"); }
-                    lines.Add(line1);
-                }
-            }
-
-            foreach (var line in lines) {
-                sb.AppendLine(line);
-            }
-        }*/
 
         /// <summary>Appends the passed-in string as a line, followed by another empty line</summary>
         public static void AppendWithNewSection(this string s, StringBuilder sb, int indentationLevel = 0) {
