@@ -5,7 +5,7 @@ using static System.IO.File;
 using static System.IO.Path;
 
 namespace TsActivexGen.Wpf {
-    [ImplementPropertyChanged]
+    [AddINotifyPropertyChangedInterface]
     public class OutputFileDetails {
         public readonly string InitialName;
         public string Name { get; set; }
