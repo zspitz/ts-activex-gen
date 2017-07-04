@@ -34,7 +34,7 @@ namespace TsActivexGen {
                 return lines.ToArray();
             }).ToList();
             if (JsDoc.Count == 0) { return; }
-            if (newLine) { "".AppendLineTo(sb); }
+            if (newLine) { sb.AppendLine(); }
             if (JsDoc.Count == 1) {
                 $"/**{jsDocLine(JsDoc[0])} */".AppendLineTo(sb, indentationLevel);
             } else {
