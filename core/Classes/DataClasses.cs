@@ -18,7 +18,7 @@ namespace TsActivexGen {
         }
         public abstract override int GetHashCode();
 
-        public static bool OperatorEquals(T x, T y) {
+        protected static bool OperatorEquals(T x, T y) {
             if (ReferenceEquals(x, null)) { return ReferenceEquals(y, null); }
             return x.Equals(y);
         }

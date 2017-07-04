@@ -18,6 +18,7 @@ namespace TsActivexGen {
             public string propertyName { get; set; }
             public TSTupleType parameterTypes { get; set; }
             public TSSimpleType valueType { get; set; }
+            public (string objectType, string propertyName, string parameterTypes, string valueType) Stringified  => (GetTypeString(objectType, ""), propertyName, GetTypeString(parameterTypes, ""), GetTypeString(valueType, ""));
         }
 
         static string AsString(object value) {
@@ -333,12 +334,7 @@ VT_NULL	1
 
             eventRegistrations.AddRangeTo(activex.Members);
 
-            parameterizedSetters.Where(x => x.objectType.Namespace == ret.Name).ToLookup(x => new {
-                objectType = GetTypeString(x.objectType, ""),
-                x.propertyName,
-                parameterTypes = GetTypeString(x.parameterTypes, ""),
-                valueType = GetTypeString(x.valueType, "")
-            }).Select(grp => grp.First()).Select(x => KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
+            parameterizedSetters.Where(x => x.objectType.Namespace == ret.Name).ToLookup(x => x.Stringified).Select(grp => grp.First()).Select(x => KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
 
             if (activex.Constructors.Any() || activex.Members.Any()) {
                 ret.GlobalInterfaces["ActiveXObject"] = activex;
