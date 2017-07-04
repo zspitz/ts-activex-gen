@@ -10,6 +10,7 @@ using static TLI.TypeKinds;
 using static TLI.TliVarType;
 using System.Diagnostics;
 using TsActivexGen.ActiveX;
+using static System.StringComparison;
 
 namespace TsActivexGen {
     public class TlbInf32Generator {
@@ -18,7 +19,7 @@ namespace TsActivexGen {
             public string propertyName { get; set; }
             public TSTupleType parameterTypes { get; set; }
             public TSSimpleType valueType { get; set; }
-            public (string objectType, string propertyName, string parameterTypes, string valueType) Stringified  => (GetTypeString(objectType, ""), propertyName, GetTypeString(parameterTypes, ""), GetTypeString(valueType, ""));
+            public (string objectType, string propertyName, string parameterTypes, string valueType) Stringified => (GetTypeString(objectType, ""), propertyName, GetTypeString(parameterTypes, ""), GetTypeString(valueType, ""));
         }
 
         static string AsString(object value) {
@@ -379,19 +380,23 @@ VT_NULL	1
         Dictionary<string, UnionInfo> allUnions = null;
         int currentTliCount = 0;
 
-        private void AddTLI(TypeLibInfo tli, bool resolveMaxVersion = false) {
+        private void AddTLIs(IEnumerable<TypeLibInfo> tlisToAdd, bool resolveMaxVersion = false) {
             if (resolveMaxVersion) {
-                var maxVersion = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == tli.GUID).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).FirstOrDefault();
-                tli = tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
+                tlisToAdd = tlisToAdd.Select(tli => {
+                    var maxVersion = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == tli.GUID).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).FirstOrDefault();
+                    return tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
+                });
             }
-            if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
-            tlis.Add(tli);
-            tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
-                var fullInterfaceName = $"{tli.Name}.{interfaceName}";
-                var current = Enumerable.Empty<string>();
-                interfaceToCoClassMapping.IfContainsKey(fullInterfaceName, val => current = val);
-                interfaceToCoClassMapping[fullInterfaceName] = coclasses.Concat(current).OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
-            });
+            tlisToAdd = tlisToAdd.Where(tli => !tlis.Any(x => x.IsSameLibrary(tli)));
+            foreach (var tli in tlisToAdd) {
+                tlis.Add(tli);
+                tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
+                    var fullInterfaceName = $"{tli.Name}.{interfaceName}";
+                    var current = Enumerable.Empty<string>();
+                    interfaceToCoClassMapping.IfContainsKey(fullInterfaceName, val => current = val);
+                    interfaceToCoClassMapping[fullInterfaceName] = coclasses.Concat(current).OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
+                });
+            }
 
             for (int i = 0; i < tlis.Count; i++) {  //don't use foreach here, as additional libraries might have been added in the meantime
                 var name = tlis[i].Name;
@@ -400,6 +405,30 @@ VT_NULL	1
                 if (NSSet.Namespaces.ContainsKey(name)) { continue; } //because the current tli might have been already added, as part of ToNamespace
                 NSSet.Namespaces.Add(toAdd.Name, toAdd);
             }
+        }
+
+        private void AddTLI(TypeLibInfo tli, bool resolveMaxVersion = false) {
+            AddTLIs(new[] { tli }, resolveMaxVersion);
+            //if (resolveMaxVersion) {
+            //    var maxVersion = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == tli.GUID).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).FirstOrDefault();
+            //    tli = tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
+            //}
+            //if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
+            //tlis.Add(tli);
+            //tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
+            //    var fullInterfaceName = $"{tli.Name}.{interfaceName}";
+            //    var current = Enumerable.Empty<string>();
+            //    interfaceToCoClassMapping.IfContainsKey(fullInterfaceName, val => current = val);
+            //    interfaceToCoClassMapping[fullInterfaceName] = coclasses.Concat(current).OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
+            //});
+
+            //for (int i = 0; i < tlis.Count; i++) {  //don't use foreach here, as additional libraries might have been added in the meantime
+            //    var name = tlis[i].Name;
+            //    if (NSSet.Namespaces.ContainsKey(name)) { continue; }
+            //    var toAdd = ToNamespace(tlis[i]);
+            //    if (NSSet.Namespaces.ContainsKey(name)) { continue; } //because the current tli might have been already added, as part of ToNamespace
+            //    NSSet.Namespaces.Add(toAdd.Name, toAdd);
+            //}
         }
 
         private void GenerateNSSetParts() {
@@ -481,6 +510,26 @@ VT_NULL	1
         public void AddFromFile(string filename) {
             var toAdd = tliApp.TypeLibInfoFromFile(filename);
             AddTLI(toAdd);
+            GenerateNSSetParts();
+        }
+
+        public void AddFromKeywords(IEnumerable<string> keywords) {
+            var toAdd = keywords.Select(keyword => {
+                var matching = TypeLibDetails.FromRegistry.Value
+                    .Where(x => x.Name?.Contains(keyword, InvariantCultureIgnoreCase) ?? false)
+                    .OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).ThenBy(x => x.LCID)
+                    .ToList();
+                var names = matching.Select(x => x.Name).Distinct().ToList();
+                if (names.Count > 1) { throw new Exception("keyword matches multiple names"); }
+                return matching.FirstOrDefault();
+            }).Where(x => x != null).Select(tlb => {
+                try {
+                    return tliApp.TypeLibInfoFromRegistry(tlb.TypeLibID, tlb.MajorVersion, tlb.MinorVersion, tlb.LCID);
+                } catch (Exception) {
+                    return null;
+                }
+            }).Where(x => x != null);
+            AddTLIs(toAdd, true);
             GenerateNSSetParts();
         }
 
