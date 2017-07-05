@@ -245,3 +245,5 @@ ModelManifest.xml
 .fake/
 /notes.txt
 /activex-ts-todo.txt
+*.diagsession
+/Report20170705-0757.diagsession

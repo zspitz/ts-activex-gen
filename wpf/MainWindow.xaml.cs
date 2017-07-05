@@ -52,6 +52,8 @@ namespace TsActivexGen.Wpf {
             txbOutputFolder.TextChanged += (s, e) => ((IList<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.OutputFolderRoot = txbOutputFolder.Text);
             btnBrowseOutputFolder.Click += (s, e) => fillFolder();
 
+            btnLoadDefaultLibs.Click += (s, e) => addFiles();
+
             dtgFiles.ItemsSource = fileList;
 
             btnOutput.Click += (s, e) => {
@@ -123,6 +125,9 @@ namespace TsActivexGen.Wpf {
                     tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
                     break;
                 case 2:
+                    tlbGenerator.AddFromKeywords(new[] { "ole automation", "scripting runtime", "wmi scripting", "adodb", "dao", "msxml2", "microsoft access 14.0 object library", "microsoft excel", "microsoft word", "microsoft powerpoint", "microsoft outlook 14.0 object library", "infopath 3.0 type library", "faxcomex", "internet controls", "shell controls and automation", "speech", "acquisition" });
+                    break;
+                case 3: //WMI
                     break;
                 default:
                     throw new InvalidOperationException();

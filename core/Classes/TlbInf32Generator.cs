@@ -380,23 +380,19 @@ VT_NULL	1
         Dictionary<string, UnionInfo> allUnions = null;
         int currentTliCount = 0;
 
-        private void AddTLIs(IEnumerable<TypeLibInfo> tlisToAdd, bool resolveMaxVersion = false) {
+        private void AddTLI(TypeLibInfo tli, bool resolveMaxVersion = false) {
             if (resolveMaxVersion) {
-                tlisToAdd = tlisToAdd.Select(tli => {
-                    var maxVersion = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == tli.GUID).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).FirstOrDefault();
-                    return tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
-                });
+                var maxVersion = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == tli.GUID).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).FirstOrDefault();
+                tli = tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
             }
-            tlisToAdd = tlisToAdd.Where(tli => !tlis.Any(x => x.IsSameLibrary(tli)));
-            foreach (var tli in tlisToAdd) {
-                tlis.Add(tli);
-                tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
-                    var fullInterfaceName = $"{tli.Name}.{interfaceName}";
-                    var current = Enumerable.Empty<string>();
-                    interfaceToCoClassMapping.IfContainsKey(fullInterfaceName, val => current = val);
-                    interfaceToCoClassMapping[fullInterfaceName] = coclasses.Concat(current).OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
-                });
-            }
+            if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
+            tlis.Add(tli);
+            tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
+                var fullInterfaceName = $"{tli.Name}.{interfaceName}";
+                var current = Enumerable.Empty<string>();
+                interfaceToCoClassMapping.IfContainsKey(fullInterfaceName, val => current = val);
+                interfaceToCoClassMapping[fullInterfaceName] = coclasses.Concat(current).OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
+            });
 
             for (int i = 0; i < tlis.Count; i++) {  //don't use foreach here, as additional libraries might have been added in the meantime
                 var name = tlis[i].Name;
@@ -405,30 +401,6 @@ VT_NULL	1
                 if (NSSet.Namespaces.ContainsKey(name)) { continue; } //because the current tli might have been already added, as part of ToNamespace
                 NSSet.Namespaces.Add(toAdd.Name, toAdd);
             }
-        }
-
-        private void AddTLI(TypeLibInfo tli, bool resolveMaxVersion = false) {
-            AddTLIs(new[] { tli }, resolveMaxVersion);
-            //if (resolveMaxVersion) {
-            //    var maxVersion = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == tli.GUID).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).FirstOrDefault();
-            //    tli = tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
-            //}
-            //if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
-            //tlis.Add(tli);
-            //tli.CoClasses.Cast().GroupBy(x => x.DefaultInterface?.Name ?? "", (key, grp) => KVP(key, grp.Select(x => x.Name))).ForEachKVP((interfaceName, coclasses) => {
-            //    var fullInterfaceName = $"{tli.Name}.{interfaceName}";
-            //    var current = Enumerable.Empty<string>();
-            //    interfaceToCoClassMapping.IfContainsKey(fullInterfaceName, val => current = val);
-            //    interfaceToCoClassMapping[fullInterfaceName] = coclasses.Concat(current).OrderBy(x => x.StartsWith("_")).Select(x => $"{tli.Name}.{x}").ToList();
-            //});
-
-            //for (int i = 0; i < tlis.Count; i++) {  //don't use foreach here, as additional libraries might have been added in the meantime
-            //    var name = tlis[i].Name;
-            //    if (NSSet.Namespaces.ContainsKey(name)) { continue; }
-            //    var toAdd = ToNamespace(tlis[i]);
-            //    if (NSSet.Namespaces.ContainsKey(name)) { continue; } //because the current tli might have been already added, as part of ToNamespace
-            //    NSSet.Namespaces.Add(toAdd.Name, toAdd);
-            //}
         }
 
         private void GenerateNSSetParts() {
@@ -529,8 +501,7 @@ VT_NULL	1
                     return null;
                 }
             }).Where(x => x != null);
-            AddTLIs(toAdd, true);
-            GenerateNSSetParts();
+            toAdd.ForEach(x => AddTLI(x, true));
         }
 
         public TSNamespaceSet NSSet { get; } = new TSNamespaceSet();

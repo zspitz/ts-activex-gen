@@ -58,6 +58,9 @@
                     </DockPanel>
                 </TabItem>
                 <TabItem>
+                    <Button HorizontalAlignment="Center" VerticalAlignment="Center" Content="Load default libraries" Name="btnLoadDefaultLibs" />
+                </TabItem>
+                <TabItem>
                     WMI classes - not yet implemented
                 </TabItem>
             </TabControl>
@@ -100,8 +103,8 @@
                     <ListBoxItem Tag="{StaticResource False}">Single file</ListBoxItem>
                 </ListBox>
                 <UniformGrid Rows="1" Columns="2" Margin="10">
-                    <Button Name="btnOutput" Content="Output" DockPanel.Dock="Right" />
-                    <Button Name="btnClearFiles" Content="Clear file list" DockPanel.Dock="Right" />
+                    <Button Name="btnOutput" Content="Output" />
+                    <Button Name="btnClearFiles" Content="Clear file list" />
                 </UniformGrid>
             </DockPanel>
             <DataGrid Name="dtgFiles" DockPanel.Dock="Top" AutoGenerateColumns="False" CanUserAddRows="False">
