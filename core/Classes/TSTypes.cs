@@ -8,6 +8,8 @@ namespace TsActivexGen {
     public class TSSimpleType : EqualityBase<TSSimpleType>, ITSType {
         public static TSSimpleType Any = new TSSimpleType("any");
         public static TSSimpleType Void = new TSSimpleType("void");
+        public static TSSimpleType Undefined = new TSSimpleType("undefined");
+
         public string FullName { get; set; }
         public string Namespace {
             get {
@@ -18,7 +20,6 @@ namespace TsActivexGen {
             }
         }
         public string NameOnly => Functions.NameOnly(FullName);
-        public string Comment { get; set; }
         public bool IsLiteralType => Functions.IsLiteralTypeName(FullName);
         public string GenericParameter => Functions.GenericParameter(FullName);
 

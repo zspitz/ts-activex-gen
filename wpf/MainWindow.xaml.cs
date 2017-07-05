@@ -83,7 +83,12 @@ namespace TsActivexGen.Wpf {
                         x.WriteTestsFile(x.Output.TestsFile);
 
                         //create tslint.json
-                        x.WritePackageFile("tslint.json", @"{ ""extends"": ""dtslint/dt.json"" }");
+                        x.WritePackageFile("tslint.json", @"{
+    ""extends"": ""dtslint/dt.json"",
+    ""rules"": {
+        ""interface-name"": [false]
+    }
+}");
 
                         //create package.json
                         x.WritePackageFile("package.json", @"{ ""dependencies"": { ""activex-helpers"": ""*""}}");
@@ -125,7 +130,11 @@ namespace TsActivexGen.Wpf {
                     tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
                     break;
                 case 2:
-                    tlbGenerator.AddFromKeywords(new[] { "ole automation", "scripting runtime", "wmi scripting", "adodb", "dao", "msxml2", "microsoft access 14.0 object library", "microsoft excel", "microsoft word", "microsoft powerpoint", "microsoft outlook 14.0 object library", "infopath 3.0 type library", "faxcomex", "internet controls", "shell controls and automation", "speech", "acquisition" });
+                    tlbGenerator.AddFromKeywords(new[] {
+                        "ole automation", "scripting runtime", "wmi scripting",
+                        "activex data objects 6.1", "access database engine", "microsoft xml, v6.0",
+                        "microsoft access 14.0 object library", "microsoft excel", "microsoft word", "microsoft powerpoint", "microsoft outlook 14.0 object library", "infopath 3.0 type library",
+                        "fax service extended com library", "internet controls", "shell controls and automation", "speech", "acquisition" });
                     break;
                 case 3: //WMI
                     break;

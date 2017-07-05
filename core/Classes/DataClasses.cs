@@ -54,7 +54,6 @@ namespace TsActivexGen {
     public class TSMemberDescription {
         public List<KeyValuePair<string, TSParameterDescription>> Parameters { get; set; } //(null means a property, empty means empty parameter list); this mut be a list, becaus parameter order is important
         public ITSType ReturnType { get; set; }
-        public string Comment { get; set; }
         public bool? ReadOnly { get; set; }
         public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
 
@@ -216,6 +215,18 @@ namespace TsActivexGen {
             public bool Is32bit { get; set; }
             public bool Is64bit { get; set; }
             public string RegistryKey { get; set; }
+
+            public override string ToString() {
+                var bittedness = "AnyCPU";
+                if (!Is32bit && !Is64bit) {
+                    bittedness = "None";
+                }else if (!Is32bit) {
+                    bittedness = "32bit";
+                } else if (!Is64bit) {
+                    bittedness = "64bit";
+                }
+                return $"Name={Name}, Version={Version} ({MajorVersion}.{MinorVersion}), {bittedness}";
+            }
         }
     }
 }

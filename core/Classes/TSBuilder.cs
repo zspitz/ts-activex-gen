@@ -60,9 +60,6 @@ namespace TsActivexGen {
         private void writeMemberBase(TSMemberDescription m, string ns, string memberIdentifier, int indentationLevel) {
             var returnType = GetTypeString(m.ReturnType, ns);
 
-            var comment = m.Comment;
-            if (!comment.IsNullOrEmpty()) { comment = $"   //{comment}"; }
-
             string parameterList = "";
             if (m.Parameters != null) {
                 var parameters = m.Parameters.Select((kvp, index) => {
@@ -76,7 +73,7 @@ namespace TsActivexGen {
 
             writeJsDoc(m.JsDoc, indentationLevel, true);
 
-            $"{memberIdentifier}{parameterList}: {returnType};{comment}".AppendLineTo(sb, indentationLevel);
+            $"{memberIdentifier}{parameterList}: {returnType};".AppendLineTo(sb, indentationLevel);
         }
 
         private void WriteMember(KeyValuePair<string, TSMemberDescription> x, string ns, int indentationLevel) {

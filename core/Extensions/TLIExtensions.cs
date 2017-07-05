@@ -169,13 +169,11 @@ namespace TsActivexGen.Util {
         }
         public static object Debug(this VarTypeInfo vt) {
             if (vt == null) { return null; }
-            //var Typename = vt.GetTypeName();
             return new {
-                //Typename,
                 vt.IsExternalType,
                 vt.TypeLibInfoExternal?.Name,
-                vt.VarType//,
-                //TypeInfo = vt.TypeInfo?.Debug()
+                vt.VarType,
+                TypeInfo = vt.TypeInfo?.Debug()
             };
         }
         public static List<object> Debug(this Parameters parameters) {

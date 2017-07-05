@@ -57,7 +57,7 @@ VT_ERROR	10
 VT_NULL	1
  */
 
-        private TSSimpleType GetTypeName(VarTypeInfo vti, object value = null) {
+        private TSSimpleType GetTypeName(VarTypeInfo vti, bool replaceVoidWithUndefined = false) {
             var ret = new TSSimpleType();
             var splitValues = vti.VarType.SplitValues();
             if (splitValues.SequenceEqual(new[] { VT_EMPTY }) && vti.TypeInfo.TypeKind == TKIND_ALIAS && !vti.IsExternalType) {
@@ -71,7 +71,7 @@ VT_NULL	1
             } else if (splitValues.ContainsAny(VT_BOOL)) {
                 ret.FullName = "boolean";
             } else if (splitValues.ContainsAny(VT_VOID, VT_HRESULT)) {
-                ret.FullName = "void";
+                ret.FullName = replaceVoidWithUndefined ? "undefined" : "void";
             } else if (splitValues.ContainsAny(VT_DATE)) {
                 ret.FullName = "VarDate";
             } else if (splitValues.ContainsAny(VT_EMPTY)) {
@@ -79,25 +79,12 @@ VT_NULL	1
                 ret.FullName = $"{ti.Parent.Name}.{ti.Name}";
                 if (vti.IsExternalType) { AddTLI(vti.TypeLibInfoExternal, true); }
                 interfaceToCoClassMapping.IfContainsKey(ret.FullName, val => ret.FullName = val.FirstOrDefault());
-            } else if (splitValues.ContainsAny(VT_VARIANT, VT_DISPATCH)) {
+            } else if (splitValues.ContainsAny(VT_VARIANT, VT_DISPATCH, VT_UNKNOWN)) {
                 ret.FullName = "any";
             } else {
-                if (Debugger.IsAttached) {
-                    var debug = vti.Debug();
-                }
-                var external = vti.IsExternalType ? " (external)" : "";
-                ret.Comment = $"{vti.VarType.ToString()}{external}";
                 ret.FullName = "any";
             }
 
-            if (ret.FullName == "any" && value != null) {
-                var t = value.GetType();
-                if (t == typeof(string)) {
-                    ret.FullName = "string";
-                } else if (t.IsNumeric()) {
-                    ret.FullName = "number";
-                }
-            }
             if (isArray) { ret.FullName += "[]"; }
             return ret;
         }
@@ -112,8 +99,8 @@ VT_NULL	1
         private KeyValuePair<string, TSParameterDescription> ToTSParameterDescription(ParameterInfo p, bool isRest, List<KeyValuePair<string, string>> jsDoc) {
             var ret = new TSParameterDescription();
             var name = p.Name;
-            var returnType = GetTypeName(p.VarTypeInfo);
-            ret.Type = returnType;
+            var tsType = GetTypeName(p.VarTypeInfo, true);
+            ret.Type = tsType;
             if (isRest) {
                 ret.ParameterType = Rest;
             } else if (p.Optional || p.Default) {
@@ -124,7 +111,7 @@ VT_NULL	1
             if (p.Default) {
                 var defaultValue = p.DefaultValue;
                 if (defaultValue != null) {
-                    var kvp = KVP("param", $"{returnType.FullName} [{name}={AsString(p.DefaultValue)}]");
+                    var kvp = KVP("param", $"{tsType.FullName} [{name}={AsString(p.DefaultValue)}]");
                     if (!jsDoc.Contains(kvp)) { jsDoc.Add(kvp); }
                 }
             }
@@ -184,7 +171,7 @@ VT_NULL	1
                 ret.ReadOnly = !hasSetter;
             }
 
-            ret.ReturnType = GetTypeName(members.First().ReturnType);
+            ret.ReturnType = GetTypeName(members.First().ReturnType, !invokeable);
             if (hasSetter && parameterList.Any()) {
                 var parameterTypes = new TSTupleType();
                 parameterList.SelectKVP((name, parameterDescription) => parameterDescription.Type).AddRangeTo(parameterTypes.Members);
@@ -255,7 +242,7 @@ VT_NULL	1
 
         //ActiveXObject.on(obj: 'Word.Application', 'BeforeDocumentSave', ['Doc','SaveAsUI','Cancel'], function (params) {});
         private TSMemberDescription ToActiveXEventMember(MemberInfo m, CoClassInfo c) {
-            var args = m.Parameters.Cast().Select(x => KVP<string, ITSType>(x.Name, GetTypeName(x.VarTypeInfo)));
+            var args = m.Parameters.Cast().Select(x => KVP<string, ITSType>(x.Name, GetTypeName(x.VarTypeInfo, true)));
             var typename = $"{c.Parent.Name}.{c.Name}";
 
             var ret = new TSMemberDescription();
@@ -500,8 +487,11 @@ VT_NULL	1
                 } catch (Exception) {
                     return null;
                 }
-            }).Where(x => x != null);
-            toAdd.ForEach(x => AddTLI(x, true));
+            }).Where(x => x != null).ToList();
+            toAdd.ForEach(x => {
+                AddTLI(x, true);
+                GenerateNSSetParts();
+            });
         }
 
         public TSNamespaceSet NSSet { get; } = new TSNamespaceSet();
