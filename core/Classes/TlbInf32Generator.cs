@@ -339,20 +339,20 @@ VT_NULL	1
             return ret;
         }
 
-        private KeyValuePair<string, TSSimpleType> ToTypeAlias(IntrinsicAliasInfo ia) {
-            var ret = KVP($"{ia.Parent.Name}.{ ia.Name}", GetTypeName(ia.ResolvedType));
-            ret.Value.JsDoc.Add("", ia.HelpString);
-            return ret;
+        private KeyValuePair<string, TSAliasDescription> ToTypeAlias(IntrinsicAliasInfo ia) {
+            var ret = new TSAliasDescription { TargetType = GetTypeName(ia.ResolvedType) };
+            ret.JsDoc.Add("", ia.HelpString);
+            return KVP($"{ia.Parent.Name}.{ ia.Name}", ret);
         }
-        private KeyValuePair<string, TSSimpleType> ToTypeAlias(UnionInfo u) {
-            var ret = KVP($"{u.Parent.Name}.{u.Name}", TSSimpleType.Any);
-            ret.Value.JsDoc.Add("", u.HelpString);
-            return ret;
+        private KeyValuePair<string, TSAliasDescription> ToTypeAlias(UnionInfo u) {
+            var ret = new TSAliasDescription { TargetType = TSSimpleType.Any };
+            ret.JsDoc.Add("", u.HelpString);
+            return KVP($"{u.Parent.Name}.{u.Name}", ret);
         }
-        private KeyValuePair<string, TSSimpleType> ToTypeAlias(InterfaceInfo ii) {
-            var ret = KVP($"{ii.Parent.Name}.{ ii.Name}", GetTypeName(ii.ResolvedType));
-            ret.Value.JsDoc.Add("", ii.HelpString);
-            return ret;
+        private KeyValuePair<string, TSAliasDescription> ToTypeAlias(InterfaceInfo ii) {
+            var ret = new TSAliasDescription { TargetType = GetTypeName(ii.ResolvedType) };
+            ret.JsDoc.Add("", ii.HelpString);
+            return KVP($"{ii.Parent.Name}.{ ii.Name}", ret);
         }
 
         TLIApplication tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime

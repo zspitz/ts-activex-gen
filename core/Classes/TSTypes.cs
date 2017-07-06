@@ -23,8 +23,6 @@ namespace TsActivexGen {
         public bool IsLiteralType => Functions.IsLiteralTypeName(FullName);
         public string GenericParameter => Functions.GenericParameter(FullName);
 
-        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
-
         public override bool Equals(TSSimpleType other) => FullName == other?.FullName;
         public override int GetHashCode() => FullName.GetHashCode();
         public override bool Equals(object other) => base.Equals(other);

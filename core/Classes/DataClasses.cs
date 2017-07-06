@@ -81,6 +81,11 @@ namespace TsActivexGen {
         public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
     }
 
+    public class TSAliasDescription {
+        public TSSimpleType TargetType { get; set; } //this could also be ITSType, but all our aliases are to simple types
+        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
+    }
+
     public class TSNamespace {
         public string Name { get; set; }
         public string Description { get; set; }
@@ -88,14 +93,14 @@ namespace TsActivexGen {
         public int MinorVersion { get; set; }
         public Dictionary<string, TSEnumDescription> Enums { get; } = new Dictionary<string, TSEnumDescription>();
         public Dictionary<string, TSInterfaceDescription> Interfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
-        public Dictionary<string, TSSimpleType> Aliases { get; } = new Dictionary<string, TSSimpleType>();
+        public Dictionary<string, TSAliasDescription> Aliases { get; } = new Dictionary<string, TSAliasDescription>();
         public HashSet<string> Dependencies { get; } = new HashSet<string>();
         public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
 
         public HashSet<string> GetUsedTypes() {
             var types = new List<string>();
             Interfaces.Values.Concat(GlobalInterfaces.Values).SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).NamedTypes().AddRangeTo(types);
-            Aliases.Values().NamedTypes().AddRangeTo(types);
+            Aliases.Select(x=>x.Value.TargetType).NamedTypes().AddRangeTo(types);
             return types.ToHashSet();
         }
         public HashSet<string> GetKnownTypes() {

@@ -7,9 +7,7 @@ using static TsActivexGen.TSParameterType;
 
 namespace TsActivexGen.Util {
     public static class Functions {
-        public static KeyValuePair<TKey, TValue> KVP<TKey, TValue>(TKey key, TValue value) {
-            return new KeyValuePair<TKey, TValue>(key, value);
-        }
+        public static KeyValuePair<TKey, TValue> KVP<TKey, TValue>(TKey key, TValue value) => new KeyValuePair<TKey, TValue>(key, value);
         public static string RelativeName(string typename, string @namespace) {
             if (IsLiteralTypeName(typename)) { return typename; }
             //HACK this doesn't handle generic parameters; we'd need to consider both the type and each of the type parameters
