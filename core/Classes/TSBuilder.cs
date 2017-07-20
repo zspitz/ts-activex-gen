@@ -97,8 +97,9 @@ namespace TsActivexGen {
             "}".AppendWithNewSection(sb, indentationLevel);
         }
 
-        private void WriteAlias(KeyValuePair<string, TSSimpleType> x, string ns) {
-            $"type {NameOnly(x.Key)} = {GetTypeString(x.Value, ns)};".AppendWithNewSection(sb, 1);
+        private void WriteAlias(KeyValuePair<string, TSAliasDescription> x, string ns) {
+            writeJsDoc(x.Value.JsDoc, 1);
+            $"type {NameOnly(x.Key)} = {GetTypeString(x.Value.TargetType, ns)};".AppendWithNewSection(sb, 1);
         }
 
         public NamespaceOutput GetTypescript(TSNamespace ns) {

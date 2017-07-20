@@ -65,27 +65,27 @@ VT_NULL	1
             }
             var isArray = splitValues.ContainsAny(VT_VECTOR, VT_ARRAY);
             if (splitValues.ContainsAny(VT_I1, VT_I2, VT_I4, VT_I8, VT_R4, VT_R8, VT_UI1, VT_UI2, VT_UI4, VT_UI8, VT_CY, VT_DECIMAL, VT_INT, VT_UINT)) {
-                ret.FullName = "number";
+                ret = "number";
             } else if (splitValues.ContainsAny(VT_BSTR, VT_LPSTR, VT_LPWSTR)) {
-                ret.FullName = "string";
+                ret= "string";
             } else if (splitValues.ContainsAny(VT_BOOL)) {
-                ret.FullName = "boolean";
+                ret= "boolean";
             } else if (splitValues.ContainsAny(VT_VOID, VT_HRESULT)) {
-                ret.FullName = replaceVoidWithUndefined ? "undefined" : "void";
+                ret= replaceVoidWithUndefined ? "undefined" : "void";
             } else if (splitValues.ContainsAny(VT_DATE)) {
-                ret.FullName = "VarDate";
+                ret= "VarDate";
             } else if (splitValues.ContainsAny(VT_EMPTY)) {
                 var ti = vti.TypeInfo;
-                ret.FullName = $"{ti.Parent.Name}.{ti.Name}";
+                ret= $"{ti.Parent.Name}.{ti.Name}";
                 if (vti.IsExternalType) { AddTLI(vti.TypeLibInfoExternal, true); }
-                interfaceToCoClassMapping.IfContainsKey(ret.FullName, val => ret.FullName = val.FirstOrDefault());
+                interfaceToCoClassMapping.IfContainsKey(ret.FullName, val => ret= val.FirstOrDefault());
             } else if (splitValues.ContainsAny(VT_VARIANT, VT_DISPATCH, VT_UNKNOWN)) {
-                ret.FullName = "any";
+                ret= "any";
             } else {
-                ret.FullName = "any";
+                ret= "any";
             }
 
-            if (isArray) { ret.FullName += "[]"; }
+            if (isArray) { ret += "[]"; }
             return ret;
         }
 
@@ -173,13 +173,12 @@ VT_NULL	1
 
             ret.ReturnType = GetTypeName(members.First().ReturnType, !invokeable);
             if (hasSetter && parameterList.Any()) {
-                var parameterTypes = new TSTupleType();
-                parameterList.SelectKVP((name, parameterDescription) => parameterDescription.Type).AddRangeTo(parameterTypes.Members);
+                var parameterTypes = new TSTupleType(parameterList.SelectKVP((name, parameterDescription) => parameterDescription.Type));
                 parameterizedSetters.Add(new ParameterizedSetterInfo() {
                     objectType = new TSSimpleType(typename),
                     propertyName = members.First().Name,
                     parameterTypes = parameterTypes,
-                    valueType = ret.ReturnType as TSSimpleType
+                    valueType = (TSSimpleType)ret.ReturnType
                 });
             }
 
@@ -193,7 +192,7 @@ VT_NULL	1
 
             var enumerableType1 = enumerableType; //because ref parameters cannot be used within lambda expressions
             members.Cast().ToLookup(x => x.Name).IfContainsKey("_NewEnum", mi => {
-                ret.IfContainsKey("Item", itemMI => enumerableType1 = (itemMI.ReturnType as TSSimpleType).FullName);
+                ret.IfContainsKey("Item", itemMI => enumerableType1 = ((TSSimpleType)itemMI.ReturnType).FullName);
             });
             enumerableType = enumerableType1;
 
@@ -250,12 +249,13 @@ VT_NULL	1
             ret.AddParameter("event", $"'{m.Name}'");
             if (args.Keys().Any()) { ret.AddParameter("argNames", new TSTupleType(args.Keys().Select(x => $"'{x}'"))); }
 
-            var parameterType = new TSObjectType();
-            args.AddRangeTo(parameterType.Members);
-            var fnType = new TSFunctionType();
-            fnType.FunctionDescription.AddParameter("this", typename);
-            fnType.FunctionDescription.AddParameter("parameter", parameterType);
-            fnType.FunctionDescription.ReturnType = TSSimpleType.Void;
+            var parameterType = new TSObjectType(args);
+
+            var memberDescr = new TSMemberDescription();
+            var fnType = new TSFunctionType(memberDescr);
+            memberDescr.AddParameter("this", typename);
+            memberDescr.AddParameter("parameter", parameterType);
+            memberDescr.ReturnType = TSSimpleType.Void;
             ret.AddParameter("handler", fnType);
 
             ret.ReturnType = TSSimpleType.Void;
@@ -266,7 +266,7 @@ VT_NULL	1
         private TSMemberDescription ToMemberDescription(ParameterizedSetterInfo x) {
             var ret = new TSMemberDescription();
             ret.AddParameter("obj", x.objectType);
-            ret.AddParameter("propertyName", new TSSimpleType($"'{x.propertyName}'"));
+            ret.AddParameter("propertyName", $"'{x.propertyName}'");
             ret.AddParameter("parameterTypes", x.parameterTypes);
             ret.AddParameter("newValue", x.valueType);
             ret.ReturnType = TSSimpleType.Void;

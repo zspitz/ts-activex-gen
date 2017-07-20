@@ -11,12 +11,13 @@ namespace TsActivexGen.Util {
         public static bool NotIn<T>(this T val, params T[] vals) => !vals.Contains(val);
 
         public static void Add<TKey,TValue>(this ICollection<KeyValuePair<TKey,TValue>> col, TKey key, TValue value) => col.Add(KVP(key, value));
+        public static void Add(this Dictionary<string, TSAliasDescription> dict, string key, TSSimpleType type) => dict.Add(key, new TSAliasDescription { TargetType = type });
 
         static string[] builtins = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" };
-        public static string[] NamedTypes(this ITSType type) => type.TypeParts().Except(builtins).Where(x => !IsLiteralTypeName(x)).ToArray();
+        public static string[] NamedTypes(this ITSType type) => type.TypeParts().Select(x=>x.FullName).Except(builtins).Where(x => !IsLiteralTypeName(x)).ToArray();
         public static HashSet<string> NamedTypes(this IEnumerable<ITSType> types) => types.SelectMany(x => x.NamedTypes()).ToHashSet();
         public static string[] NamedTypes(this IEnumerable<string> types) => types.Except(builtins).Where(x => !IsLiteralTypeName(x)).ToArray();
-        public static bool IsLiteralType(this ITSType type) => IsLiteralTypeName((type as TSSimpleType)?.FullName);
+        public static bool IsLiteralType(this ITSType type) => type is TSSimpleType x && x.IsLiteralType;
 
         //https://github.com/zspitz/ts-activex-gen/issues/32
         public static void AddInterfaceTo(this KeyValuePair<string, TSInterfaceDescription> x, TSNamespace ns) {

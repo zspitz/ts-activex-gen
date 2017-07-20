@@ -51,7 +51,7 @@ namespace TsActivexGen {
         public static bool operator !=(TSParameterDescription x, TSParameterDescription y) => !OperatorEquals(x, y);
     }
 
-    public class TSMemberDescription {
+    public class TSMemberDescription : EqualityBase<TSMemberDescription> {
         public List<KeyValuePair<string, TSParameterDescription>> Parameters { get; set; } //(null means a property, empty means empty parameter list); this mut be a list, becaus parameter order is important
         public ITSType ReturnType { get; set; }
         public bool? ReadOnly { get; set; }
@@ -61,13 +61,24 @@ namespace TsActivexGen {
             if (Parameters == null) { Parameters = new List<KeyValuePair<string, TSParameterDescription>>(); }
             Parameters.Add(name, new TSParameterDescription() { Type = type });
         }
-        public void AddParameter(string name, string type) => AddParameter(name, new TSSimpleType(type));
-        public string[] TypeParts() {
-            var ret = new List<string>();
-            Parameters.DefaultIfNull().Values().SelectMany(x => x.Type.TypeParts()).AddRangeTo(ret);
-            ReturnType.TypeParts().AddRangeTo(ret);
-            return ret.ToArray();
+        public void AddParameter(string name, TSSimpleType type) => AddParameter(name, (ITSType)type);
+
+        public override bool Equals(TSMemberDescription other) => Parameters.SequenceEqual(other.Parameters) && ReadOnly == other.ReadOnly && ReturnType == other.ReturnType;
+        public override int GetHashCode() {
+            unchecked {
+                int hash = 17;
+                hash = hash * 486187739 + ReturnType.GetHashCode();
+                foreach (var prm in Parameters) {
+                    hash = hash * 486187739 + prm.GetHashCode();
+                }
+                if (ReadOnly.HasValue) {
+                    hash = hash * 486187739 + ReadOnly.GetHashCode();
+                }
+                return hash;
+            }
         }
+
+        public IEnumerable<TSSimpleType> TypeParts() => Parameters.DefaultIfNull().Values().SelectMany(x => x.Type.TypeParts()).Concat(ReturnType.TypeParts());
     }
 
     public class TSInterfaceDescription {
@@ -98,10 +109,11 @@ namespace TsActivexGen {
         public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
 
         public HashSet<string> GetUsedTypes() {
-            var types = new List<string>();
-            Interfaces.Values.Concat(GlobalInterfaces.Values).SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).NamedTypes().AddRangeTo(types);
-            Aliases.Select(x=>x.Value.TargetType).NamedTypes().AddRangeTo(types);
-            return types.ToHashSet();
+            var types = new List<TSSimpleType>();
+            Interfaces.Values.Concat(GlobalInterfaces.Values).SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).AddRangeTo(types);
+            Aliases.Select(x=>x.Value.TargetType).AddRangeTo(types);
+            types.RemoveAll(x => x.IsLiteralType);
+            return types.Select(x=>x.FullName).ToHashSet();
         }
         public HashSet<string> GetKnownTypes() {
             var ret = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" }.ToHashSet();
@@ -109,7 +121,7 @@ namespace TsActivexGen {
             Interfaces.Keys.AddRangeTo(ret);
             Aliases.Keys.AddRangeTo(ret);
             ret.ToList().Select(x => x + "[]").AddRangeTo(ret);
-            return ret;
+            return ret.ToHashSet();
         }
         public HashSet<string> GetUndefinedTypes() {
             var ret = GetUsedTypes();

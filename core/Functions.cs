@@ -28,16 +28,6 @@ namespace TsActivexGen.Util {
             return true;
         }
 
-        static Regex re = new Regex("^.*<(.*)>$");
-        public static string GenericParameter(string fullName) {
-            //HACK The only generic types used in this code base are Enumerator<T>, which has a single parameter; this code really should do a full parse, but YAGNI
-            if (IsLiteralTypeName(fullName)) { return null; }
-            var match = re.Match(fullName);
-            var ret = match.Groups[1].Value;
-            if (ret.IsNullOrEmpty()) { return null; }
-            return ret;
-        }
-
         public static bool IsGenericTypeName(string fullName) => !IsLiteralTypeName(fullName) && fullName.Contains("<");
 
         public static string GetProgIDFromCLSID(string clsid) {
