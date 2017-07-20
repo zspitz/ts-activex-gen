@@ -241,7 +241,8 @@ VT_NULL	1
 
         //ActiveXObject.on(obj: 'Word.Application', 'BeforeDocumentSave', ['Doc','SaveAsUI','Cancel'], function (params) {});
         private TSMemberDescription ToActiveXEventMember(MemberInfo m, CoClassInfo c) {
-            var args = m.Parameters.Cast().Select(x => KVP<string, ITSType>(x.Name, GetTypeName(x.VarTypeInfo, true)));
+            var args = m.Parameters.Cast().Select(x => KVP<string, (ITSType type, bool @readonly)>(x.Name, (GetTypeName(x.VarTypeInfo, true), !x.IsByRef()))).ToList();
+
             var typename = $"{c.Parent.Name}.{c.Name}";
 
             var ret = new TSMemberDescription();

@@ -6,6 +6,7 @@ using static TLI.TliVarType;
 using static TLI.DescKinds;
 using static TLI.InvokeKinds;
 using System.Diagnostics;
+using static TLI.ParamFlags;
 
 namespace TsActivexGen.Util {
     public static class TLIExtensions {
@@ -68,15 +69,10 @@ namespace TsActivexGen.Util {
             }
             return false;
         }
-        public static bool IsProperty(this MemberInfo mi) {
-            return mi.InvokeKind.In(INVOKE_PROPERTYGET, INVOKE_PROPERTYPUT, INVOKE_PROPERTYPUTREF);
-        }
-        public static bool IsCreateable(this CoClassInfo cc) {
-            return (cc.AttributeMask & 2) == 2;
-        }
-        public static bool IsInvokeable(this MemberInfo mi) {
-            return mi.InvokeKind.In(INVOKE_FUNC, INVOKE_EVENTFUNC);
-        }
+        public static bool IsProperty(this MemberInfo mi)  => mi.InvokeKind.In(INVOKE_PROPERTYGET, INVOKE_PROPERTYPUT, INVOKE_PROPERTYPUTREF);
+        public static bool IsCreateable(this CoClassInfo cc) => (cc.AttributeMask & 2) == 2;
+        public static bool IsInvokeable(this MemberInfo mi) =>mi.InvokeKind.In(INVOKE_FUNC, INVOKE_EVENTFUNC);
+        public static bool IsByRef(this ParameterInfo pi) => (pi.Flags & PARAMFLAG_FOUT) ==PARAMFLAG_FOUT;
 
         public static HashSet<TliVarType> SplitValues(this TliVarType varType) {
             var ret = new List<TliVarType>();

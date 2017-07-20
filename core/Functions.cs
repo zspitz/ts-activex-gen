@@ -49,7 +49,7 @@ namespace TsActivexGen.Util {
                     ret = $"[{x.Members.Joined(", ", y => GetTypeString(y, ns))}]";
                     break;
                 case TSObjectType x:
-                    ret = $"{{{x.Members.JoinedKVP((key, val) => $"{key}: {GetTypeString(val, ns)}", ", ")}}}";
+                    ret = $"{{{x.Members.JoinedKVP((key, val) => $"{(val.@readonly ? "readonly " : "")}{key}: {GetTypeString(val.type, ns)}", ", ")}}}";
                     break;
                 case TSFunctionType x:
                     ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => GetParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}";

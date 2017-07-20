@@ -55,12 +55,12 @@ namespace TsActivexGen {
     }
 
     public struct TSObjectType : ITSType {
-        public Dictionary<string, ITSType> Members { get; } 
+        public Dictionary<string, (ITSType type, bool @readonly)> Members { get; } 
 
         public bool Equals(ITSType other) => other is TSObjectType x && Members.OrderBy(y=>y.Key).ToList().SequenceEqual(x.Members.OrderBy(y=>y.Key).ToList());
-        public IEnumerable<TSSimpleType> TypeParts() => Members.Values.SelectMany(x => x.TypeParts());
+        public IEnumerable<TSSimpleType> TypeParts() => Members.Values.SelectMany(x => x.type.TypeParts());
 
-        public TSObjectType(IEnumerable<KeyValuePair<string, ITSType>> members) => Members = members.ToDictionary();
+        public TSObjectType(IEnumerable<KeyValuePair<string, (ITSType type, bool @readonly)>> members) => Members = members.ToDictionary();
     }
 
     public struct TSFunctionType : ITSType {
