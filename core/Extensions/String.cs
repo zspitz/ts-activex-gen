@@ -21,7 +21,11 @@ namespace TsActivexGen.Util {
             while (toAppend.Length>200) {
                 isAfterPipeBreak = false;
                 var match = toAppend.ShortestMatch(linebreakers, linebreakers2);
-                if (match == null) { throw new Exception("Unable to split long line"); }
+                if (match == null) {
+                    //throw new Exception("Unable to split long line");
+                    sb.AppendLine(toAppend);
+                    return;
+                }
                 if (match.Value.EndsWithAny(new[] { "(", "{" })) { indentationLevel += 1; }
                 sb.AppendLine(match.Value);
                 toAppend = new string(' ', indentationLevel * 4) + toAppend.Substring(match.Length).TrimStart();

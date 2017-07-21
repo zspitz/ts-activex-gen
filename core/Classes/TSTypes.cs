@@ -42,6 +42,8 @@ namespace TsActivexGen {
 
         public static implicit operator string(TSSimpleType t) => t.FullName;
         public static implicit operator TSSimpleType(string s) => new TSSimpleType(s);
+
+        public override string ToString() => FullName;
     }
 
     public struct TSTupleType : ITSType {
@@ -52,6 +54,8 @@ namespace TsActivexGen {
 
         public TSTupleType(IEnumerable<ITSType> members) => Members = members.ToList();
         public TSTupleType(IEnumerable<string> members) => Members = members.Select(x=>new TSSimpleType(x)).Cast<ITSType>().ToList();
+
+        public override string ToString() => "[" + Members.Joined(",") + "]";
     }
 
     public struct TSObjectType : ITSType {
@@ -61,15 +65,19 @@ namespace TsActivexGen {
         public IEnumerable<TSSimpleType> TypeParts() => Members.Values.SelectMany(x => x.type.TypeParts());
 
         public TSObjectType(IEnumerable<KeyValuePair<string, (ITSType type, bool @readonly)>> members) => Members = members.ToDictionary();
+
+        public override string ToString() => $"{Members.Keys.Joined(",",x=>$".{x}")}";
     }
 
     public struct TSFunctionType : ITSType {
         public TSMemberDescription FunctionDescription { get; }
 
-        public bool Equals(ITSType other) => other is TSFunctionType x && FunctionDescription == x.FunctionDescription;
+        public bool Equals(ITSType other) => other is TSFunctionType x && FunctionDescription.Equals(x.FunctionDescription);
         public IEnumerable<TSSimpleType> TypeParts() => FunctionDescription.TypeParts();
 
         public TSFunctionType(TSMemberDescription fn)  => FunctionDescription = fn;
+
+        public override string ToString() => $"({FunctionDescription.Parameters.Keys().Joined(",")}) => {FunctionDescription.ReturnType}";
     }
 
     public class TSUnionType : ITSType {
@@ -86,5 +94,7 @@ namespace TsActivexGen {
 
         public bool Equals(ITSType other) => other is TSUnionType x && Parts.SequenceEqual(x.Parts);
         public IEnumerable<TSSimpleType> TypeParts() => Parts.SelectMany(x => x.TypeParts());
+
+        public override string ToString() => Parts.Joined("|");
     }
 }

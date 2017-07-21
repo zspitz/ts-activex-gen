@@ -14,7 +14,7 @@ namespace TsActivexGen.Util {
             if (selector == null) { return string.Join(delimiter, source); }
             return string.Join(delimiter, source.Select(selector));
         }
-        public static string Joined<T>(this IEnumerable<T> source, string delimiter , Func<T, int, string> selector ) {
+        public static string Joined<T>(this IEnumerable<T> source, string delimiter, Func<T, int, string> selector) {
             if (source == null) { return ""; }
             if (selector == null) { return string.Join(delimiter, source); }
             return string.Join(delimiter, source.Select(selector));
@@ -51,7 +51,7 @@ namespace TsActivexGen.Util {
             }
             return src;
         }
-        public static IEnumerable<T> ForEach<T>(this IEnumerable<T> src, Action<T,int> action) {
+        public static IEnumerable<T> ForEach<T>(this IEnumerable<T> src, Action<T, int> action) {
             var current = 0;
             foreach (var item in src) {
                 action(item, current);
@@ -72,6 +72,15 @@ namespace TsActivexGen.Util {
                 previous = x;
             }
             if (counter > 0) { yield return selector(previous, counter - 1, true); }
+        }
+
+        public static IEnumerable<TResult> Zip<TFirst, TSecond, TResult>(this IEnumerable<TFirst> first, IEnumerable<TSecond> second, Func<TFirst, TSecond, int, TResult> resultSelector) {
+            var counter = 0;
+            return Enumerable.Zip(first,second, (x, y) => {
+                var ret = resultSelector(x, y, counter);
+                counter += 1;
+                return ret;
+            });
         }
     }
 }

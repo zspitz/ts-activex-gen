@@ -49,6 +49,19 @@ namespace TsActivexGen {
 
         public static bool operator ==(TSParameterDescription x, TSParameterDescription y) => OperatorEquals(x, y);
         public static bool operator !=(TSParameterDescription x, TSParameterDescription y) => !OperatorEquals(x, y);
+
+        public void MergeTypeFrom(TSParameterDescription source) {
+            if (Type is TSUnionType x) {
+                x.AddPart(source.Type);
+            } else if (Type != source.Type) {
+                var final = new TSUnionType();
+                final.AddPart(Type);
+                final.AddPart(source.Type);
+                if (final.Parts.Count > 1) {
+                    Type = final;
+                }
+            }
+        }
     }
 
     public class TSMemberDescription : EqualityBase<TSMemberDescription> {
@@ -63,7 +76,7 @@ namespace TsActivexGen {
         }
         public void AddParameter(string name, TSSimpleType type) => AddParameter(name, (ITSType)type);
 
-        public override bool Equals(TSMemberDescription other) => Parameters.SequenceEqual(other.Parameters) && ReadOnly == other.ReadOnly && ReturnType == other.ReturnType;
+        public override bool Equals(TSMemberDescription other) => Parameters.SequenceEqual(other.Parameters) && ReadOnly == other.ReadOnly && ReturnType.Equals(other.ReturnType);
         public override int GetHashCode() {
             unchecked {
                 int hash = 17;
@@ -79,12 +92,112 @@ namespace TsActivexGen {
         }
 
         public IEnumerable<TSSimpleType> TypeParts() => Parameters.DefaultIfNull().Values().SelectMany(x => x.Type.TypeParts()).Concat(ReturnType.TypeParts());
+
+        public bool TryFoldInto(TSMemberDescription destination) {
+            if (Parameters == null || destination.Parameters == null) { return false; } //property
+            if (!Equals(ReturnType, destination.ReturnType)) { return false; }
+            if (Parameters.Count != destination.Parameters.Count) { return false; }
+            if (!Parameters.Keys().SequenceEqual(destination.Parameters.Keys())) { return false; }
+            if (Parameters.Values().Any(x => x.ParameterType == Rest) || destination.Parameters.Values().Any(x => x.ParameterType == Rest)) { return false; }
+
+            var parameter1Type = Parameters.Get("obj")?.Type;
+            var destParameter1Type = destination.Parameters.Get("obj")?.Type;
+            var parameter2Type = Parameters.Get("event")?.Type;
+            var destParameter2Type = destination.Parameters.Get("event")?.Type;
+            if (parameter1Type != null && parameter1Type.Equals(destParameter1Type) && parameter2Type != null && parameter2Type.Equals(destParameter2Type)) {
+                Debugger.Break();
+            }
+
+            var foldableMethod = true;
+            var unfoldableParameters = Parameters.Values().Zip(destination.Parameters.Values(), (sourceParam, destParam) => {
+                if (!foldableMethod) { return null; }
+                if (sourceParam.ParameterType != destParam.ParameterType) { //if "optionality" of corresponding parameters doesn't match
+                    foldableMethod = false;
+                    return null;
+                }
+                var alreadyIncludesType = false;
+                if (destParam.Type is TSUnionType x && sourceParam.Type is TSUnionType y) {
+                    alreadyIncludesType = y.Parts.Except(x.Parts).None();
+                } else if (destParam.Type is TSUnionType x1) {
+                    alreadyIncludesType = x1.Parts.Contains(sourceParam.Type);
+                } else {
+                    alreadyIncludesType = destParam.Type.Equals(sourceParam.Type);
+                }
+                return new { sourceParam, destParam, alreadyIncludesType };
+            }).Where(x => !x.alreadyIncludesType).ToList();
+            if (!foldableMethod) { return false; }
+
+            switch (unfoldableParameters.Count) {
+                case 0:
+                    return true;
+                case var x2 when x2 > 1:
+                    return false;
+                default: // 1
+                    var details = unfoldableParameters[0];
+                    details.destParam.MergeTypeFrom(details.sourceParam);
+                    return true;
+            }
+        }
     }
 
     public class TSInterfaceDescription {
         public List<KeyValuePair<string, TSMemberDescription>> Members { get; } = new List<KeyValuePair<string, TSMemberDescription>>();
         public List<TSMemberDescription> Constructors { get; } = new List<TSMemberDescription>();
         public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
+
+        public void ConsolidateMembers() {
+
+            //consolidate members
+            var membersLookup = Members.Select((kvp, index) => (key: kvp.Key, value: kvp.Value, position: index)).ToLookup(x => new {
+                name = x.key,
+                returnType = x.value.ReturnType,
+                parameterString = x.value.Parameters?.Keys().Joined()
+            });
+            var positionsToRemove = new List<int>();
+            foreach (var grp in membersLookup) {
+                if (grp.Count() == 1) { continue; }
+                if (grp.Key.parameterString == null) { continue; } //ignore properties
+                ConsolidateGroup(grp.Select(x => (x.value, x.position))).AddRangeTo(positionsToRemove);
+            }
+            Members.RemoveMultipleAt(positionsToRemove);
+
+            //consolidate constructors
+            var constructorsLookup = Constructors.Select((ctor, index) => (ctor: ctor, position: index)).ToLookup(x => new {
+                returnType = x.ctor.ReturnType,
+                parameterString = x.ctor.Parameters?.Keys().Joined()
+            });
+            positionsToRemove = new List<int>();
+            foreach (var grp in constructorsLookup) {
+                if (grp.Count() == 1) { continue; }
+                //constructors are always members, never properties; we don't have to check for null parameter collections
+                ConsolidateGroup(grp).AddRangeTo(positionsToRemove);
+            }
+            Constructors.RemoveMultipleAt(positionsToRemove);
+
+
+            List<int> ConsolidateGroup(IEnumerable<(TSMemberDescription member, int position)> grp)
+            {
+                var ret = new List<int>();
+                var lst = grp.Reverse().ToList();
+                bool modified;
+                do {
+                    modified = false;
+                    for (int i = lst.Count - 1; i >= 0; i -= 1) {
+                        var source = lst[i];
+                        for (int j = 0; j < i; j++) {
+                            var dest = lst[j];
+                            if (source.member.TryFoldInto(dest.member)) {
+                                modified = true;
+                                ret.Add(lst[i].position);
+                                lst.RemoveAt(i);
+                                break;
+                            }
+                        }
+                    }
+                } while (modified);
+                return ret;
+            }
+        }
     }
 
     public class TSNamespaceDescription {
@@ -108,12 +221,14 @@ namespace TsActivexGen {
         public HashSet<string> Dependencies { get; } = new HashSet<string>();
         public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
 
+        private IEnumerable<TSInterfaceDescription> allInterfaces => Interfaces.Values.Concat(GlobalInterfaces.Values);
+
         public HashSet<string> GetUsedTypes() {
             var types = new List<TSSimpleType>();
-            Interfaces.Values.Concat(GlobalInterfaces.Values).SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).AddRangeTo(types);
-            Aliases.Select(x=>x.Value.TargetType).AddRangeTo(types);
+            allInterfaces.SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).AddRangeTo(types);
+            Aliases.Select(x => x.Value.TargetType).AddRangeTo(types);
             types.RemoveAll(x => x.IsLiteralType);
-            return types.Select(x=>x.FullName).ToHashSet();
+            return types.Select(x => x.FullName).ToHashSet();
         }
         public HashSet<string> GetKnownTypes() {
             var ret = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" }.ToHashSet();
@@ -237,7 +352,7 @@ namespace TsActivexGen {
                 var bittedness = "AnyCPU";
                 if (!Is32bit && !Is64bit) {
                     bittedness = "None";
-                }else if (!Is32bit) {
+                } else if (!Is32bit) {
                     bittedness = "32bit";
                 } else if (!Is64bit) {
                     bittedness = "64bit";

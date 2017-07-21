@@ -307,19 +307,6 @@ VT_NULL	1
                 eventInterface = x.DefaultEventInterface
             }).Where(x => x.eventInterface != null).SelectMany(x => x.eventInterface.Members.Cast().Select(y => KVP("on", ToActiveXEventMember(y, x.coclass)))).ToList();
 
-            var lookup = eventRegistrations.ToLookup(x => new {
-                objectType = GetTypeString(x.Value.Parameters.Get("obj").Type, ""),
-                argNamesType = GetTypeString(x.Value.Parameters.Get("argNames")?.Type, ""),
-                handlerType = GetTypeString(x.Value.Parameters.Get("handler").Type, "")
-            }).Where(grp => grp.Count() > 1);
-            foreach (var grp in lookup) {
-                var eventType = new TSUnionType();
-                grp.Select(x => x.Value.Parameters.Get("event").Type).AddRangeTo(eventType.Parts);
-                grp.First().Value.Parameters.Get("event").Type = eventType;
-                foreach (var toRemove in grp.Skip(1)) {
-                    eventRegistrations.Remove(toRemove);
-                }
-            }
 
             eventRegistrations.AddRangeTo(activex.Members);
 

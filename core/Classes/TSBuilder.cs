@@ -103,6 +103,9 @@ namespace TsActivexGen {
         }
 
         public NamespaceOutput GetTypescript(TSNamespace ns) {
+            ns.Interfaces.Values().ForEach(x => x.ConsolidateMembers());
+            ns.GlobalInterfaces.Values().ForEach(x => x.ConsolidateMembers());
+
             sb = new StringBuilder();
 
             writeJsDoc(ns.JsDoc, 0);
