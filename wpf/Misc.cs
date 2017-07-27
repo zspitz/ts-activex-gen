@@ -1,4 +1,6 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace TsActivexGen.Wpf {
     public static class Misc {
@@ -23,5 +25,23 @@ namespace TsActivexGen.Wpf {
             {"word","https://msdn.microsoft.com/en-us/library/fp179696.aspx"},
             {"adodb","https://msdn.microsoft.com/en-us/library/jj249010.aspx" }
         };
+
+        public static Task RunCommandlineAsync(string commandline) {
+            // there is no non-generic TaskCompletionSource
+            var tcs = new TaskCompletionSource<bool>();
+
+            var process = new Process {
+                StartInfo = {
+                    FileName="cmd.exe",
+                    Arguments = "/K echo " + commandline + " & " + commandline
+                },
+                EnableRaisingEvents = true
+            };
+            process.Exited += (s, e) => tcs.SetResult(true);
+
+            process.Start();
+
+            return tcs.Task;
+        }
     }
 }

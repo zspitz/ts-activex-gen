@@ -102,9 +102,10 @@
                     </ListBoxItem>
                     <ListBoxItem Tag="{StaticResource False}">Single file</ListBoxItem>
                 </ListBox>
-                <UniformGrid Rows="1" Columns="2" Margin="10">
+                <UniformGrid Rows="1" Columns="3" Margin="10">
                     <Button Name="btnOutput" Content="Output" />
                     <Button Name="btnClearFiles" Content="Clear file list" />
+                    <Button Name="btnTest" Content="Test" />
                 </UniformGrid>
             </DockPanel>
             <DataGrid Name="dtgFiles" DockPanel.Dock="Top" AutoGenerateColumns="False" CanUserAddRows="False">

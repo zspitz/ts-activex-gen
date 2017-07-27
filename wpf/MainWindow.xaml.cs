@@ -17,7 +17,6 @@ using System.Collections.ObjectModel;
 using static TsActivexGen.Wpf.Functions;
 using System.IO;
 using static TsActivexGen.Util.Functions;
-using static System.Environment;
 using static TsActivexGen.Wpf.Misc;
 
 namespace TsActivexGen.Wpf {
@@ -107,6 +106,12 @@ namespace TsActivexGen.Wpf {
             btnClearFiles.Click += (s, e) => {
                 tlbGenerator = new TlbInf32Generator();
                 fileList.Clear();
+            };
+
+            btnTest.Click += (s, e) => {
+                Directory.EnumerateFiles(txbOutputFolder.Text, "tsconfig.json", SearchOption.AllDirectories).ForEach(x => {
+                    RunCommandlineAsync($"tsc -p {x} && tslint -p {x}");
+                });
             };
         }
 
