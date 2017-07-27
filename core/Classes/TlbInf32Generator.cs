@@ -246,9 +246,16 @@ VT_NULL	1
 
             var args = m.Parameters.Cast().Select(x => KVP<string, (ITSType type, bool @readonly)>(x.Name, (GetTypeName(x.VarTypeInfo, true), !x.IsByRef()))).ToList();
 
-            //TODO when args.Count<5, then write definitions inline, as before
+            ITSType argnamesType;
+            ITSType parameterType;
 
-            if (args.Any()) {
+            if (args.None()) {
+                argnamesType = null;
+                parameterType = TSObjectType.PlainObject;
+            } else if (args.Count <= 6) {
+                argnamesType= new TSTupleType(args.Keys().Select(x => $"'{x}'"));
+                parameterType = new TSObjectType(args);
+            } else {
                 var alias = new TSAliasDescription() { TargetType = new TSTupleType(args.Keys().Select(x => $"'{x}'")) };
                 var param = new TSInterfaceDescription();
                 args.SelectKVP((key, value) => KVP(key, new TSMemberDescription() { ReturnType = value.type, ReadOnly = value.@readonly })).AddRangeTo(param.Members);
@@ -259,25 +266,22 @@ VT_NULL	1
                 } else if (!helperTypes.argNamesType.Equals(alias) || !helperTypes.parameterType.Equals(param)) {
                     Debugger.Break();
                 }
+
+                argnamesType = (TSSimpleType)$"{@namespace}.EventHelperTypes.{c.Name}_{eventName}_ArgNames";
+                parameterType = (TSSimpleType)$"{@namespace}.EventHelperTypes.{c.Name}_{eventName}_Parameter";
             }
 
-            var typename = $"{@namespace}.{c.Name}";
+            var eventsourceType = $"{@namespace}.{c.Name}";
 
             var ret = new TSMemberDescription();
-            ret.AddParameter("obj", $"{typename}");
+            ret.AddParameter("obj", $"{eventsourceType}");
             ret.AddParameter("event", $"'{eventName}'");
-            if (args.Keys().Any()) { ret.AddParameter("argNames", $"{@namespace}.EventHelperTypes.{c.Name}_{eventName}_ArgNames"); }
+            if (argnamesType != null) { ret.AddParameter("argNames", argnamesType); }
 
-            ITSType parameterType;
-            if (args.Any()) {
-                parameterType = (TSSimpleType)$"{@namespace}.EventHelperTypes.{c.Name}_{eventName}_Parameter";
-            } else {
-                parameterType = TSObjectType.PlainObject;
-            }
-
+            //build the handler parameter type
             var memberDescr = new TSMemberDescription();
             var fnType = new TSFunctionType(memberDescr);
-            memberDescr.AddParameter("this", typename);
+            memberDescr.AddParameter("this", eventsourceType);
             memberDescr.AddParameter("parameter", parameterType);
             memberDescr.ReturnType = TSSimpleType.Void;
             ret.AddParameter("handler", fnType);
