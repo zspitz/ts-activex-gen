@@ -76,7 +76,18 @@ namespace TsActivexGen {
         }
         public void AddParameter(string name, TSSimpleType type) => AddParameter(name, (ITSType)type);
 
-        public override bool Equals(TSMemberDescription other) => Parameters.SequenceEqual(other.Parameters) && ReadOnly == other.ReadOnly && ReturnType.Equals(other.ReturnType);
+        public override bool Equals(TSMemberDescription other) {
+            bool parameterEquality;
+            if ((Parameters == null) != (other.Parameters==null)) {
+                parameterEquality = false;
+            } else if (Parameters==null) {
+                parameterEquality = true;
+            } else {
+                parameterEquality = Parameters.SequenceEqual(other.Parameters);
+            }
+            return parameterEquality && ReadOnly == other.ReadOnly  && ReturnType.Equals(other.ReturnType) ;
+        }
+
         public override int GetHashCode() {
             unchecked {
                 int hash = 17;
@@ -140,7 +151,7 @@ namespace TsActivexGen {
         }
     }
 
-    public class TSInterfaceDescription {
+    public class TSInterfaceDescription : EqualityBase<TSInterfaceDescription> {
         public List<KeyValuePair<string, TSMemberDescription>> Members { get; } = new List<KeyValuePair<string, TSMemberDescription>>();
         public List<TSMemberDescription> Constructors { get; } = new List<TSMemberDescription>();
         public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
@@ -198,44 +209,46 @@ namespace TsActivexGen {
                 return ret;
             }
         }
+
+        public override bool Equals(TSInterfaceDescription other) => Members.SequenceEqual(other.Members) && Constructors.SequenceEqual(other.Constructors);
+
+        public override int GetHashCode() {
+            unchecked {
+                int hash = 17;
+                hash = hash * 486187739 + Members.GetHashCode();
+                hash = hash * 486187739 + Constructors.GetHashCode();
+                return hash;
+            }
+        }
     }
 
     public class TSNamespaceDescription {
-        public Dictionary<string, string> Members { get; } = new Dictionary<string, string>();
-        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
-    }
-
-    public class TSAliasDescription {
-        public TSSimpleType TargetType { get; set; } //this could also be ITSType, but all our aliases are to simple types
-        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
-    }
-
-    public class TSNamespace {
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public int MajorVersion { get; set; }
-        public int MinorVersion { get; set; }
         public Dictionary<string, TSEnumDescription> Enums { get; } = new Dictionary<string, TSEnumDescription>();
         public Dictionary<string, TSInterfaceDescription> Interfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
         public Dictionary<string, TSAliasDescription> Aliases { get; } = new Dictionary<string, TSAliasDescription>();
-        public HashSet<string> Dependencies { get; } = new HashSet<string>();
-        public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
+        public Dictionary<string, TSNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSNamespaceDescription>();
+        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
 
-        private IEnumerable<TSInterfaceDescription> allInterfaces => Interfaces.Values.Concat(GlobalInterfaces.Values);
+        protected virtual IEnumerable<TSInterfaceDescription> allInterfaces => Interfaces.Values;
 
         public HashSet<string> GetUsedTypes() {
             var types = new List<TSSimpleType>();
             allInterfaces.SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).AddRangeTo(types);
-            Aliases.Select(x => x.Value.TargetType).AddRangeTo(types);
+            Aliases.SelectMany(x => x.Value.TargetType.TypeParts()).AddRangeTo(types);
             types.RemoveAll(x => x.IsLiteralType);
-            return types.Select(x => x.FullName).ToHashSet();
+            var ret = types.Select(x => x.FullName).ToHashSet();
+            Namespaces.SelectMany(x => x.Value.GetUsedTypes()).AddRangeTo(ret);
+            return ret;
         }
         public HashSet<string> GetKnownTypes() {
-            var ret = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" }.ToHashSet();
+            var ret = MiscExtensions.builtins.ToHashSet();
             Enums.Keys.AddRangeTo(ret);
             Interfaces.Keys.AddRangeTo(ret);
             Aliases.Keys.AddRangeTo(ret);
             ret.ToList().Select(x => x + "[]").AddRangeTo(ret);
+
+            Namespaces.Values().SelectMany(x => x.GetKnownTypes()).AddRangeTo(ret);
+            
             return ret.ToHashSet();
         }
         public HashSet<string> GetUndefinedTypes() {
@@ -243,11 +256,35 @@ namespace TsActivexGen {
             ret.ExceptWith(GetKnownTypes());
             return ret;
         }
+
+        public void ConsolidateMembers() {
+            allInterfaces.ForEach(x => x.ConsolidateMembers());
+            Namespaces.ForEachKVP((name, ns) => ns.ConsolidateMembers());
+        }
+    }
+
+    public class TSAliasDescription : EqualityBase<TSAliasDescription> {
+        public ITSType TargetType { get; set; }
         public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
+
+        public override bool Equals(TSAliasDescription other)  => TargetType.Equals(other.TargetType);
+        public override int GetHashCode()  => unchecked( 17* 486187739 + TargetType.GetHashCode());
+    }
+
+    public class TSRootNamespaceDescription : TSNamespaceDescription {
+        [Obsolete] public string Name { get; set; }
+        public string Description { get; set; }
+        public int MajorVersion { get; set; }
+        public int MinorVersion { get; set; }
+        public HashSet<string> Dependencies { get; } = new HashSet<string>();
+
+        public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
+
+        protected override IEnumerable<TSInterfaceDescription> allInterfaces => Interfaces.Values.Concat(GlobalInterfaces.Values);
     }
 
     public class TSNamespaceSet {
-        public Dictionary<string, TSNamespace> Namespaces { get; } = new Dictionary<string, TSNamespace>();
+        public Dictionary<string, TSRootNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSRootNamespaceDescription>();
         public HashSet<string> GetUsedTypes() => Namespaces.SelectMany(x => x.Value.GetUsedTypes()).ToHashSet();
         public HashSet<string> GetKnownTypes() => Namespaces.SelectMany(x => x.Value.GetKnownTypes()).ToHashSet();
         public HashSet<string> GetUndefinedTypes() {
@@ -280,7 +317,7 @@ namespace TsActivexGen {
 
     namespace ActiveX {
         public class TypeLibDetails {
-            public static Lazy<List<TypeLibDetails>> FromRegistry = new Lazy<List<TypeLibDetails>>(() => {
+            private static List<TypeLibDetails> initializer() {
                 var tliapp = new TLIApplication();
                 var ret = new List<TypeLibDetails>();
 
@@ -289,24 +326,21 @@ namespace TsActivexGen {
                         using (var tlbkey = key.OpenSubKey(tlbid)) {
                             foreach (var version in tlbkey.GetSubKeyNames()) {
                                 var indexOf = version.IndexOf(".");
-                                short majorVersion;
-                                short.TryParse(version.Substring(0, indexOf), out majorVersion);
-                                short minorVersion;
-                                short.TryParse(version.Substring(indexOf + 1), out minorVersion);
+                                version.Substring(0, indexOf).TryParse(out short? majorVersion);
+                                version.Substring(indexOf + 1).TryParse(out short? minorVersion);
                                 using (var versionKey = tlbkey.OpenSubKey(version)) {
                                     var libraryName = (string)versionKey.GetValue("");
                                     foreach (var lcid in versionKey.GetSubKeyNames()) {
-                                        short lcidParsed;
-                                        if (!short.TryParse(lcid, out lcidParsed)) { continue; } //exclude non-numeric keys such as FLAGS and HELPDIR
+                                        if (!short.TryParse(lcid, out short lcidParsed)) { continue; } //exclude non-numeric keys such as FLAGS and HELPDIR
                                         using (var lcidKey = versionKey.OpenSubKey(lcid)) {
                                             var names = lcidKey.GetSubKeyNames();
                                             var td = new TypeLibDetails() {
                                                 TypeLibID = tlbid,
                                                 Name = libraryName,
                                                 Version = version,
-                                                MajorVersion = majorVersion,
-                                                MinorVersion = minorVersion,
-                                                LCID = short.Parse(lcid),
+                                                MajorVersion = majorVersion ?? 0,
+                                                MinorVersion = minorVersion ?? 0,
+                                                LCID = lcidParsed,
                                                 Is32bit = names.Contains("win32"),
                                                 Is64bit = names.Contains("win64"),
                                                 RegistryKey = lcidKey.ToString()
@@ -336,7 +370,9 @@ namespace TsActivexGen {
                 }
 
                 return ret.OrderBy(x => x.Name).ToList();
-            });
+            }
+
+            public static Lazy<List<TypeLibDetails>> FromRegistry = new Lazy<List<TypeLibDetails>>(initializer);
 
             public string TypeLibID { get; set; }
             public string Name { get; set; }

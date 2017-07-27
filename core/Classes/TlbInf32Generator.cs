@@ -67,22 +67,22 @@ VT_NULL	1
             if (splitValues.ContainsAny(VT_I1, VT_I2, VT_I4, VT_I8, VT_R4, VT_R8, VT_UI1, VT_UI2, VT_UI4, VT_UI8, VT_CY, VT_DECIMAL, VT_INT, VT_UINT)) {
                 ret = "number";
             } else if (splitValues.ContainsAny(VT_BSTR, VT_LPSTR, VT_LPWSTR)) {
-                ret= "string";
+                ret = "string";
             } else if (splitValues.ContainsAny(VT_BOOL)) {
-                ret= "boolean";
+                ret = "boolean";
             } else if (splitValues.ContainsAny(VT_VOID, VT_HRESULT)) {
-                ret= replaceVoidWithUndefined ? "undefined" : "void";
+                ret = replaceVoidWithUndefined ? "undefined" : "void";
             } else if (splitValues.ContainsAny(VT_DATE)) {
-                ret= "VarDate";
+                ret = "VarDate";
             } else if (splitValues.ContainsAny(VT_EMPTY)) {
                 var ti = vti.TypeInfo;
-                ret= $"{ti.Parent.Name}.{ti.Name}";
+                ret = $"{ti.Parent.Name}.{ti.Name}";
                 if (vti.IsExternalType) { AddTLI(vti.TypeLibInfoExternal, true); }
-                interfaceToCoClassMapping.IfContainsKey(ret.FullName, val => ret= val.FirstOrDefault());
+                interfaceToCoClassMapping.IfContainsKey(ret.FullName, val => ret = val.FirstOrDefault());
             } else if (splitValues.ContainsAny(VT_VARIANT, VT_DISPATCH, VT_UNKNOWN)) {
-                ret= "any";
+                ret = "any";
             } else {
-                ret= "any";
+                ret = "any";
             }
 
             if (isArray) { ret += "[]"; }
@@ -241,16 +241,39 @@ VT_NULL	1
 
         //ActiveXObject.on(obj: 'Word.Application', 'BeforeDocumentSave', ['Doc','SaveAsUI','Cancel'], function (params) {});
         private TSMemberDescription ToActiveXEventMember(MemberInfo m, CoClassInfo c) {
+            var @namespace = c.Parent.Name;
+            var eventName = m.Name;
+
             var args = m.Parameters.Cast().Select(x => KVP<string, (ITSType type, bool @readonly)>(x.Name, (GetTypeName(x.VarTypeInfo, true), !x.IsByRef()))).ToList();
 
-            var typename = $"{c.Parent.Name}.{c.Name}";
+            //TODO when args.Count<5, then write definitions inline, as before
+
+            if (args.Any()) {
+                var alias = new TSAliasDescription() { TargetType = new TSTupleType(args.Keys().Select(x => $"'{x}'")) };
+                var param = new TSInterfaceDescription();
+                args.SelectKVP((key, value) => KVP(key, new TSMemberDescription() { ReturnType = value.type, ReadOnly = value.@readonly })).AddRangeTo(param.Members);
+                var helperTypeKey = $"{@namespace}.EventHelperTypes.{c.Name}_{eventName}";
+                if (!eventHelperTypes.TryGetValue(helperTypeKey, out var helperTypes)) {
+                    helperTypes = (alias, param);
+                    eventHelperTypes.Add(helperTypeKey, helperTypes);
+                } else if (!helperTypes.argNamesType.Equals(alias) || !helperTypes.parameterType.Equals(param)) {
+                    Debugger.Break();
+                }
+            }
+
+            var typename = $"{@namespace}.{c.Name}";
 
             var ret = new TSMemberDescription();
             ret.AddParameter("obj", $"{typename}");
-            ret.AddParameter("event", $"'{m.Name}'");
-            if (args.Keys().Any()) { ret.AddParameter("argNames", new TSTupleType(args.Keys().Select(x => $"'{x}'"))); }
+            ret.AddParameter("event", $"'{eventName}'");
+            if (args.Keys().Any()) { ret.AddParameter("argNames", $"{@namespace}.EventHelperTypes.{c.Name}_{eventName}_ArgNames"); }
 
-            var parameterType = new TSObjectType(args);
+            ITSType parameterType;
+            if (args.Any()) {
+                parameterType = (TSSimpleType)$"{@namespace}.EventHelperTypes.{c.Name}_{eventName}_Parameter";
+            } else {
+                parameterType = TSObjectType.PlainObject;
+            }
 
             var memberDescr = new TSMemberDescription();
             var fnType = new TSFunctionType(memberDescr);
@@ -283,10 +306,12 @@ VT_NULL	1
             return ret;
         }
 
-        private TSNamespace ToNamespace(TypeLibInfo tli) {
+        private TSRootNamespaceDescription ToNamespace(TypeLibInfo tli) {
             var coclasses = tli.CoClasses.Cast().ToList();
 
-            var ret = new TSNamespace() { Name = tli.Name };
+            var @namespace = tli.Name;
+
+            var ret = new TSRootNamespaceDescription() { Name = @namespace };
             tli.Constants.Cast().Select(ToTSEnumDescription).AddRangeTo(ret.Enums);
             coclasses.Select(ToTSInterfaceDescription).AddInterfacesTo(ret);
 
@@ -307,8 +332,15 @@ VT_NULL	1
                 eventInterface = x.DefaultEventInterface
             }).Where(x => x.eventInterface != null).SelectMany(x => x.eventInterface.Members.Cast().Select(y => KVP("on", ToActiveXEventMember(y, x.coclass)))).ToList();
 
-
             eventRegistrations.AddRangeTo(activex.Members);
+
+            var currentEventTypes = eventHelperTypes.WhereKVP((key, value) => SplitName(key).@namespace == $"{@namespace}.EventHelperTypes").ToList();
+            if (currentEventTypes.Any()) {
+                var eventHelperTypesNamespace = new TSNamespaceDescription();
+                currentEventTypes.SelectKVP((key, value) => KVP($"{key}_ArgNames", value.argNamesType)).AddRangeTo(eventHelperTypesNamespace.Aliases);
+                currentEventTypes.SelectKVP((key, value) => KVP($"{key}_Parameter", value.parameterType)).AddRangeTo(eventHelperTypesNamespace.Interfaces);
+                ret.Namespaces.Add($"{@namespace}.EventHelperTypes", eventHelperTypesNamespace);
+            }
 
             parameterizedSetters.Where(x => x.objectType.Namespace == ret.Name).ToLookup(x => x.Stringified).Select(grp => grp.First()).Select(x => KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
 
@@ -348,6 +380,7 @@ VT_NULL	1
         Dictionary<string, List<string>> interfaceToCoClassMapping = new Dictionary<string, List<string>>();
         Dictionary<TSSimpleType, string> enumerableCollectionItemMapping = new Dictionary<TSSimpleType, string>();
         List<ParameterizedSetterInfo> parameterizedSetters = new List<ParameterizedSetterInfo>();
+        Dictionary<string, (TSAliasDescription argNamesType, TSInterfaceDescription parameterType)> eventHelperTypes = new Dictionary<string, (TSAliasDescription, TSInterfaceDescription)>();
 
         ILookup<string, InterfaceInfo> allInterfaces = null;
         Dictionary<string, RecordInfo> allRecords = null;

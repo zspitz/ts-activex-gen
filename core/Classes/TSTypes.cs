@@ -7,9 +7,9 @@ using System.Text.RegularExpressions;
 namespace TsActivexGen {
     /// <summary>Describes namespace+name types, as well as built-in and literal types</summary>
     public struct TSSimpleType : ITSType {
-        public static TSSimpleType Any = new TSSimpleType("any");
-        public static TSSimpleType Void = new TSSimpleType("void");
-        public static TSSimpleType Undefined = new TSSimpleType("undefined");
+        public static readonly TSSimpleType Any = new TSSimpleType("any");
+        public static readonly TSSimpleType Void = new TSSimpleType("void");
+        public static readonly TSSimpleType Undefined = new TSSimpleType("undefined");
 
         public string FullName { get; }
         public string Namespace {
@@ -20,7 +20,6 @@ namespace TsActivexGen {
                 return parts[0];
             }
         }
-        public string NameOnly => Functions.NameOnly(FullName);
         public bool IsLiteralType => Functions.IsLiteralTypeName(FullName);
 
         private static Regex re = new Regex("^.*<(.*)>$");
@@ -59,6 +58,8 @@ namespace TsActivexGen {
     }
 
     public struct TSObjectType : ITSType {
+        public static readonly TSObjectType PlainObject = new TSObjectType(Enumerable.Empty<KeyValuePair<string, (ITSType, bool)>>());
+
         public Dictionary<string, (ITSType type, bool @readonly)> Members { get; } 
 
         public bool Equals(ITSType other) => other is TSObjectType x && Members.OrderBy(y=>y.Key).ToList().SequenceEqual(x.Members.OrderBy(y=>y.Key).ToList());

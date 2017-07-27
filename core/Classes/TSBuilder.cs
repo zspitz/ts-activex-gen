@@ -44,17 +44,16 @@ namespace TsActivexGen {
             }
         }
 
-        //https://github.com/zspitz/ts-activex-gen/issues/25#issue-204161318
-        private void writeEnumDeclaration(KeyValuePair<string, TSEnumDescription> x) {
-            var name = NameOnly(x.Key);
+        private void writeEnum(KeyValuePair<string, TSEnumDescription> x, int indentationLevel) {
+            var name = SplitName(x.Key).name;
             var @enum = x.Value;
             var members = @enum.Members.OrderBy(y => y.Key);
 
             writeJsDoc(@enum.JsDoc, 1);
 
-            $"const enum {name} {{".AppendLineTo(sb, 1);
-            members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", 2, ",");
-            "}".AppendWithNewSection(sb, 1);
+            $"const enum {name} {{".AppendLineTo(sb, indentationLevel);
+            members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", indentationLevel + 1, ",");
+            "}".AppendWithNewSection(sb, indentationLevel);
         }
 
         private void writeMemberBase(TSMemberDescription m, string ns, string memberIdentifier, int indentationLevel) {
@@ -76,50 +75,61 @@ namespace TsActivexGen {
             $"{memberIdentifier}{parameterList}: {returnType};".AppendLineTo(sb, indentationLevel);
         }
 
-        private void WriteMember(KeyValuePair<string, TSMemberDescription> x, string ns, int indentationLevel) {
+        private void writeMember(KeyValuePair<string, TSMemberDescription> x, string ns, int indentationLevel) {
             var memberDescription = x.Value;
             string @readonly = memberDescription.ReadOnly.GetValueOrDefault() ? "readonly " : "";
             writeMemberBase(memberDescription, ns, $"{@readonly}{x.Key}", indentationLevel);
         }
 
-        private void WriteConstructor(TSMemberDescription m, string ns, int indentationLevel) => writeMemberBase(m, ns, "new", indentationLevel);
+        private void writeConstructor(TSMemberDescription m, string ns, int indentationLevel) => writeMemberBase(m, ns, "new", indentationLevel);
 
         /// <summary>Provides a simple way to order members by the set of parameters</summary>
-        private string ParametersString(TSMemberDescription m) => m.Parameters?.JoinedKVP((name, prm) => $"{name}: {GetTypeString(prm.Type, "")}");
+        private string parametersString(TSMemberDescription m) => m.Parameters?.JoinedKVP((name, prm) => $"{name}: {GetTypeString(prm.Type, "")}");
 
-        private void WriteInterface(KeyValuePair<string, TSInterfaceDescription> x, string ns, int indentationLevel) {
-            var name = NameOnly(x.Key);
+        private void writeInterface(KeyValuePair<string, TSInterfaceDescription> x, string ns, int indentationLevel) {
+            var name = SplitName(x.Key).name;
             var @interface = x.Value;
             writeJsDoc(@interface.JsDoc, indentationLevel);
             $"interface {name} {{".AppendLineTo(sb, indentationLevel);
-            @interface.Members.OrderBy(y => y.Key).ThenBy(y => ParametersString(y.Value)).ForEach(y => WriteMember(y, ns, indentationLevel + 1));
-            @interface.Constructors.OrderBy(ParametersString).ForEach(y => WriteConstructor(y, ns, indentationLevel + 1));
+            @interface.Members.OrderBy(y => y.Key).ThenBy(y => parametersString(y.Value)).ForEach(y => writeMember(y, ns, indentationLevel + 1));
+            @interface.Constructors.OrderBy(parametersString).ForEach(y => writeConstructor(y, ns, indentationLevel + 1));
             "}".AppendWithNewSection(sb, indentationLevel);
         }
 
-        private void WriteAlias(KeyValuePair<string, TSAliasDescription> x, string ns) {
-            writeJsDoc(x.Value.JsDoc, 1);
-            $"type {NameOnly(x.Key)} = {GetTypeString(x.Value.TargetType, ns)};".AppendWithNewSection(sb, 1);
+        private void writeAlias(KeyValuePair<string, TSAliasDescription> x, string ns, int indentationLevel) {
+            writeJsDoc(x.Value.JsDoc, indentationLevel);
+            $"type {SplitName(x.Key).name} = {GetTypeString(x.Value.TargetType, ns)};".AppendWithNewSection(sb, indentationLevel);
         }
 
-        public NamespaceOutput GetTypescript(TSNamespace ns) {
-            ns.Interfaces.Values().ForEach(x => x.ConsolidateMembers());
-            ns.GlobalInterfaces.Values().ForEach(x => x.ConsolidateMembers());
+        private void writeNamespace(KeyValuePair<string, TSNamespaceDescription> x, string ns, int indentationLevel) {
+            //TODO if there are no members, write the nested namespace, and include the entire chain -- com.sun.star etc. -- as the namespace name
+            var nsDescription = x.Value;
+            var isRootNamespace = nsDescription is TSRootNamespaceDescription;
+
+            writeJsDoc(nsDescription.JsDoc, 0);
+            $"{(isRootNamespace ? "declare " : "")}namespace {RelativeName(x.Key,ns)} {{".AppendLineTo(sb, indentationLevel);
+
+            nsDescription.Aliases.OrderBy(y => y.Key).ForEach(y => writeAlias(y, x.Key, indentationLevel + 1));
+
+            nsDescription.Enums.OrderBy(y => y.Key).ForEach(y => writeEnum(y, indentationLevel + 1));
+
+            nsDescription.Interfaces.OrderBy(y => y.Key).ForEach(y => writeInterface(y, x.Key, indentationLevel + 1));
+
+            nsDescription.Namespaces.OrderBy(y => y.Key).ForEach(y => writeNamespace(y, MakeNamespace(ns,y.Key), indentationLevel + 1));
+
+            "}".AppendWithNewSection(sb, indentationLevel);
+        }
+
+        public NamespaceOutput GetTypescript(KeyValuePair<string, TSRootNamespaceDescription> x) {
+            var ns = x.Value;
 
             sb = new StringBuilder();
 
-            writeJsDoc(ns.JsDoc, 0);
-            $"declare namespace {ns.Name} {{".AppendLineTo(sb);
+            x.Value.ConsolidateMembers();
 
-            ns.Aliases.OrderBy(x => x.Key).ForEach(x => WriteAlias(x, ns.Name));
+            writeNamespace(KVP<string, TSNamespaceDescription>(x.Key, x.Value),"", 0);
 
-            ns.Enums.OrderBy(x => x.Key).ForEach(writeEnumDeclaration);
-
-            ns.Interfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, ns.Name, 1));
-
-            "}".AppendWithNewSection(sb);
-
-            ns.GlobalInterfaces.OrderBy(x => x.Key).ForEach(x => WriteInterface(x, "", 0));
+            ns.GlobalInterfaces.OrderBy(y => y.Key).ForEach(y => writeInterface(y, "", 0));
 
             var mainFile = sb.ToString()
                 .Replace("{" + NewLine + NewLine, "{" + NewLine) //writeJsdoc inserts a blank line before the jsdoc; if the member is the first after an opening brace, tslint doesn't like it
@@ -129,19 +139,19 @@ namespace TsActivexGen {
             var ret = new NamespaceOutput() {
                 MainFile = mainFile,
                 Description = ns.Description,
-                MajorVersion=ns.MajorVersion,
-                MinorVersion=ns.MinorVersion,
+                MajorVersion = ns.MajorVersion,
+                MinorVersion = ns.MinorVersion,
                 Dependencies = ns.Dependencies
             };
 
             //Build the tests file
-            ns.GlobalInterfaces.IfContainsKey("ActiveXObject", x => {
-                ret.TestsFile = x.Constructors.Joined(NewLine + NewLine, (y, index) => $"let obj{index} = new ActiveXObject({GetTypeString(y.Parameters[0].Value.Type, "")});") + NewLine;
+            ns.GlobalInterfaces.IfContainsKey("ActiveXObject", y => {
+                ret.TestsFile = y.Constructors.Joined(NewLine + NewLine, (z, index) => $"let obj{index} = new ActiveXObject({GetTypeString(z.Parameters[0].Value.Type, "")});") + NewLine;
             });
 
             return ret;
         }
 
-        public List<KeyValuePair<string, NamespaceOutput>> GetTypescript(TSNamespaceSet namespaceSet) => namespaceSet.Namespaces.SelectKVP((name, ns) => KVP(name, GetTypescript(ns))).ToList();
+        public List<KeyValuePair<string, NamespaceOutput>> GetTypescript(TSNamespaceSet namespaceSet) => namespaceSet.Namespaces.Select(kvp => KVP(kvp.Key, GetTypescript(kvp))).ToList();
     }
 }

@@ -1,24 +1,49 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using static TsActivexGen.TSParameterType;
 
 namespace TsActivexGen.Util {
     public static class Functions {
         public static KeyValuePair<TKey, TValue> KVP<TKey, TValue>(TKey key, TValue value) => new KeyValuePair<TKey, TValue>(key, value);
-        public static string RelativeName(string typename, string @namespace) {
-            if (IsLiteralTypeName(typename)) { return typename; }
+
+        public static string RelativeName(string absoluteType, string withinNamespace) {
+            if (IsLiteralTypeName(absoluteType)) { return absoluteType; }
+
             //HACK this doesn't handle generic parameters; we'd need to consider both the type and each of the type parameters
-            //  but for the current purposes of the code, this is enough
-            if (IsGenericTypeName(typename)) { return typename; }
-            if (typename.StartsWith(@namespace + ".")) { return typename.Substring(@namespace.Length + 1); }
-            return typename;
+            //  but for the current purposes of the code, this is enough, because the only generic type we are using is Enumerator<T>,
+            //  which is in the global namespace
+            if (IsGenericTypeName(absoluteType)) { return absoluteType; }
+
+            var (typeNamespace, typeOnly) = SplitName(absoluteType);
+            if (typeNamespace.Length==0) { return absoluteType; }
+
+            var typeNamespaceParts = typeNamespace.Split('.');
+            var partsOfWithinNamespace = withinNamespace.Split('.');
+            var retParts = new List<string>();
+            var pathMismatch = false;
+            for (int i = 0; i < typeNamespaceParts.Length; i++) {
+                if (partsOfWithinNamespace.Length <= i || typeNamespaceParts[i] != partsOfWithinNamespace[i]) {
+                    pathMismatch = true;
+                }
+                if (pathMismatch) {
+                    retParts.Add(typeNamespaceParts[i]);
+                }
+            }
+            retParts.Add(typeOnly);
+            return retParts.Joined(".");
         }
-        public static string NameOnly(string typename) {
-            if (IsLiteralTypeName(typename)) { return typename; }
-            return typename.Split('.').Last();
+        public static (string @namespace, string name) SplitName(string typename) {
+            if (IsLiteralTypeName(typename)) { return ("", typename); }
+            switch (typename.LastIndexOf('.')) {
+                case int x when x < 0:
+                    return ("", typename);
+                case int x when x == 0:
+                    return ("", typename.Substring(1));
+                case int x:
+                    return (typename.Substring(0, x), typename.Substring(x + 1));
+            }
         }
         public static bool IsLiteralTypeName(string typename) {
             if (typename.IsNullOrEmpty()) { return false; }
@@ -26,6 +51,13 @@ namespace TsActivexGen.Util {
             var firstChar = typename[0];
             if (char.IsLetter(firstChar) || firstChar == '_') { return false; }
             return true;
+        }
+        public static string MakeNamespace(string part1, string part2) {
+            if (part1.IsNullOrEmpty() || part2.IsNullOrEmpty()) {
+                return part1 + part2;
+            } else {
+                return $"{part1}.{part2}";
+            }
         }
 
         public static bool IsGenericTypeName(string fullName) => !IsLiteralTypeName(fullName) && fullName.Contains("<");
@@ -55,7 +87,7 @@ namespace TsActivexGen.Util {
                     ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => GetParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}";
                     break;
                 case TSUnionType x:
-                    ret = x.Parts.Select(y=>GetTypeString(y,ns)).OrderBy(y=>y).Joined(" | ");
+                    ret = x.Parts.Select(y => GetTypeString(y, ns)).OrderBy(y => y).Joined(" | ");
                     break;
                 default:
                     if (type != null) { throw new NotImplementedException(); }

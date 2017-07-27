@@ -78,5 +78,15 @@ namespace TsActivexGen.Util {
             var earliestPos = matches.Min(x => x.Length);
             return matches.FirstOrDefault(x => x.Length == earliestPos);
         }
+
+        public static bool TryParse(this string s, out short? i) {
+            if (short.TryParse(s, out short result)) {
+                i = result;
+                return true;
+            } else {
+                i = null;
+                return false;
+            }
+        }
     }
 }
