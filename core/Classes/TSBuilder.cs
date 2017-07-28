@@ -19,7 +19,7 @@ namespace TsActivexGen {
             return $" {key}{entry.Value}";
         }
 
-        private Regex spaceBreaker = new Regex(@".{0,150}(?:\S|$)");
+        private Regex spaceBreaker = new Regex(@".{0,150}(?:\s|$)");
         private void writeJsDoc(List<KeyValuePair<string, string>> JsDoc, int indentationLevel, bool newLine = false) {
             JsDoc = JsDoc.WhereKVP((key, value) => !key.IsNullOrEmpty() || !value.IsNullOrEmpty()).SelectMany(kvp => {
                 if (kvp.Value.Length <= 150) { return new[] { kvp }; }
@@ -120,6 +120,7 @@ namespace TsActivexGen {
             "}".AppendWithNewSection(sb, indentationLevel);
         }
 
+        private static Regex blankLineAtBlockEnd = new Regex(@"}(" + NewLine + @"){2}(?=\s*})");
         public NamespaceOutput GetTypescript(KeyValuePair<string, TSRootNamespaceDescription> x) {
             var ns = x.Value;
 
@@ -133,7 +134,7 @@ namespace TsActivexGen {
 
             var mainFile = sb.ToString()
                 .Replace("{" + NewLine + NewLine, "{" + NewLine) //writeJsdoc inserts a blank line before the jsdoc; if the member is the first after an opening brace, tslint doesn't like it
-                .Replace("}" + NewLine + NewLine + "}", "}" + NewLine + "}") //removes the blank line after the last interface in the namespace
+                .RegexReplace(blankLineAtBlockEnd, "}" + NewLine) //removes the blank line after the last interface in the namespace; including nested namespaces
                 .Trim() + NewLine;
 
             var ret = new NamespaceOutput() {
