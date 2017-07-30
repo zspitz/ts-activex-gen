@@ -1,0 +1,112 @@
+﻿{
+  "access": {
+    "url": "https://msdn.microsoft.com/en-us/library/dn142571.aspx",
+    "major": 14,
+    "minor": 0
+  },
+  "adodb": {
+    "url": "https://msdn.microsoft.com/en-us/library/jj249010.aspx",
+    "major": 6,
+    "minor": 1
+  },
+  "dao": {
+    "url": "https://msdn.microsoft.com/en-us/library/dn124645.aspx",
+    "major": 14,
+    "minor": 0
+  },
+  "excel": {
+    "url": "https://msdn.microsoft.com/en-us/library/fp179694.aspx",
+    "major": 14,
+    "minor": 0
+  },
+  "faxcomexlib": {
+    "url": "https://msdn.microsoft.com/en-us/library/windows/desktop/ms684513(v=vs.85).aspx",
+    "major": 0,
+    "minor": 0
+  },
+  "graph": {
+    "url": "https://msdn.microsoft.com/en-us/vba/excel-vba/articles/graph-visual-basic-reference",
+    "major": 14,
+    "minor": 0
+  },
+  "infopath": {
+    "url": "https://msdn.microsoft.com/en-us/library/jj602751.aspx",
+    "major": 3,
+    "minor": 0
+  },
+  "mshtml": {
+    "url": "https://msdn.microsoft.com/en-us/library/aa741317(v=vs.85).aspx",
+    "major": 0,
+    "minor": 0
+  },
+  "msxml2": {
+    "url": "https://msdn.microsoft.com/en-us/library/ms763742.aspx",
+    "major": 6,
+    "minor": 0
+  },
+  "office": {
+    "url": "https://msdn.microsoft.com/VBA/Office-Shared-VBA/articles/office-vba-object-library-reference",
+    "major": 14,
+    "minor": 0
+  },
+  "outlook": {
+    "url": "https://msdn.microsoft.com/en-us/vba/vba-outlook",
+    "major": 14,
+    "minor": 0
+  },
+  "powerpoint": {
+    "url": "https://msdn.microsoft.com/en-us/library/fp161225.aspx",
+    "major": 14,
+    "minor": 0
+  },
+  "publisher": {
+    "url": "https://msdn.microsoft.com/en-us/vba/publisher-vba/articles/object-model-publisher-vba-reference",
+    "major": 14,
+    "minor": 0
+  },
+  "scripting": {
+    "url": "https://msdn.microsoft.com/en-us/library/bstcxhf7.aspx",
+    "major": 0,
+    "minor": 0
+  },
+  "shdocvw": {
+    "url": "https://msdn.microsoft.com/en-us/library/aa752040(v=vs.85).aspx",
+    "major": 0,
+    "minor": 0
+  },
+  "shell32": {
+    "url": "https://msdn.microsoft.com/en-us/library/windows/desktop/bb773938(v=vs.85).aspx",
+    "major": 0,
+    "minor": 0
+  },
+  "speechlib": {
+    "url": "https://msdn.microsoft.com/en-us/library/ee125663(v=vs.85).aspx",
+    "major": 5,
+    "minor": 4
+  },
+  "vbide": {
+    "url": "https://msdn.microsoft.com/en-us/vba/language-reference-vba/articles/collections-visual-basic-add-in-model",
+    "major": 14,
+    "minor": 0
+  },
+  "wmi": {
+    "url": "https://msdn.microsoft.com/en-us/library/aa393258(v=vs.85).aspx",
+    "major": 0,
+    "minor": 0
+  },
+  "word": {
+    "url": "https://msdn.microsoft.com/en-us/library/fp179696.aspx",
+    "major": 14,
+    "minor": 0
+  },
+  "wbemscripting": {
+    "url": "https://msdn.microsoft.com/en-us/library/aa393258(v=vs.85).aspx",
+    "major": 0,
+    "minor": 0
+  },
+  "wia": {
+    "url": "https://msdn.microsoft.com/en-us/library/windows/desktop/ms630827(v=vs.85).aspx",
+    "major": 2,
+    "minor": 0
+  }
+}

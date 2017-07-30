@@ -115,6 +115,8 @@
                     <DataGridTextColumn Binding="{Binding FormattedName}" IsReadOnly="True" />
                     <my:DataGridTextColumnExt Binding="{Binding Output.Description}" IsReadOnly="True" Header="Description" TextTrimming="CharacterEllipsis" />
                     <DataGridTextColumn Binding="{Binding LibraryUrl}" Header="Library URL" />
+                    <DataGridTextColumn Binding="{Binding MajorVersion}" Header="Major" />
+                    <DataGridTextColumn Binding="{Binding MinorVersion}" Header="Minor" />
                     <DataGridCheckBoxColumn Header="Exists">
                         <DataGridCheckBoxColumn.Binding>
                             <MultiBinding Converter="{StaticResource ExistsConverter}" Mode="OneWay">

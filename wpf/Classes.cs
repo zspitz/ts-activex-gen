@@ -59,4 +59,10 @@ namespace TsActivexGen.Wpf {
             return tb;
         }
     }
+
+    public class ImportedDetails {
+        public string url { get; set; }
+        public int major { get; set; }
+        public int minor { get; set; }
+    }
 }

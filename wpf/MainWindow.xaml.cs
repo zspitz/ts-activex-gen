@@ -18,6 +18,7 @@ using static TsActivexGen.Wpf.Functions;
 using System.IO;
 using static TsActivexGen.Util.Functions;
 using static TsActivexGen.Wpf.Misc;
+using static System.Environment;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -65,7 +66,29 @@ namespace TsActivexGen.Wpf {
 
                 if (lbPackaging.SelectedValue<bool>()) {
                     //package for DefinitelyTyped
-                    toOutput.ForEach(x=> {
+
+                    //prompt about missing common details
+                    var missingCommon = new(string description, string value)[] { ("author name", txbAuthorName.Text), ("author URL", txbAuthorURL.Text) }.Where(x => x.value.IsNullOrEmpty());
+                    var errors = new List<(string description, string library)>();
+                    foreach (var x in toOutput) {
+                        if (x.MajorVersion == 0 && x.MinorVersion == 0) { errors.Add("version", x.Name); }
+                        if (x.LibraryUrl.IsNullOrEmpty()) { errors.Add("library url", x.Name); }
+                    }
+                    var missingDetails = errors.GroupBy(x => x.description, (description, x) => (description: description, libs: x.Joined(", ", y => y.library))).ToList();
+
+                    var msg = "";
+                    if (missingCommon.Any()) {
+                        msg += "The following shared details are missing:" + NewLines(2) + missingCommon.Joined(NewLine, x => $" - {x.description}") + NewLines(2);
+                    }
+                    if (missingDetails.Any()) {
+                        msg += "The following details are missing from individual lbraries:" + NewLines(2) + missingDetails.Joined(NewLine, x => $" - {x.description} ({x.libs})") + NewLines(2);
+                    }
+                    if (!msg.IsNullOrEmpty()) {
+                        if (MessageBox.Show(msg + "Continue anyway?", "Missing details", YesNo) == No) { return; }
+                    }
+
+                    //begin output
+                    toOutput.ForEach(x => {
                         //create subdirectory for all files
                         Directory.CreateDirectory(x.PackagedFolderPath);
 
@@ -73,7 +96,7 @@ namespace TsActivexGen.Wpf {
                         x.WritePackageFile("tsconfig.json", GetTsConfig(x.FormattedName));
 
                         //create index.d.ts
-                        var s1 = GetHeaders(x.Name,x.Description,x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text, x.MajorVersion, x.MinorVersion);
+                        var s1 = GetHeaders(x.Name, x.Description, x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text, x.MajorVersion, x.MinorVersion);
                         s1 += ReferenceDirectives(x.Output.Dependencies);
                         s1 += x.Output.MainFile;
                         WriteAllText(x.PackagedFilePath, s1);
@@ -82,12 +105,13 @@ namespace TsActivexGen.Wpf {
                         x.WriteTestsFile(x.Output.TestsFile);
 
                         //create tslint.json
-                        x.WritePackageFile("tslint.json", @"{
+                        x.WritePackageFile("tslint.json", @"
+{
     ""extends"": ""dtslint/dt.json"",
     ""rules"": {
         ""interface-name"": [false]
     }
-}");
+}".TrimStart());
 
                         //create package.json
                         x.WritePackageFile("package.json", @"{ ""dependencies"": { ""activex-helpers"": ""*""}}");
@@ -151,8 +175,18 @@ namespace TsActivexGen.Wpf {
             fileList.Clear();
             new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, x) => {
                 if (!old.TryGetValue(name, out var ret)) {
-                    ret = new OutputFileDetails(name);
-                     ProjectURL.IfContainsKey(name.ToLower(), url => ret.LibraryUrl = url);
+                    ret = new OutputFileDetails(name) {
+                        Description = x.Description,
+                        MajorVersion = x.MajorVersion,
+                        MinorVersion = x.MinorVersion
+                    };
+                    StoredDetails.IfContainsKey(name.ToLower(), y => {
+                        ret.LibraryUrl = y.url;
+                        if (y.major != 0 || y.minor != 0) {
+                            ret.MajorVersion = y.major;
+                            ret.MinorVersion = y.minor;
+                        }
+                    });
                 }
                 ret.Output = x;
                 ret.OutputFolderRoot = txbOutputFolder.Text;

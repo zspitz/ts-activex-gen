@@ -56,6 +56,7 @@
     <Compile Include="Classes\TSTypes.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="Extensions\HashSetT.cs" />
+    <Compile Include="Extensions\ICollectionT.cs" />
     <Compile Include="Extensions\IDictionaryTKeyTValue.cs" />
     <Compile Include="Extensions\IEnumerable.cs" />
     <Compile Include="Extensions\IEnumerableKVP.cs" />

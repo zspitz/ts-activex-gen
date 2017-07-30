@@ -252,7 +252,7 @@ VT_NULL	1
             if (args.None()) {
                 argnamesType = null;
                 parameterType = TSObjectType.PlainObject;
-            } else if (args.Count <= 6) {
+            } else if (args.Count <= 5) {
                 argnamesType= new TSTupleType(args.Keys().Select(x => $"'{x}'"));
                 parameterType = new TSObjectType(args);
             } else {

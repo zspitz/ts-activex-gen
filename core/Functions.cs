@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Win32;
 using static TsActivexGen.TSParameterType;
+using static System.Environment;
+using static System.Linq.Enumerable;
 
 namespace TsActivexGen.Util {
     public static class Functions {
@@ -107,5 +109,7 @@ namespace TsActivexGen.Util {
             }
             return $"{name}: {GetTypeString(parameterDescription.Type, ns)}";
         }
+
+        public static string NewLines(int count) => Repeat(NewLine, count).Joined("");
     }
 }

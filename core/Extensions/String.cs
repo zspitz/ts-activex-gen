@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq;
 using static System.StringComparison;
+using System.Diagnostics;
 
 namespace TsActivexGen.Util {
     public static class StringExtensions {
@@ -13,16 +14,26 @@ namespace TsActivexGen.Util {
         public static string IfNullOrEmpty(this string s, string replacement) => s.IsNullOrEmpty() ? replacement : s;
 
         private static Regex linebreakers = new Regex(@".*?(?:\(|\{)");
-        public static Regex linebreakers2 = new Regex(@".{1,170}(?:\||,(?= \w*\??:))");
-        public static Regex comma = new Regex(@",(?= \w*\??:)");
-        public static void AppendLineTo(this string s, StringBuilder sb, int indentationLevel=0) {
+        private static Regex linebreakers2 = new Regex(@".{1,170}(?:\||,(?= \w*\??:))");
+        private static Regex comma = new Regex(@",(?= \w*\??:)");
+        private static Regex typeAlias = new Regex(@"\s*type \w* = \[.{0,140},");
+
+        public static void AppendLineTo(this string s, StringBuilder sb, int indentationLevel = 0) {
             var toAppend = (new string(' ', indentationLevel * 4) + s).TrimEnd();
             var isAfterPipeBreak = false;
-            while (toAppend.Length>200) {
+            while (toAppend.Length > 200) {
                 isAfterPipeBreak = false;
                 var match = toAppend.ShortestMatch(linebreakers, linebreakers2);
                 if (match == null) {
-                    //throw new Exception("Unable to split long line");
+                    match = typeAlias.Match(toAppend);
+                    if (match.Success) {
+                        sb.AppendLine(match.Value);
+                        toAppend = new string(' ', indentationLevel * 4) + toAppend.Substring(match.Value.Length);
+                        if (toAppend.Length>200 &&  Debugger.IsAttached) { throw new Exception("Unable to split long line"); }
+                        sb.AppendLine(toAppend);
+                        return;
+                    }
+                    if (toAppend.Length>200 &&  Debugger.IsAttached) { throw new Exception("Unable to split long line"); }
                     sb.AppendLine(toAppend);
                     return;
                 }
@@ -36,8 +47,8 @@ namespace TsActivexGen.Util {
             if (isAfterPipeBreak) {
                 var match = comma.Match(toAppend);
                 if (match.Success) {
-                    sb.AppendLine(toAppend.Substring(0, match.Index+1));
-                    toAppend = new string(' ', indentationLevel * 4) + toAppend.Substring(match.Index+1).TrimStart();
+                    sb.AppendLine(toAppend.Substring(0, match.Index + 1));
+                    toAppend = new string(' ', indentationLevel * 4) + toAppend.Substring(match.Index + 1).TrimStart();
                 }
             }
 

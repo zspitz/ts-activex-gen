@@ -3,10 +3,11 @@ using System.Linq;
 using System.Collections.Generic;
 using TsActivexGen.Util;
 using static System.Environment;
+using static TsActivexGen.Util.Functions;
 
 namespace TsActivexGen.Wpf {
     public static class Functions {
-        public static string GetTsConfig(string name)  => @"
+        public static string GetTsConfig(string name) => @"
 {
     ""compilerOptions"": {
         ""module"": ""commonjs"",
@@ -29,11 +30,14 @@ namespace TsActivexGen.Wpf {
     ]
 }".Trim();
 
-        public static string GetHeaders(string name, string description, string libraryUrl, string authorName, string authorUrl, int majorVerion, int minorVersion) => $@"
-// Type definitions for {new[] { description, name }.Where(x=>!x.IsNullOrEmpty()).Joined(" - ")} {majorVerion}.{minorVersion}
-// Project: {libraryUrl}
-// Definitions by: {authorName} <{authorUrl}>
-// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped".Trim() + NewLine + NewLine;
+        public static string GetHeaders(string name, string description, string libraryUrl, string authorName, string authorUrl, int majorVerion, int minorVersion) {
+            var lines = new List<string>();
+            $"// Type definitions for {new[] { description, name }.Where(x => !x.IsNullOrEmpty()).Joined(" - ")} {majorVerion}.{minorVersion}".AddTo(lines);
+            if (!libraryUrl.IsNullOrEmpty()) { $"// Project: {libraryUrl}".AddTo(lines); }
+            $"// Definitions by: {authorName} <{authorUrl}>".AddTo(lines);
+            $"// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped".AddTo(lines);
+            return lines.Joined(NewLine) + NewLines(2);
+        }
 
         public static string ReferenceDirectives(IEnumerable<string> types) {
             var ret = types.Joined("", y => $"/// <reference types=\"activex-{y.ToLower()}\" />" + NewLine);
