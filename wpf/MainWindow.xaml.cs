@@ -11,14 +11,14 @@ using static System.Windows.MessageBoxButton;
 using static System.Windows.MessageBoxResult;
 using System.Diagnostics;
 using static System.Reflection.Assembly;
-using TsActivexGen.ActiveX;
 using System.Windows.Data;
 using System.Collections.ObjectModel;
 using static TsActivexGen.Wpf.Functions;
 using System.IO;
-using static TsActivexGen.Util.Functions;
+using static TsActivexGen.Functions;
 using static TsActivexGen.Wpf.Misc;
 using static System.Environment;
+using TsActivexGen.tlibuilder;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {

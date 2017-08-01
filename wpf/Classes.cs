@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows;
 using static System.IO.File;
 using static System.IO.Path;
+using TsActivexGen;
 
 namespace TsActivexGen.Wpf {
     [AddINotifyPropertyChangedInterface]

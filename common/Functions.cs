@@ -6,7 +6,7 @@ using static TsActivexGen.TSParameterType;
 using static System.Environment;
 using static System.Linq.Enumerable;
 
-namespace TsActivexGen.Util {
+namespace TsActivexGen {
     public static class Functions {
         public static KeyValuePair<TKey, TValue> KVP<TKey, TValue>(TKey key, TValue value) => new KeyValuePair<TKey, TValue>(key, value);
 

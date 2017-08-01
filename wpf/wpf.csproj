@@ -130,9 +130,17 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\core\core.csproj">
-      <Project>{0152c917-b88a-4fac-af49-a40e9985743e}</Project>
-      <Name>core</Name>
+    <ProjectReference Include="..\common\common.csproj">
+      <Project>{c6531877-8272-4302-959a-2fabb2663771}</Project>
+      <Name>common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\tlibuilder\tlibuilder.csproj">
+      <Project>{a916f574-6ab0-4bed-9ed1-f0d4e4866f5a}</Project>
+      <Name>tlibuilder</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\writer\writer.csproj">
+      <Project>{491fe1ec-1882-4c62-8625-949b09c0004a}</Project>
+      <Name>writer</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

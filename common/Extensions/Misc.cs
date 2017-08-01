@@ -1,9 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using static TsActivexGen.Util.Functions;
+using static TsActivexGen.Functions;
 
-namespace TsActivexGen.Util {
+namespace TsActivexGen {
     public static class MiscExtensions {
         public static bool In<T>(this T val, IEnumerable<T> vals)  =>vals.Contains(val);
         public static bool In<T>(this T val, params T[] vals) => vals.Contains(val);
@@ -25,7 +24,7 @@ namespace TsActivexGen.Util {
         public static string[] NamedTypes(this IEnumerable<string> types) => types.Except(builtins).Where(x => !IsLiteralTypeName(x)).ToArray();
         public static bool IsLiteralType(this ITSType type) => type is TSSimpleType x && x.IsLiteralType;
 
-        //https://github.com/zspitz/ts-activex-gen/issues/32
+        /// empty interfaces are added as aliases
         public static void AddInterfaceTo(this KeyValuePair<string, TSInterfaceDescription> x, TSRootNamespaceDescription ns) {
             if (x.Value.Members.Any()) {
                 ns.Interfaces.Add(x);

@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace TsActivexGen.Util {
+namespace TsActivexGen {
     public static class TypeExtensions {
         public static Type DefinitionIfGeneric(this Type t) {
             if (t.IsGenericType) { t= t.GetGenericTypeDefinition(); }

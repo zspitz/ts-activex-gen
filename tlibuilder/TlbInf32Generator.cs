@@ -2,17 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 using TLI;
-using TsActivexGen.Util;
-using static TsActivexGen.Util.Functions;
 using static TsActivexGen.TSParameterType;
 using static TLI.InvokeKinds;
 using static TLI.TypeKinds;
 using static TLI.TliVarType;
 using System.Diagnostics;
-using TsActivexGen.ActiveX;
 using static System.StringComparison;
+using static TsActivexGen.Functions;
 
-namespace TsActivexGen {
+namespace TsActivexGen.tlibuilder {
     public class TlbInf32Generator {
         private class ParameterizedSetterInfo {
             public TSSimpleType objectType { get; set; }

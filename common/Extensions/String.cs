@@ -6,7 +6,7 @@ using System.Linq;
 using static System.StringComparison;
 using System.Diagnostics;
 
-namespace TsActivexGen.Util {
+namespace TsActivexGen {
     public static class StringExtensions {
         public static string RegexReplace(this string s, Regex re, string replacement) => re.Replace(s, replacement);
         public static string RegexReplace(this string s, string pattern, string replacement) => Regex.Replace(s, pattern, replacement);

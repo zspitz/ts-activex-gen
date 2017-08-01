@@ -2,10 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using TsActivexGen.Util;
-using static TsActivexGen.Util.Functions;
 using static System.Environment;
 using System.Text.RegularExpressions;
+using static TsActivexGen.Functions;
 
 namespace TsActivexGen {
     public class TSBuilder {

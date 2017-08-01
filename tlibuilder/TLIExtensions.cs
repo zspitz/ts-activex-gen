@@ -5,10 +5,9 @@ using TLI;
 using static TLI.TliVarType;
 using static TLI.DescKinds;
 using static TLI.InvokeKinds;
-using System.Diagnostics;
 using static TLI.ParamFlags;
 
-namespace TsActivexGen.Util {
+namespace TsActivexGen.tlibuilder {
     public static class TLIExtensions {
         //using the LINQ Cast method fails; apprently because the source collections cannot be casted to IEnumerable (???)
 

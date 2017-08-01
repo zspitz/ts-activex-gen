@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace TsActivexGen.Util {
+namespace TsActivexGen {
     public static class IDictionaryTKeyTValueExtensions {
         public static bool IfContainsKey<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey key, Action<TValue> action = null, Action @else = null) {
             TValue val;

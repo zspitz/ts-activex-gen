@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
-using TsActivexGen.Util;
 using static System.Environment;
-using static TsActivexGen.Util.Functions;
+using static TsActivexGen.Functions;
 
 namespace TsActivexGen.Wpf {
     public static class Functions {
