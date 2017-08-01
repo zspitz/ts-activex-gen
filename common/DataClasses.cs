@@ -269,7 +269,7 @@ namespace TsActivexGen {
     }
 
     public class TSRootNamespaceDescription : TSNamespaceDescription {
-        [Obsolete] public string Name { get; set; }
+        //[Obsolete] public string Name { get; set; }
         public string Description { get; set; }
         public int MajorVersion { get; set; }
         public int MinorVersion { get; set; }

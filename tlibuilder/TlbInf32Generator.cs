@@ -313,7 +313,7 @@ VT_NULL	1
 
             var @namespace = tli.Name;
 
-            var ret = new TSRootNamespaceDescription() { Name = @namespace };
+            var ret = new TSRootNamespaceDescription();
             tli.Constants.Cast().Select(ToTSEnumDescription).AddRangeTo(ret.Enums);
             coclasses.Select(ToTSInterfaceDescription).AddInterfacesTo(ret);
 
@@ -344,7 +344,7 @@ VT_NULL	1
                 ret.Namespaces.Add($"{@namespace}.EventHelperTypes", eventHelperTypesNamespace);
             }
 
-            parameterizedSetters.Where(x => x.objectType.Namespace == ret.Name).ToLookup(x => x.Stringified).Select(grp => grp.First()).Select(x => KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
+            parameterizedSetters.Where(x => x.objectType.Namespace == @namespace).ToLookup(x => x.Stringified).Select(grp => grp.First()).Select(x => KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
 
             if (activex.Constructors.Any() || activex.Members.Any()) {
                 ret.GlobalInterfaces["ActiveXObject"] = activex;
@@ -409,7 +409,7 @@ VT_NULL	1
                 if (NSSet.Namespaces.ContainsKey(name)) { continue; }
                 var toAdd = ToNamespace(tlis[i]);
                 if (NSSet.Namespaces.ContainsKey(name)) { continue; } //because the current tli might have been already added, as part of ToNamespace
-                NSSet.Namespaces.Add(toAdd.Name, toAdd);
+                NSSet.Namespaces.Add(name, toAdd);
             }
         }
 
