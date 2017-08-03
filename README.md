@@ -13,9 +13,12 @@ The first step is to generate an instance of `TSNamespaceSet`, which is a data s
 ```csharp
 TSNamespaceSet nsset = ...
 var builder = new TSBuilder();
-NamespaceOutput output = builder.GetTypescript(nsset);
-string typescriptDefinitions = output.MainFile;
-string typescriptTestsFileStub = output.TestsFile;
+List<KeyValuePair<string, NamespaceOutput>> output = builder.GetTypescript(nsset);
+foreach (var x in output) {
+  string typescriptDefinitions = x.MainFile;
+  string typescriptTestsFileStub = x.TestsFile;
+  ...
+}
 ```
 
 ### Generating a `TSNamespaceSet` for COM type libraries
