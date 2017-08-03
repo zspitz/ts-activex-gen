@@ -3,17 +3,29 @@ Library and WPF UI for generating Typescript definitions from COM type libraries
 
 Optionally, definitions can be packaged for publication on DefinitelyTyped, as outlined [here](https://github.com/DefinitelyTyped/DefinitelyTyped) and [here](http://www.typescriptlang.org/docs/handbook/declaration-files/publishing.html).
 
-### UI
+## UI
 
 ![Choosing a registerd COM library](https://raw.githubusercontent.com/zspitz/ts-activex-gen/master/screenshot.png)
 
-### Library
+## Library
 
-Generating Typescript with the library looks like this:
+The first step is to generate an instance of `TSNamespaceSet`, which is a data structure describing a set of TypeScript namespaces, interfaces, enums, and their members (see below). That instance is passed to the `GetTypescript` method:
+```csharp
+TSNamespaceSet nsset = ...
+var builder = new TSBuilder();
+NamespaceOutput output = builder.GetTypescript(nsset);
+string typescriptDefinitions = output.MainFile;
+string typescriptTestsFileStub = output.TestsFile;
+```
 
+### Generating a `TSNamespaceSet` for COM type libraries
+
+To generate a` TSNamespaceSet` from a COM type library, use `TlbInf32Generator`:
 ```csharp
 var generator = new TlbInf32Generator();
-
+```
+To add a library from the registry:
+```csharp
 var args = new {
   tlbid = "{420B2830-E718-11CF-893D-00A0C9054228}",
   majorVersion = 1,
@@ -21,20 +33,26 @@ var args = new {
   lcid = 0
 };
 generator.AddFromRegistry(args.tlbid, args.majorVersion, args.minorVersion, args.lcid);
-//All the arguments except for the TLBID are optional
+```
+All arguments except for the TLBID are optional.
+The highest registered version in the registry with the given TLBID will be used.
 
-//Also add a type library from a file
+To add a library from a file:
+```csharp
 generator.AddFromFile(@"c:\path\to\file.dll");
+```
 
-//multiple files / registered libraries can be added
+To add a library based on keywords in the name (case-insensitive)
+```csharp
+generator.AddFromKeywords(new [] {"microsoft word", "microsoft excel"});
+```
 
-//TSNamespaceSet describes a set of Typescript namespaces
-TSNamespaceSet namespaceSet = generator.NSSet;
+Multiple files / registered libraries can be added.
+If a library references an external library, the external library will also be added to the namespace set. For example, since the Microsoft Word obejct library uses types from the Microsoft Office shared object library, the namespace set will contain both Microsoft Word and Microsoft Office object libraries.
 
-var builder = new TSBuilder();
-NamespaceOutput output = builder.GetTypescript(namespaceSet);
-string typescriptDefinitions = output.MainFile;
-string typescriptTestsFileStub = output.TestsFile;
+To get the `TSNamespaceSet`:
+```csharp
+TSNamespaceSet nsset = generator.NSSet;
 ```
 
 ### Event handlers and parameterized setters
@@ -55,4 +73,15 @@ interface ActiveXObject {
     ...
     set(obj: Word.Document, propertyName: 'ActiveWritingStyle', parameterTypes: [any], newValue: string): void;
     ...
+```
+
+### Generating a `TSNamespace` for the LibreOffice API
+
+(WIP) LibreOffice supports generating documentation using Doxygen, which provides an intermediate XML format. Using the outputted XML, eventually the following should be possible:
+```csharp
+var generator = new DoxygenIDLBuilder(@"c:\path\to\xml\file");
+TSNamespaceSet nsset = generator.NSSet;
+var builder = new TSBuilder();
+NamespaceOutput output = builder.GetTypescript(nsset);
+string typescriptDefinitions = output.MainFile;
 ```
