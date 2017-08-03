@@ -15,8 +15,9 @@ TSNamespaceSet nsset = ...
 var builder = new TSBuilder();
 List<KeyValuePair<string, NamespaceOutput>> output = builder.GetTypescript(nsset);
 foreach (var x in output) {
-  string typescriptDefinitions = x.MainFile;
-  string typescriptTestsFileStub = x.TestsFile;
+  var name = x.Key;
+  string typescriptDefinitions = x.Value.MainFile;
+  string typescriptTestsFileStub = x.Value.TestsFile;
   ...
 }
 ```
