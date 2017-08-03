@@ -39,7 +39,7 @@ var args = new {
 generator.AddFromRegistry(args.tlbid, args.majorVersion, args.minorVersion, args.lcid);
 ```
 All arguments except for the TLBID are optional.
-The highest registered version in the registry with the given TLBID will be used.
+The highest registered version in the registry with the matching details will be used.
 
 To add a library from a file:
 ```csharp
