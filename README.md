@@ -52,6 +52,7 @@ generator.AddFromKeywords(new [] {"microsoft word", "microsoft excel"});
 ```
 
 Multiple files / registered libraries can be added.
+
 If a library references an external library, the external library will also be added to the namespace set. For example, since the Microsoft Word obejct library uses types from the Microsoft Office shared object library, the namespace set will contain both Microsoft Word and Microsoft Office object libraries.
 
 To get the `TSNamespaceSet`:
