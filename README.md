@@ -1,5 +1,5 @@
 # ts-activex-gen
-Library and WPF UI for generating Typescript definitions from COM type libraries, either from the Windows Registry, or from files on disk.
+Library and WPF UI for generating Typescript definitions from COM type libraries, either from the Windows Registry, or from files on disk. Also allows generating definitions for the LibreOffice API.
 
 Optionally, definitions can be packaged for publication on DefinitelyTyped, as outlined [here](https://github.com/DefinitelyTyped/DefinitelyTyped) and [here](http://www.typescriptlang.org/docs/handbook/declaration-files/publishing.html).
 
