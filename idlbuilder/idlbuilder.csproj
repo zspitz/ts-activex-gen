@@ -4,14 +4,13 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{C6531877-8272-4302-959A-2FABB2663771}</ProjectGuid>
+    <ProjectGuid>{FEDF776C-0051-42E1-A675-A8DED7AC140D}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>common</RootNamespace>
-    <AssemblyName>common</AssemblyName>
+    <RootNamespace>idlbuilder</RootNamespace>
+    <AssemblyName>idlbuilder</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -31,9 +30,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="MoreLinq, Version=2.6.20831.0, Culture=neutral, PublicKeyToken=384d532d7e88985d, processorArchitecture=MSIL">
-      <HintPath>..\packages\morelinq.2.6.0\lib\net40\MoreLinq.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.ValueTuple, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -47,21 +43,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DataClasses.cs" />
-    <Compile Include="Enums.cs" />
-    <Compile Include="Extensions\HashSetT.cs" />
-    <Compile Include="Extensions\ICollectionT.cs" />
-    <Compile Include="Extensions\IDictionaryTKeyTValue.cs" />
-    <Compile Include="Extensions\IEnumerable.cs" />
-    <Compile Include="Extensions\IEnumerableKVP.cs" />
-    <Compile Include="Extensions\IEnumerableT.cs" />
-    <Compile Include="Extensions\Misc.cs" />
-    <Compile Include="Extensions\String.cs" />
-    <Compile Include="Extensions\Type.cs" />
-    <Compile Include="Functions.cs" />
-    <Compile Include="Interfaces.cs" />
+    <Compile Include="DoxygenIDLBuilder.cs" />
+    <Compile Include="IDLBuilderExtensions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TSTypes.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\common\common.csproj">
+      <Project>{c6531877-8272-4302-959a-2fabb2663771}</Project>
+      <Name>common</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

@@ -89,7 +89,10 @@ namespace TsActivexGen {
             var name = SplitName(x.Key).name;
             var @interface = x.Value;
             writeJsDoc(@interface.JsDoc, indentationLevel);
-            $"interface {name} {{".AppendLineTo(sb, indentationLevel);
+
+            var extends = "";
+            if (@interface.Extends.Any()) { extends = " extends " + @interface.Extends.Joined(", "); }
+            $"interface {name} {extends}{{".AppendLineTo(sb, indentationLevel);
             @interface.Members.OrderBy(y => y.Key).ThenBy(y => parametersString(y.Value)).ForEach(y => writeMember(y, ns, indentationLevel + 1));
             @interface.Constructors.OrderBy(parametersString).ForEach(y => writeConstructor(y, ns, indentationLevel + 1));
             "}".AppendWithNewSection(sb, indentationLevel);
@@ -98,6 +101,14 @@ namespace TsActivexGen {
         private void writeAlias(KeyValuePair<string, TSAliasDescription> x, string ns, int indentationLevel) {
             writeJsDoc(x.Value.JsDoc, indentationLevel);
             $"type {SplitName(x.Key).name} = {GetTypeString(x.Value.TargetType, ns)};".AppendWithNewSection(sb, indentationLevel);
+        }
+
+        private void writeNominalType(TSSimpleType x) {
+            string classDeclaration = x;
+            if (x=="SafeArray<T>") { classDeclaration = "SafeArray<T=any>"; } // HACK we have no generic type parsing, and we want to provide the default
+            $"declare class {classDeclaration} {{".AppendWithNewSection(sb, 1);
+            $"private as: {x.FullName};".AppendLineTo(sb, 2);
+            "}".AppendLineTo(sb, 1);
         }
 
         private void writeNamespace(KeyValuePair<string, TSNamespaceDescription> x, string ns, int indentationLevel) {
@@ -126,6 +137,8 @@ namespace TsActivexGen {
             sb = new StringBuilder();
 
             x.Value.ConsolidateMembers();
+
+            ns.NominalTypes.ForEach(writeNominalType);
 
             writeNamespace(KVP<string, TSNamespaceDescription>(x.Key, x.Value),"", 0);
 

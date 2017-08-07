@@ -23,7 +23,7 @@ namespace TsActivexGen {
         private static Regex re = new Regex("^.*<(.*)>$");
         public string GenericParameter {
             get {
-                //HACK The only generic types used in this code base are Enumerator<T>, which has a single parameter; this code really should do a full parse, but YAGNI
+                //HACK The only generic types used in this code base are Enumerator<T> and SafeArray<T>, which each have a single parameter; this code really should do a full parse, but YAGNI
                 if (IsLiteralType) { return null; }
                 var match = re.Match(FullName);
                 var ret = match.Groups[1].Value;

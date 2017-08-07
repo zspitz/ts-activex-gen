@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using static TsActivexGen.TSParameterType;
 using System.Diagnostics;
+using static TsActivexGen.Functions;
 
 namespace TsActivexGen {
     public abstract class EqualityBase<T> : IEquatable<T> where T : class {
@@ -152,6 +153,7 @@ namespace TsActivexGen {
         public List<KeyValuePair<string, TSMemberDescription>> Members { get; } = new List<KeyValuePair<string, TSMemberDescription>>();
         public List<TSMemberDescription> Constructors { get; } = new List<TSMemberDescription>();
         public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
+        public HashSet<string> Extends { get; } = new HashSet<string>();
 
         public void ConsolidateMembers() {
 
@@ -206,8 +208,9 @@ namespace TsActivexGen {
                 return ret;
             }
         }
-
-        public override bool Equals(TSInterfaceDescription other) => Members.SequenceEqual(other.Members) && Constructors.SequenceEqual(other.Constructors);
+        
+        //TODO if an interface extends other interfaces, it's considered not equal to any other interface; ideally equality would involve checcking that the sum of all inherited members are equal
+        public override bool Equals(TSInterfaceDescription other) => Extends.None() && Members.SequenceEqual(other.Members) && Constructors.SequenceEqual(other.Constructors);
 
         public override int GetHashCode() {
             unchecked {
@@ -242,7 +245,7 @@ namespace TsActivexGen {
             Enums.Keys.AddRangeTo(ret);
             Interfaces.Keys.AddRangeTo(ret);
             Aliases.Keys.AddRangeTo(ret);
-            ret.ToList().Select(x => x + "[]").AddRangeTo(ret);
+            ret.ToList().Select(x => $"SafeArray<{x}>").AddRangeTo(ret);
 
             Namespaces.Values().SelectMany(x => x.GetKnownTypes()).AddRangeTo(ret);
 
@@ -258,6 +261,18 @@ namespace TsActivexGen {
             allInterfaces.ForEach(x => x.ConsolidateMembers());
             Namespaces.ForEachKVP((name, ns) => ns.ConsolidateMembers());
         }
+
+        public TSNamespaceDescription GetNamespace(string path) {
+            if (path.IsNullOrEmpty()) { return null; }
+            var parts = path.Split('.');
+            if (!Namespaces.TryGetValue(parts[0], out var next)) {
+                next = new TSNamespaceDescription();
+                Namespaces.Add(parts[0], next);
+            }
+            if (parts.Length==1) { return next; }
+            path = parts.Skip(1).Joined(".");
+            return next.GetNamespace(path);
+        }
     }
 
     public class TSAliasDescription : EqualityBase<TSAliasDescription> {
@@ -269,13 +284,14 @@ namespace TsActivexGen {
     }
 
     public class TSRootNamespaceDescription : TSNamespaceDescription {
-        //[Obsolete] public string Name { get; set; }
         public string Description { get; set; }
         public int MajorVersion { get; set; }
         public int MinorVersion { get; set; }
         public HashSet<string> Dependencies { get; } = new HashSet<string>();
 
         public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
+
+        public HashSet<TSSimpleType> NominalTypes { get; } = new HashSet<TSSimpleType>();
 
         protected override IEnumerable<TSInterfaceDescription> allInterfaces => Interfaces.Values.Concat(GlobalInterfaces.Values);
     }
@@ -288,6 +304,14 @@ namespace TsActivexGen {
             var ret = GetUsedTypes();
             ret.ExceptWith(GetKnownTypes());
             return ret;
+        }
+        public TSNamespaceDescription GetNamespace(string path) {
+            var (firstPart, rest) = FirstPathPart(path);
+            if (!Namespaces.TryGetValue(firstPart, out var root)) {
+                root = new TSRootNamespaceDescription();
+                Namespaces.Add(firstPart, root);
+            }
+            return root.GetNamespace(rest);
         }
     }
 

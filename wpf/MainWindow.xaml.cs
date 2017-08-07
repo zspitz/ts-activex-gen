@@ -19,6 +19,7 @@ using static TsActivexGen.Functions;
 using static TsActivexGen.Wpf.Misc;
 using static System.Environment;
 using TsActivexGen.tlibuilder;
+using TsActivexGen.idlbuilder;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -53,6 +54,8 @@ namespace TsActivexGen.Wpf {
             btnBrowseOutputFolder.Click += (s, e) => fillFolder();
 
             btnLoadDefaultLibs.Click += (s, e) => addFiles();
+
+            btnIDLGenerate.Click += (s, e) => addFiles();
 
             dtgFiles.ItemsSource = fileList;
 
@@ -150,30 +153,36 @@ namespace TsActivexGen.Wpf {
 
         TlbInf32Generator tlbGenerator = new TlbInf32Generator();
         private void addFiles() {
-            switch (cmbDefinitionType.SelectedIndex) {
-                case 0:
-                    var details = dgTypeLibs.SelectedItem<TypeLibDetails>();
-                    tlbGenerator.AddFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
-                    break;
-                case 1:
-                    tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
-                    break;
-                case 2:
-                    tlbGenerator.AddFromKeywords(new[] {
+            TSNamespaceSet nsset;
+            var selected = cmbDefinitionType.SelectedIndex;
+            if (selected==4) {
+                var idlBuilder = new DoxygenIDLBuilder(txbXMLPath.Text);
+                nsset = idlBuilder.Generate();
+            } else {
+                switch (selected) {
+                    case 0:
+                        var details = dgTypeLibs.SelectedItem<TypeLibDetails>();
+                        tlbGenerator.AddFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
+                        break;
+                    case 1:
+                        tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
+                        break;
+                    case 2:
+                        tlbGenerator.AddFromKeywords(new[] {
                         "ole automation", "scripting runtime", "wmi scripting",
                         "activex data objects 6.1", "access database engine", "microsoft xml, v6.0",
                         "microsoft access 14.0 object library", "microsoft excel", "microsoft word", "microsoft powerpoint", "microsoft outlook 14.0 object library", "infopath 3.0 type library",
                         "fax service extended com library", "internet controls", "shell controls and automation", "speech", "acquisition" });
-                    break;
-                case 3: //WMI
-                    break;
-                default:
-                    throw new InvalidOperationException();
+                        break;
+                    default:
+                        throw new InvalidOperationException();
+                }
+                nsset = tlbGenerator.NSSet;
             }
 
             var old = fileList.Select(x => KVP(x.InitialName, x)).ToDictionary();
             fileList.Clear();
-            new TSBuilder().GetTypescript(tlbGenerator.NSSet).SelectKVP((name, x) => {
+            new TSBuilder().GetTypescript(nsset).SelectKVP((name, x) => {
                 if (!old.TryGetValue(name, out var ret)) {
                     ret = new OutputFileDetails(name) {
                         Description = x.Description,

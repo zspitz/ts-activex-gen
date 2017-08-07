@@ -36,9 +36,9 @@ namespace TsActivexGen {
             retParts.Add(typeOnly);
             return retParts.Joined(".");
         }
-        public static (string @namespace, string name) SplitName(string typename) {
+        public static (string @namespace, string name) SplitName(string typename, string delimiter = ".") {
             if (IsLiteralTypeName(typename)) { return ("", typename); }
-            switch (typename.LastIndexOf('.')) {
+            switch (typename.LastIndexOf(delimiter)) {
                 case int x when x < 0:
                     return ("", typename);
                 case int x when x == 0:
@@ -111,5 +111,11 @@ namespace TsActivexGen {
         }
 
         public static string NewLines(int count) => Repeat(NewLine, count).Joined("");
+
+        public static (string first, string rest) FirstPathPart(string path, string delimiter = ".") {
+            if (path.IsNullOrEmpty()) { return ("", ""); }
+            var parts = path.Split(new[] { delimiter }, StringSplitOptions.None);
+            return (parts[0], parts.Skip(1).Joined(delimiter));
+        }
     }
 }

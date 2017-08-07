@@ -134,6 +134,10 @@
       <Project>{c6531877-8272-4302-959a-2fabb2663771}</Project>
       <Name>common</Name>
     </ProjectReference>
+    <ProjectReference Include="..\idlbuilder\idlbuilder.csproj">
+      <Project>{fedf776c-0051-42e1-a675-a8ded7ac140d}</Project>
+      <Name>idlbuilder</Name>
+    </ProjectReference>
     <ProjectReference Include="..\tlibuilder\tlibuilder.csproj">
       <Project>{a916f574-6ab0-4bed-9ed1-f0d4e4866f5a}</Project>
       <Name>tlibuilder</Name>

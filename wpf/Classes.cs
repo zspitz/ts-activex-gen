@@ -40,7 +40,7 @@ namespace TsActivexGen.Wpf {
 
     public class DefinitionTypesComboBox : ComboBox {
         public DefinitionTypesComboBox() {
-            ItemsSource = new[] { "Type lib from registry", "Type lib from file", "Default library list", "WMI class" };
+            ItemsSource = new[] { "Type lib from registry", "Type lib from file", "Default library list", "WMI class", "Doxygen IDL XML files" };
             SelectedIndex = 0;
         }
     }

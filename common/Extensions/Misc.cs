@@ -26,9 +26,11 @@ namespace TsActivexGen {
 
         /// empty interfaces are added as aliases
         public static void AddInterfaceTo(this KeyValuePair<string, TSInterfaceDescription> x, TSRootNamespaceDescription ns) {
-            if (x.Value.Members.Any()) {
+            if (x.Value.Members.Any() || x.Value.Extends.Count > 1) {
                 ns.Interfaces.Add(x);
-            } else {
+            } else if (x.Value.Extends.Any()) {
+                ns.Aliases.Add(x.Key, x.Value.Extends.First());
+            } else { 
                 ns.Aliases.Add(x.Key, TSSimpleType.Any);
             }
         }

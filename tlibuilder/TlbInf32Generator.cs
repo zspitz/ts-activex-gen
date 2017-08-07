@@ -83,7 +83,7 @@ VT_NULL	1
                 ret = "any";
             }
 
-            if (isArray) { ret += "[]"; }
+            if (isArray) { ret = $"SafeArray<{ret}>"; }
             return ret;
         }
 
@@ -470,6 +470,9 @@ VT_NULL	1
                     enumerables.Select(ToEnumeratorConstructorDescription).AddRangeTo(enumerable.Constructors);
                     ns.GlobalInterfaces["EnumeratorConstructor"] = enumerable;
                 }
+
+                ns.NominalTypes.Add("VarDate");
+                ns.NominalTypes.Add("SafeArray<T>");
             });
         }
 

@@ -63,6 +63,13 @@
                 <TabItem>
                     WMI classes - not yet implemented
                 </TabItem>
+                <TabItem>
+                    <StackPanel HorizontalAlignment="Center" Orientation="Vertical">
+                        <Label Content="Path to Doxygen XML files" />
+                        <TextBox Name="txbXMLPath" Text="D:\Zev\Projects\IDLParser_Doxygen\output\xml" />
+                        <Button Name="btnIDLGenerate" Content="Generate" />
+                    </StackPanel>
+                </TabItem>
             </TabControl>
         </DockPanel>
         <DockPanel>
