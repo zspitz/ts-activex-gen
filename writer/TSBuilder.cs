@@ -5,6 +5,7 @@ using System.Text;
 using static System.Environment;
 using System.Text.RegularExpressions;
 using static TsActivexGen.Functions;
+using System.Diagnostics;
 
 namespace TsActivexGen {
     public class TSBuilder {
@@ -22,8 +23,12 @@ namespace TsActivexGen {
         private void writeJsDoc(List<KeyValuePair<string, string>> JsDoc, int indentationLevel, bool newLine = false) {
             JsDoc = JsDoc.WhereKVP((key, value) => !key.IsNullOrEmpty() || !value.IsNullOrEmpty()).SelectMany(kvp => {
                 if (kvp.Value.Length <= 150) { return new[] { kvp }; }
+                if (!kvp.Key.IsNullOrEmpty()) {
+                    Debug.Print($"Unhandled long line in JSDoc parameter {kvp.Key}");
+                    return new [] { KVP(kvp.Key, kvp.Value.Substring(0, 145))};
+                }
+
                 var lines = new List<KeyValuePair<string, string>>();
-                if (!kvp.Key.IsNullOrEmpty()) { throw new Exception("Unhandled long line in JSDoc parameter defaults"); }
                 var matches = spaceBreaker.Matches(kvp.Value);
                 if (matches.Count == 0) { throw new Exception("Unhandled long line in JSDoc"); }
                 foreach (Match match in matches) {
@@ -91,7 +96,7 @@ namespace TsActivexGen {
             writeJsDoc(@interface.JsDoc, indentationLevel);
 
             var extends = "";
-            if (@interface.Extends.Any()) { extends = " extends " + @interface.Extends.Joined(", "); }
+            if (@interface.Extends.Any()) { extends = "extends " + @interface.Extends.Joined(", ", y=>RelativeName(y,ns)) + " "; }
             $"interface {name} {extends}{{".AppendLineTo(sb, indentationLevel);
             @interface.Members.OrderBy(y => y.Key).ThenBy(y => parametersString(y.Value)).ForEach(y => writeMember(y, ns, indentationLevel + 1));
             @interface.Constructors.OrderBy(parametersString).ForEach(y => writeConstructor(y, ns, indentationLevel + 1));
@@ -115,17 +120,18 @@ namespace TsActivexGen {
             //TODO if there are no members, write the nested namespace, and include the entire chain -- com.sun.star etc. -- as the namespace name
             var nsDescription = x.Value;
             var isRootNamespace = nsDescription is TSRootNamespaceDescription;
+            var currentNamespace = MakeNamespace(ns, x.Key);
 
             writeJsDoc(nsDescription.JsDoc, 0);
-            $"{(isRootNamespace ? "declare " : "")}namespace {RelativeName(x.Key,ns)} {{".AppendLineTo(sb, indentationLevel);
+            $"{(isRootNamespace ? "declare " : "")}namespace {x.Key} {{".AppendLineTo(sb, indentationLevel);
 
-            nsDescription.Aliases.OrderBy(y => y.Key).ForEach(y => writeAlias(y, x.Key, indentationLevel + 1));
+            nsDescription.Aliases.OrderBy(y => y.Key).ForEach(y => writeAlias(y, currentNamespace, indentationLevel + 1));
 
             nsDescription.Enums.OrderBy(y => y.Key).ForEach(y => writeEnum(y, indentationLevel + 1));
 
-            nsDescription.Interfaces.OrderBy(y => y.Key).ForEach(y => writeInterface(y, x.Key, indentationLevel + 1));
+            nsDescription.Interfaces.OrderBy(y => y.Key).ForEach(y => writeInterface(y, currentNamespace, indentationLevel + 1));
 
-            nsDescription.Namespaces.OrderBy(y => y.Key).ForEach(y => writeNamespace(y, MakeNamespace(ns,y.Key), indentationLevel + 1));
+            nsDescription.Namespaces.OrderBy(y => y.Key).ForEach(y => writeNamespace(y, currentNamespace, indentationLevel + 1));
 
             "}".AppendWithNewSection(sb, indentationLevel);
         }

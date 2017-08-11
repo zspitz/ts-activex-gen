@@ -8,6 +8,8 @@ namespace TsActivexGen {
         public static readonly TSSimpleType Any = new TSSimpleType("any");
         public static readonly TSSimpleType Void = new TSSimpleType("void");
         public static readonly TSSimpleType Undefined = new TSSimpleType("undefined");
+        public static readonly TSSimpleType Number = new TSSimpleType("number");
+        public static readonly TSSimpleType String = new TSSimpleType("string");
 
         public string FullName { get; }
         public string Namespace {
@@ -21,6 +23,8 @@ namespace TsActivexGen {
         public bool IsLiteralType => Functions.IsLiteralTypeName(FullName);
 
         private static Regex re = new Regex("^.*<(.*)>$");
+        
+
         public string GenericParameter {
             get {
                 //HACK The only generic types used in this code base are Enumerator<T> and SafeArray<T>, which each have a single parameter; this code really should do a full parse, but YAGNI

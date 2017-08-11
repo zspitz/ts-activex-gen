@@ -58,6 +58,7 @@
     <Compile Include="Extensions\Misc.cs" />
     <Compile Include="Extensions\String.cs" />
     <Compile Include="Extensions\Type.cs" />
+    <Compile Include="Extensions\XElement.cs" />
     <Compile Include="Functions.cs" />
     <Compile Include="Interfaces.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

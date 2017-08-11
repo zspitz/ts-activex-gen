@@ -43,6 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes.cs" />
     <Compile Include="DoxygenIDLBuilder.cs" />
     <Compile Include="IDLBuilderExtensions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
