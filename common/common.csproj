@@ -47,6 +47,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\SimpleTreeNode.cs" />
     <Compile Include="DataClasses.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="Extensions\HashSetT.cs" />
@@ -63,6 +64,7 @@
     <Compile Include="Interfaces.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TSTypes.cs" />
+    <Compile Include="TypenameTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

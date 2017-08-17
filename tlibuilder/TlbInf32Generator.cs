@@ -171,7 +171,8 @@ VT_NULL	1
 
             ret.ReturnType = GetTypeName(members.First().ReturnType, !invokeable);
             if (hasSetter && parameterList.Any()) {
-                var parameterTypes = new TSTupleType(parameterList.SelectKVP((name, parameterDescription) => parameterDescription.Type));
+                var parameterTypes = new TSTupleType();
+                parameterList.SelectKVP((name, parameterDescription) => parameterDescription.Type).AddRangeTo(parameterTypes.Members);
                 parameterizedSetters.Add(new ParameterizedSetterInfo() {
                     objectType = new TSSimpleType(typename),
                     propertyName = members.First().Name,
@@ -251,7 +252,7 @@ VT_NULL	1
                 argnamesType = null;
                 parameterType = TSObjectType.PlainObject;
             } else if (args.Count <= 5) {
-                argnamesType= new TSTupleType(args.Keys().Select(x => $"'{x}'"));
+                argnamesType = new TSTupleType(args.Keys().Select(x => $"'{x}'"));
                 parameterType = new TSObjectType(args);
             } else {
                 var alias = new TSAliasDescription() { TargetType = new TSTupleType(args.Keys().Select(x => $"'{x}'")) };

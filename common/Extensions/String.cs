@@ -71,6 +71,8 @@ namespace TsActivexGen {
             lines.SelectKVP(selector).AppendLinesTo(sb, indentationLevel, endOfLine);
         }
 
+        public static void AppendTo(this string s, StringBuilder sb) => sb.Append(s);
+
         public static bool Contains(this string source, string toCheck, StringComparison comp) => source.IndexOf(toCheck, comp) >= 0;
 
         public static string ForceEndsWith(this string s, string end, StringComparison comparisonType = OrdinalIgnoreCase) {
@@ -99,5 +101,7 @@ namespace TsActivexGen {
                 return false;
             }
         }
+
+        public static bool IsMatchedBy(this string s, Regex re) => re.IsMatch(s);
     }
 }

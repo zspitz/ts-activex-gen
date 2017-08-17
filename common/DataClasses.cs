@@ -245,6 +245,10 @@ namespace TsActivexGen {
             Enums.Keys.AddRangeTo(ret);
             Interfaces.Keys.AddRangeTo(ret);
             Aliases.Keys.AddRangeTo(ret);
+            if (this is TSRootNamespaceDescription root) {
+                root.NominalTypes.Select(x => (string)x).AddRangeTo(ret);
+            }
+            
             ret.ToList().Select(x => $"SafeArray<{x}>").AddRangeTo(ret);
 
             Namespaces.Values().SelectMany(x => x.GetKnownTypes()).AddRangeTo(ret);

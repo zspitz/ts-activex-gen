@@ -111,15 +111,21 @@ namespace TsActivexGen {
         private void writeNominalType(TSSimpleType x) {
             string classDeclaration = x;
             if (x=="SafeArray<T>") { classDeclaration = "SafeArray<T=any>"; } // HACK we have no generic type parsing, and we want to provide the default
-            $"declare class {classDeclaration} {{".AppendWithNewSection(sb, 1);
-            $"private as: {x.FullName};".AppendLineTo(sb, 2);
-            "}".AppendLineTo(sb, 1);
+            $"declare class {classDeclaration} {{".AppendWithNewSection(sb);
+            $"private typekey: {x.FullName};".AppendLineTo(sb, 1); //we can hardcode the indentation level here, because currently nominal types exist at the root level only
+            "}".AppendLineTo(sb);
         }
 
         private void writeNamespace(KeyValuePair<string, TSNamespaceDescription> x, string ns, int indentationLevel) {
-            //TODO if there are no members, write the nested namespace, and include the entire chain -- com.sun.star etc. -- as the namespace name
             var nsDescription = x.Value;
-            var isRootNamespace = nsDescription is TSRootNamespaceDescription;
+            var isRootNamespace = nsDescription is TSRootNamespaceDescription; //this has to be here, before we overwrite nsDescription with nested namespaces
+
+            while (nsDescription.JsDoc.None() && nsDescription.Aliases.None() && nsDescription.Enums.None() && nsDescription.Interfaces.None() && nsDescription.Namespaces.Count() == 1) {
+                string nextKey;
+                (nextKey, nsDescription) = nsDescription.Namespaces.First();
+                x = KVP($"{x.Key}.{nextKey}", nsDescription);
+            }
+
             var currentNamespace = MakeNamespace(ns, x.Key);
 
             writeJsDoc(nsDescription.JsDoc, 0);

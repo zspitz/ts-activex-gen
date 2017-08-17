@@ -7,15 +7,30 @@ using static TsActivexGen.Functions;
 using System.Diagnostics;
 using static System.Environment;
 using System.Text.RegularExpressions;
+using static TsActivexGen.MiscExtensions;
+using static System.IO.Path;
 
 namespace TsActivexGen.idlbuilder {
     public class DoxygenIDLBuilder {
         private string idlPath;
-        public DoxygenIDLBuilder(string idlPath) => this.idlPath = idlPath;
+        public DoxygenIDLBuilder(string idlPath) {
+            this.idlPath = idlPath;
+            refIDs = XDocument.Load(Combine(idlPath, "index.xml")).Root.Elements("compound").Select(x => KVP(x.Attribute("refid").Value, x.Element("name").Value)).ToDictionary();
+        }
+
+        private Dictionary<string, string> refIDs;
 
         public TSNamespaceSet Generate() {
             var ret = new TSNamespaceSet();
-            foreach (var x in EnumerateFiles(idlPath, "*.xml").Where(x=>!x.EndsWith("_8idl.xml") && !x.StartsWith("dir_")).Select(x => (path: x, doc: XDocument.Load(x)))) {
+
+            Func<string, bool> fileFilter = s => {
+                if (s.EndsWith("_8idl.xml")) { return false; }
+                if (s.StartsWith("dir_")) { return false; }
+                if (s == "index.xml") { return false; }
+                return true;
+            };
+
+            foreach (var x in EnumerateFiles(idlPath, "*.xml").Where(fileFilter).Select(x => (path: x, doc: XDocument.Load(x)))) {
                 var root = x.doc.Root;
                 var compounddef = root.Elements("compounddef").SingleOrDefault();
                 if (compounddef == null) { continue; }
@@ -42,13 +57,21 @@ namespace TsActivexGen.idlbuilder {
                 }
             }
 
+            ret.Namespaces.ForEachKVP((key, rootNs) => rootNs.NominalTypes.Add("type"));
+
+            if (ret.GetUndefinedTypes().Any()) {
+                throw new Exception("Undefined types");
+            }
+
             return ret;
         }
 
         int counter = 0;
         private KeyValuePair<string, TSInterfaceDescription> parseInterface(XElement x) {
             var fullName = x.Element("compoundname").Value.DeJavaName();
-            Debug.Print($"{counter} -- {fullName}");
+            if (counter % 100 == 0) {
+                Debug.Print($"{counter} -- {fullName}");
+            }
             counter += 1;
 
             var ret = new TSInterfaceDescription();
@@ -84,24 +107,63 @@ namespace TsActivexGen.idlbuilder {
             var ret = new TSParameterDescription();
             ret.Type = parseType(x);
 
-            if (x.Element("attributes").Value.NotIn("[in]", "[out]","[inout]")) { throw new NotImplementedException("Unknown parameter attribute"); }
+            if (x.Element("attributes").Value.NotIn("[in]", "[out]", "[inout]")) { throw new NotImplementedException("Unknown parameter attribute"); }
 
             return KVP(x.Element("declname").Value, ret);
         }
 
-        private TSSimpleType parseType(XElement x) {
+        private static Dictionary<string, ITSType> typeMapping = IIFE(() => {
+            var ret = new Dictionary<string, ITSType>();
+            new[] { "long", "short", "hyper", "byte", "double", "unsigned short", "unsigned long", "unsigned hyper", "float" }.ForEach(x => ret[x] = TSSimpleType.Number);
+            ret[""] = TSSimpleType.Void;
+            ret["char"] = TSSimpleType.String; //TODO this needs to be verified; according to the official mapping, it returns a short
+            ret["type"] = (TSSimpleType)"type";
+            builtins.ForEach(x => ret[x] = (TSSimpleType)x);
+            return ret;
+        });
+
+        //private static Regex reGeneric = new Regex(@"((?:\w|\.).+?)<(.+)>");
+        private ITSType parseType(XElement x) {
             var type = x.Element("type");
             string ret;
-            if (type.HasElements) {
-                ret = type.Element("ref").Value;
+            if (!type.HasElements) {
+                ret = type.Value;
+            } else if (refIDs.TryGetValue(type.Element("ref").Attribute("refid").Value, out ret)) {
             } else {
-                ret =type.Value;
+                ret = type.Element("ref").Value;
             }
-            if (ret.IsNullOrEmpty()) { return TSSimpleType.Void; }
-            if (ret.In("long","short","hyper","byte","double")) { return TSSimpleType.Number; }
-            if (ret == "char") { return TSSimpleType.String; }
-            return ret.DeJavaName();
+            //return parseType(ret);
+            return ParseTypeName(ret.DeJavaName(), typeMapping);
         }
+
+        //private ITSType parseType(string s) {
+            //s = s.Trim();
+            //if (s.IsNullOrEmpty()) { return TSSimpleType.Void; }
+            //if (s.In("long", "short", "hyper", "byte", "double", "unsigned short", "unsigned long", "unsigned hyper", "float")) { return TSSimpleType.Number; }
+            //if (s == "char") { return TSSimpleType.String; } //TODO this needs to be verified; according to the official mapping, it returns a short
+            //if (s == "type") { return (TSSimpleType)"type"; }
+            //if (s.In(builtins)) { return (TSSimpleType)s; }
+
+            //s = s.DeJavaName();
+
+            //var match = reGeneric.Match(s);
+            //if (match.Success) {
+            //    var ret = new TSGenericType();
+            //    ret.Name = match.Groups[1].Value;
+            //    match.Groups[2].Value.Split(',').Select(x => parseType(x)).AddRangeTo(ret.Parameters);
+            //    return ret;
+            //} else if (s.Contains("<")) {
+            //    throw new NotImplementedException("Unparsed generic name");
+            //}
+
+            //if (!s.Contains(".")) {
+            //    s = $"{currentNamespace}.{s}";
+            //}
+
+            //return (TSSimpleType)s;
+
+            //return ParseTypeName(s);
+        //}
 
         static Regex reNewLine = new Regex(@"(?:\r\n|\r|\n)\s*");
         private void buildJsDoc(XElement x, List<KeyValuePair<string, string>> dest) {
@@ -174,7 +236,7 @@ namespace TsActivexGen.idlbuilder {
                             if (nodeResults.OfType<(string, string)>().Count() > 1) {
                                 Debug.Print("Nested block tag within return section"); //com.sun.star.i18n.XCollator
                                 nodeResults = nodeResults.Select(y => {
-                                    object ret=null;
+                                    object ret = null;
                                     switch (y) {
                                         case string s:
                                             ret = y;
@@ -191,7 +253,7 @@ namespace TsActivexGen.idlbuilder {
                                             break;
                                     }
                                     return ret;
-                                }).Where(y=>y != null).ToList();
+                                }).Where(y => y != null).ToList();
                             }
                             addParts(nodeResults);
                             break;
