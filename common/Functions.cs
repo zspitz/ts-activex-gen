@@ -188,5 +188,19 @@ namespace TsActivexGen {
         }
 
         public static T IIFE<T>(Func<T> generator) => generator();
+
+        /// <summary>Generates a string representation of literal values</summary>
+        public static string AsString(object value) {
+            var t = value.GetType().UnderlyingIfNullable();
+            if (t == typeof(string)) {
+                return $"\'{(value as string).Replace("'", "\\'")}\'";
+            } else if (t.IsNumeric()) {
+                return $"{value}";
+            } else if (t == typeof(bool)) {
+                return (bool)value ? "true" : "false";
+            }
+            throw new Exception($"Unable to generate string representation of value '{value}' of type '{t.Name}'");
+        }
+
     }
 }

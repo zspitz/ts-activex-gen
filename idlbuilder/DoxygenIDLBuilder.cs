@@ -35,11 +35,11 @@ namespace TsActivexGen.idlbuilder {
                 var compounddef = root.Elements("compounddef").SingleOrDefault();
                 if (compounddef == null) { continue; }
 
+                string ns;
                 switch ((string)compounddef.Attribute("kind")) {
                     case "file":
                     case "page":
                     case "dir":
-                    case "namespace":
                         continue;
 
                     case "interface":
@@ -47,9 +47,25 @@ namespace TsActivexGen.idlbuilder {
                     case "service":
                     case "singleton":
                     case "struct":
-                        var kvp = parseInterface(compounddef);
-                        var (ns, _) = SplitName(kvp.Key);
+                        var kvp = parseCompound(compounddef);
+                        (ns, _) = SplitName(kvp.Key);
                         ret.GetNamespace(ns).Interfaces.Add(kvp);
+                        break;
+
+                    case "namespace":
+                        ns = compounddef.Element("compoundname").Value.DeJavaName();
+                        var nsDesc = ret.GetNamespace(ns);
+                        foreach (var sectiondef in compounddef.Elements("sectiondef")) {
+                            switch ((string)sectiondef.Attribute("kind")) {
+                                case "enum":
+                                    sectiondef.Elements("memberdef").Select(y => parseEnum(y, ns)).AddRangeTo(nsDesc.Enums);
+                                    break;
+                                case "typedef":
+                                    sectiondef.Elements("memberdef").Select(y => parseTypedef(y, ns)).AddRangeTo(nsDesc.Aliases);
+                                    break;
+                            }
+
+                        }
                         break;
 
                     default:
@@ -66,8 +82,39 @@ namespace TsActivexGen.idlbuilder {
             return ret;
         }
 
+        private KeyValuePair<string, TSEnumDescription> parseEnum(XElement x, string ns) {
+            var fullname = $"{ns}.{x.Element("name")}";
+            var ret = new TSEnumDescription();
+
+            long currentValue = 0;
+            x.Elements("enumvalue").Select(y => parseEnumValue(y, ref currentValue)).AddRangeTo(ret.Members);
+
+            buildJsDoc(x, ret.JsDoc);
+            return KVP(fullname, ret);
+        }
+
+        private KeyValuePair<string, string> parseEnumValue(XElement x, ref long currentValue) {
+            var initializer = x.Element("initializer");
+            if (initializer != null) {
+                var initializerValue = initializer.Value.TrimStart(' ', '=');
+                if ('x'.In(initializerValue)) { initializerValue = initializerValue.Substring(2); } //handles values like 0x00020000
+                currentValue = long.Parse(initializerValue);
+            }
+            var ret = KVP(x.Element("name").Value, currentValue.ToString());
+            currentValue += 1;
+            return ret;
+        }
+
+        private KeyValuePair<string, TSAliasDescription> parseTypedef(XElement x, string ns) {
+            var fullname = $"{ns}.{x.Element("name")}";
+            var ret = new TSAliasDescription();
+            ret.TargetType = parseType(x);
+            buildJsDoc(x, ret.JsDoc);
+            return KVP(fullname, ret);
+        }
+
         int counter = 0;
-        private KeyValuePair<string, TSInterfaceDescription> parseInterface(XElement x) {
+        private KeyValuePair<string, TSInterfaceDescription> parseCompound(XElement x) {
             var fullName = x.Element("compoundname").Value.DeJavaName();
             if (counter % 100 == 0) {
                 Debug.Print($"{counter} -- {fullName}");
@@ -122,48 +169,19 @@ namespace TsActivexGen.idlbuilder {
             return ret;
         });
 
-        //private static Regex reGeneric = new Regex(@"((?:\w|\.).+?)<(.+)>");
         private ITSType parseType(XElement x) {
             var type = x.Element("type");
             string ret;
             if (!type.HasElements) {
                 ret = type.Value;
             } else if (refIDs.TryGetValue(type.Element("ref").Attribute("refid").Value, out ret)) {
+                //TODO even if there are elements, there might also be text around it
+                //  we have to treat this as an entire tree; replacing the ref elements with their actual names, and using the entire text
             } else {
                 ret = type.Element("ref").Value;
             }
-            //return parseType(ret);
             return ParseTypeName(ret.DeJavaName(), typeMapping);
         }
-
-        //private ITSType parseType(string s) {
-            //s = s.Trim();
-            //if (s.IsNullOrEmpty()) { return TSSimpleType.Void; }
-            //if (s.In("long", "short", "hyper", "byte", "double", "unsigned short", "unsigned long", "unsigned hyper", "float")) { return TSSimpleType.Number; }
-            //if (s == "char") { return TSSimpleType.String; } //TODO this needs to be verified; according to the official mapping, it returns a short
-            //if (s == "type") { return (TSSimpleType)"type"; }
-            //if (s.In(builtins)) { return (TSSimpleType)s; }
-
-            //s = s.DeJavaName();
-
-            //var match = reGeneric.Match(s);
-            //if (match.Success) {
-            //    var ret = new TSGenericType();
-            //    ret.Name = match.Groups[1].Value;
-            //    match.Groups[2].Value.Split(',').Select(x => parseType(x)).AddRangeTo(ret.Parameters);
-            //    return ret;
-            //} else if (s.Contains("<")) {
-            //    throw new NotImplementedException("Unparsed generic name");
-            //}
-
-            //if (!s.Contains(".")) {
-            //    s = $"{currentNamespace}.{s}";
-            //}
-
-            //return (TSSimpleType)s;
-
-            //return ParseTypeName(s);
-        //}
 
         static Regex reNewLine = new Regex(@"(?:\r\n|\r|\n)\s*");
         private void buildJsDoc(XElement x, List<KeyValuePair<string, string>> dest) {

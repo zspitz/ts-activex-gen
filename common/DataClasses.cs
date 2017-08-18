@@ -23,6 +23,7 @@ namespace TsActivexGen {
     }
 
     public class TSEnumDescription {
+        //TODO make this a Dictionary<string, object>?
         public Dictionary<string, string> Members { get; } = new Dictionary<string, string>(); //values -> string representation of value
         public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
     }

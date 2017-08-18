@@ -20,18 +20,6 @@ namespace TsActivexGen.tlibuilder {
             public (string objectType, string propertyName, string parameterTypes, string valueType) Stringified => (GetTypeString(objectType, ""), propertyName, GetTypeString(parameterTypes, ""), GetTypeString(valueType, ""));
         }
 
-        static string AsString(object value) {
-            var t = value.GetType().UnderlyingIfNullable();
-            if (t == typeof(string)) {
-                return $"\'{(value as string).Replace("'", "\\'")}\'";
-            } else if (t.IsNumeric()) {
-                return $"{value}";
-            } else if (t == typeof(bool)) {
-                return (bool)value ? "true" : "false";
-            }
-            throw new Exception($"Unable to generate string representation of value '{value}' of type '{t.Name}'");
-        }
-
         //unhandled values for VarType
         /*
 VT_RESERVED	32768
