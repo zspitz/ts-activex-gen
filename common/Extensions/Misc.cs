@@ -9,9 +9,10 @@ namespace TsActivexGen {
         public static bool In(this char c, string s) => s.IndexOf(c) > -1;
         public static bool NotIn<T>(this T val, IEnumerable<T> vals) => !vals.Contains(val);
         public static bool NotIn<T>(this T val, params T[] vals) => !vals.Contains(val);
+        public static bool NotIn(this char c, string s) => s.IndexOf(c) == -1;
 
         public static void Add<TKey,TValue>(this ICollection<KeyValuePair<TKey,TValue>> col, TKey key, TValue value) => col.Add(KVP(key, value));
-        public static void Add(this Dictionary<string, TSAliasDescription> dict, string key, TSSimpleType type, Dictionary<string, string> jsDoc = null) {
+        public static void Add(this Dictionary<string, TSAliasDescription> dict, string key, TSSimpleType type, IEnumerable<KeyValuePair<string,string>> jsDoc = null) {
             var alias = new TSAliasDescription { TargetType = type };
             jsDoc?.AddRangeTo(alias.JsDoc);
             dict.Add(key, alias);
@@ -20,20 +21,17 @@ namespace TsActivexGen {
         public static void RemoveMultipleAt<T>(this List<T> lst, IEnumerable<int> positions) => positions.Distinct().OrderedDescending().ForEach(x => lst.RemoveAt(x));
 
         public static readonly string[] builtins = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" };
-        //public static string[] NamedTypes(this ITSType type) => type.TypeParts().Select(x=>x.FullName).Except(builtins).Where(x => !IsLiteralTypeName(x)).ToArray();
-        //public static HashSet<string> NamedTypes(this IEnumerable<ITSType> types) => types.SelectMany(x => x.NamedTypes()).ToHashSet();
-        //public static string[] NamedTypes(this IEnumerable<string> types) => types.Except(builtins).Where(x => !IsLiteralTypeName(x)).ToArray();
         public static bool IsLiteralType(this ITSType type) => type is TSSimpleType x && x.IsLiteralType;
         public static bool IsBuiltIn(this ITSType type) => type is TSSimpleType x && x.FullName.In(builtins);
 
         /// empty interfaces are added as aliases
-        public static void AddInterfaceTo(this KeyValuePair<string, TSInterfaceDescription> x, TSRootNamespaceDescription ns) {
+        public static void AddInterfaceTo(this KeyValuePair<string, TSInterfaceDescription> x, TSNamespaceDescription ns) {
             if (x.Value.Members.Any() || x.Value.Extends.Count > 1) {
                 ns.Interfaces.Add(x);
             } else if (x.Value.Extends.Any()) {
-                ns.Aliases.Add(x.Key, x.Value.Extends.First());
+                ns.Aliases.Add(x.Key, x.Value.Extends.First(), x.Value.JsDoc);
             } else { 
-                ns.Aliases.Add(x.Key, TSSimpleType.Any);
+                ns.Aliases.Add(x.Key, TSSimpleType.Any, x.Value.JsDoc);
             }
         }
         public static void AddInterfacesTo(this IEnumerable<KeyValuePair<string, TSInterfaceDescription>> src, TSRootNamespaceDescription ns) => src.ForEach(x => x.AddInterfaceTo(ns));

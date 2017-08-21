@@ -1,17 +1,15 @@
 ﻿using System.Linq;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
-using System;
 using static System.Linq.Enumerable;
 
 namespace TsActivexGen {
-    /// <summary>Describes namespace+name types, as well as built-in and literal types</summary>
+    /// <summary>Describes namespace+name types, literal types, built-ins, and open generic types</summary>
     public class TSSimpleType : ITSType {
-        public static readonly TSSimpleType Any = new TSSimpleType("any");
-        public static readonly TSSimpleType Void = new TSSimpleType("void");
-        public static readonly TSSimpleType Undefined = new TSSimpleType("undefined");
-        public static readonly TSSimpleType Number = new TSSimpleType("number");
-        public static readonly TSSimpleType String = new TSSimpleType("string");
+        public static readonly TSSimpleType Any = "any";
+        public static readonly TSSimpleType Void = "void";
+        public static readonly TSSimpleType Undefined = "undefined";
+        public static readonly TSSimpleType Number = "number";
+        public static readonly TSSimpleType String = "string";
 
         public string FullName { get; }
         public string Namespace {
@@ -24,11 +22,11 @@ namespace TsActivexGen {
         }
         public bool IsLiteralType => Functions.IsLiteralTypeName(FullName);
 
-        public IEnumerable<TSSimpleType> TypeParts() => new [] { this }; 
+        public IEnumerable<TSSimpleType> TypeParts() => new[] { this };
         public bool Equals(ITSType other) => other is TSSimpleType x && FullName == x.FullName;
 
         public TSSimpleType(string fullName = null) {
-            if (fullName.Contains("<") || fullName.Contains(">")) { throw new InvalidOperationException("Use TSGeneriicType for generic types."); }
+            //TODO throw an exception on non-open generic types -- e.g. SafeArray<int>; SafeArray<> should be allowed
             FullName = fullName.Trim();
         }
 
@@ -44,7 +42,6 @@ namespace TsActivexGen {
         public IEnumerable<TSSimpleType> TypeParts() => Members.SelectMany(x => x.TypeParts());
         public bool Equals(ITSType other) => other is TSTupleType x && Members.SequenceEqual(x.Members);
 
-        //public TSTupleType(IEnumerable<ITSType> members) => Members = members.ToList();
         public TSTupleType() { }
         public TSTupleType(IEnumerable<string> members) => Members = members.Select(x => new TSSimpleType(x)).Cast<ITSType>().ToList();
 
@@ -105,12 +102,19 @@ namespace TsActivexGen {
 
     public class TSGenericType : ITSType {
         public string Name { get; set; }
-        public List<ITSType> Parameters { get;  } = new List<ITSType>();
+        public List<ITSType> Parameters { get; } = new List<ITSType>();  //In order to refer to the same type parameter twice, use two TSPlaceholder types with the same name
 
         public bool Equals(ITSType other) => other is TSGenericType x && Parameters.SequenceEqual(x.Parameters);
 
-        public IEnumerable<TSSimpleType> TypeParts() => Parameters.SelectMany(x => x.TypeParts());
+        public IEnumerable<TSSimpleType> TypeParts() {
+            yield return GenericDefinition;
+            foreach (var part in Parameters.SelectMany(x => x.TypeParts())) {
+                yield return part;
+            }
+        }
 
-        public override string ToString() => $"{Name}<{Parameters.Joined()}>";
+        public override string ToString() => $"{Name}<{Parameters.Joined(",", x => x is TSPlaceholder ? null : x?.ToString())}>";
+
+        public TSSimpleType GenericDefinition => $"{Name}<{Parameters.Joined(",", x => "")}>";
     }
 }

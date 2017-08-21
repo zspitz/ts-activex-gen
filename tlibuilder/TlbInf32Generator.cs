@@ -43,8 +43,8 @@ VT_ERROR	10
 VT_NULL	1
  */
 
-        private TSSimpleType GetTypeName(VarTypeInfo vti, bool replaceVoidWithUndefined = false) {
-            var ret = new TSSimpleType();
+        private ITSType GetTypeName(VarTypeInfo vti, bool replaceVoidWithUndefined = false) {
+            TSSimpleType ret;
             var splitValues = vti.VarType.SplitValues();
             if (splitValues.SequenceEqual(new[] { VT_EMPTY }) && vti.TypeInfo.TypeKind == TKIND_ALIAS && !vti.IsExternalType) {
                 splitValues = vti.TypeInfo.ResolvedType.VarType.SplitValues();
@@ -70,9 +70,11 @@ VT_NULL	1
             } else {
                 ret = "any";
             }
+            if (!isArray) { return ret; }
 
-            if (isArray) { ret = $"SafeArray<{ret}>"; }
-            return ret;
+            var safeArray = new TSGenericType() { Name = "SafeArray" };
+            safeArray.Parameters.Add(ret);
+            return safeArray;
         }
 
         private KeyValuePair<string, TSEnumDescription> ToTSEnumDescription(ConstantInfo c) {
@@ -85,8 +87,7 @@ VT_NULL	1
         private KeyValuePair<string, TSParameterDescription> ToTSParameterDescription(ParameterInfo p, bool isRest, List<KeyValuePair<string, string>> jsDoc) {
             var ret = new TSParameterDescription();
             var name = p.Name;
-            var tsType = GetTypeName(p.VarTypeInfo, true);
-            ret.Type = tsType;
+            ret.Type = GetTypeName(p.VarTypeInfo, true);
             if (isRest) {
                 ret.ParameterType = Rest;
             } else if (p.Optional || p.Default) {
@@ -97,7 +98,7 @@ VT_NULL	1
             if (p.Default) {
                 var defaultValue = p.DefaultValue;
                 if (defaultValue != null) {
-                    var kvp = KVP("param", $"{tsType.FullName} [{name}={AsString(p.DefaultValue)}]");
+                    var kvp = KVP("param", $"{ret.Type} [{name}={AsString(p.DefaultValue)}]");
                     if (!jsDoc.Contains(kvp)) { jsDoc.Add(kvp); }
                 }
             }
@@ -231,7 +232,7 @@ VT_NULL	1
             var @namespace = c.Parent.Name;
             var eventName = m.Name;
 
-            var args = m.Parameters.Cast().Select(x => KVP<string, (ITSType type, bool @readonly)>(x.Name, (GetTypeName(x.VarTypeInfo, true), !x.IsByRef()))).ToList();
+            var args = m.Parameters.Cast().Select(x => KVP(x.Name, (type: GetTypeName(x.VarTypeInfo, true), @readonly: !x.IsByRef()))).ToList();
 
             ITSType argnamesType;
             ITSType parameterType;
@@ -461,7 +462,7 @@ VT_NULL	1
                 }
 
                 ns.NominalTypes.Add("VarDate");
-                ns.NominalTypes.Add("SafeArray<T>");
+                ns.NominalTypes.Add("SafeArray<>");
             });
         }
 

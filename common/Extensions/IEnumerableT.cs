@@ -5,7 +5,10 @@ using System.Linq;
 
 namespace TsActivexGen {
     public static class IEnumerableTExtensions {
-        public static bool None<T>(this IEnumerable<T> src) => !src.Any();
+        public static bool None<T>(this IEnumerable<T> src, Func<T, bool> predicate = null) {
+            if (predicate==null) { return !src.Any(); }
+            return !src.Any(predicate);
+        }
 
         public static string Joined<T>(this IEnumerable<T> source, string delimiter = ",", Func<T, string> selector = null) {
             if (source == null) { return ""; }

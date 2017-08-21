@@ -55,7 +55,7 @@ namespace TsActivexGen.idlbuilder {
                     case "struct":
                         var kvp = parseCompound(compounddef);
                         (ns, _) = SplitName(kvp.Key);
-                        ret.GetNamespace(ns).Interfaces.Add(kvp);
+                        kvp.AddInterfaceTo(ret.GetNamespace(ns));
                         break;
 
                     case "namespace":
@@ -79,7 +79,7 @@ namespace TsActivexGen.idlbuilder {
                 }
             }
 
-            ret.Namespaces.ForEachKVP((key, rootNs) => rootNs.NominalTypes.Add("type"));
+            ret.Namespaces.ForEachKVP((key, rootNs) => new[] { "type", "sequence<>" }.AddRangeTo( rootNs.NominalTypes));
 
             if (ret.GetUndefinedTypes().Any()) {
                 throw new Exception("Undefined types");
@@ -199,6 +199,8 @@ namespace TsActivexGen.idlbuilder {
 
         static Regex reNewLine = new Regex(@"(?:\r\n|\r|\n)\s*");
         private void buildJsDoc(XElement x, List<KeyValuePair<string, string>> dest) {
+            return; //TODO fix
+
             var description = x.Elements("detaileddescription").SingleOrDefault();
             if (description == null) { return; }
 

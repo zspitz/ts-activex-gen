@@ -241,16 +241,19 @@ namespace TsActivexGen {
             Namespaces.SelectMany(x => x.Value.GetUsedTypes()).AddRangeTo(ret);
             return ret;
         }
+
+        private static string nameParser(string typename) {
+            if ('<'.NotIn(typename)) { return typename; }
+            return (ParseTypeName(typename) as TSGenericType).GenericDefinition;
+        }
         public HashSet<string> GetKnownTypes() {
             var ret = MiscExtensions.builtins.ToHashSet();
             Enums.Keys.AddRangeTo(ret);
-            Interfaces.Keys.AddRangeTo(ret);
-            Aliases.Keys.AddRangeTo(ret);
+            Interfaces.Keys.Select(nameParser).AddRangeTo(ret);
+            Aliases.Keys.Select(nameParser).AddRangeTo(ret);
             if (this is TSRootNamespaceDescription root) {
-                root.NominalTypes.Select(x => (string)x).AddRangeTo(ret);
+                root.NominalTypes.AddRangeTo(ret);
             }
-            
-            ret.ToList().Select(x => $"SafeArray<{x}>").AddRangeTo(ret);
 
             Namespaces.Values().SelectMany(x => x.GetKnownTypes()).AddRangeTo(ret);
 
@@ -278,6 +281,8 @@ namespace TsActivexGen {
             path = parts.Skip(1).Joined(".");
             return next.GetNamespace(path);
         }
+
+        public bool IsEmpty => Enums.None() && allInterfaces.None() && Aliases.None() && (Namespaces.None() || Namespaces.All(x => x.Value.IsEmpty));
     }
 
     public class TSAliasDescription : EqualityBase<TSAliasDescription> {
@@ -296,7 +301,7 @@ namespace TsActivexGen {
 
         public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
 
-        public HashSet<TSSimpleType> NominalTypes { get; } = new HashSet<TSSimpleType>();
+        public HashSet<string> NominalTypes { get; } = new HashSet<string>();
 
         protected override IEnumerable<TSInterfaceDescription> allInterfaces => Interfaces.Values.Concat(GlobalInterfaces.Values);
     }

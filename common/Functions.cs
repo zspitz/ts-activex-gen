@@ -81,7 +81,7 @@ namespace TsActivexGen {
                     ret = x.Parts.Select(y => GetTypeString(y, ns)).OrderBy(y => y).Joined(" | ");
                     break;
                 case TSGenericType x:
-                    ret = $"{x.Name}<{x.Parameters.Joined(",", y => GetTypeString(y, ns))}>";
+                    ret = $"{x.Name}<{x.Parameters.Joined(", ", y => GetTypeString(y, ns))}>";
                     break;
                 default:
                     if (type != null) { throw new NotImplementedException(); }

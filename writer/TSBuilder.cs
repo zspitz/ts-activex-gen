@@ -25,7 +25,7 @@ namespace TsActivexGen {
                 if (kvp.Value.Length <= 150) { return new[] { kvp }; }
                 if (!kvp.Key.IsNullOrEmpty()) {
                     Debug.Print($"Unhandled long line in JSDoc parameter {kvp.Key}");
-                    return new [] { KVP(kvp.Key, kvp.Value.Substring(0, 145))};
+                    return new[] { KVP(kvp.Key, kvp.Value.Substring(0, 145)) };
                 }
 
                 var lines = new List<KeyValuePair<string, string>>();
@@ -96,7 +96,7 @@ namespace TsActivexGen {
             writeJsDoc(@interface.JsDoc, indentationLevel);
 
             var extends = "";
-            if (@interface.Extends.Any()) { extends = "extends " + @interface.Extends.Joined(", ", y=>RelativeName(y,ns)) + " "; }
+            if (@interface.Extends.Any()) { extends = "extends " + @interface.Extends.Joined(", ", y => RelativeName(y, ns)) + " "; }
             $"interface {name} {extends}{{".AppendLineTo(sb, indentationLevel);
             @interface.Members.OrderBy(y => y.Key).ThenBy(y => parametersString(y.Value)).ForEach(y => writeMember(y, ns, indentationLevel + 1));
             @interface.Constructors.OrderBy(parametersString).ForEach(y => writeConstructor(y, ns, indentationLevel + 1));
@@ -108,16 +108,28 @@ namespace TsActivexGen {
             $"type {SplitName(x.Key).name} = {GetTypeString(x.Value.TargetType, ns)};".AppendWithNewSection(sb, indentationLevel);
         }
 
-        private void writeNominalType(TSSimpleType x) {
-            string classDeclaration = x;
-            if (x=="SafeArray<T>") { classDeclaration = "SafeArray<T=any>"; } // HACK we have no generic type parsing, and we want to provide the default
-            $"declare class {classDeclaration} {{".AppendWithNewSection(sb);
-            $"private typekey: {x.FullName};".AppendLineTo(sb, 1); //we can hardcode the indentation level here, because currently nominal types exist at the root level only
-            "}".AppendLineTo(sb);
+        private void writeNominalType(string typename) {
+            var x = ParseTypeName(typename);
+            switch (x) {
+                case TSSimpleType simpleType:
+                    $"declare class {simpleType.FullName} {{".AppendLineTo(sb);
+                    $"private typekey: {simpleType.FullName};".AppendLineTo(sb, 1); //we can hardcode the indentation level here, because currently nominal types exist at the root level only
+                    "}".AppendWithNewSection(sb);
+                    break;
+                case TSGenericType genericType: //this handles up to 7 generic type parameters -- T-Z
+                    var parameterNames = genericType.Parameters.Select((t, index) => $"{(char)(84 + index)}");
+                    $"declare class {genericType.Name}<{parameterNames.Joined(",", y=>$"{y} = any")}> {{".AppendLineTo(sb);
+                    $"private typekey: {genericType.Name}<{parameterNames.Joined()}>;".AppendLineTo(sb, 1); //we can hardcode the indentation level here, because currently nominal types exist at the root level only
+                    "}".AppendWithNewSection(sb);
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
         }
 
         private void writeNamespace(KeyValuePair<string, TSNamespaceDescription> x, string ns, int indentationLevel) {
             var nsDescription = x.Value;
+            if (nsDescription.IsEmpty) { return; }
             var isRootNamespace = nsDescription is TSRootNamespaceDescription; //this has to be here, before we overwrite nsDescription with nested namespaces
 
             while (nsDescription.JsDoc.None() && nsDescription.Aliases.None() && nsDescription.Enums.None() && nsDescription.Interfaces.None() && nsDescription.Namespaces.Count() == 1) {
@@ -142,7 +154,7 @@ namespace TsActivexGen {
             "}".AppendWithNewSection(sb, indentationLevel);
         }
 
-        private static Regex blankLineAtBlockEnd = new Regex(@"}(" + NewLine + @"){2}(?=\s*})");
+        private static Regex blankLineAtBlockEnd = new Regex(@"(}|;)(" + NewLine + @"){2}(?=\s*})");
         public NamespaceOutput GetTypescript(KeyValuePair<string, TSRootNamespaceDescription> x) {
             var ns = x.Value;
 
@@ -152,13 +164,13 @@ namespace TsActivexGen {
 
             ns.NominalTypes.ForEach(writeNominalType);
 
-            writeNamespace(KVP<string, TSNamespaceDescription>(x.Key, x.Value),"", 0);
+            writeNamespace(KVP<string, TSNamespaceDescription>(x.Key, x.Value), "", 0);
 
             ns.GlobalInterfaces.OrderBy(y => y.Key).ForEach(y => writeInterface(y, "", 0));
 
             var mainFile = sb.ToString()
                 .Replace("{" + NewLine + NewLine, "{" + NewLine) //writeJsdoc inserts a blank line before the jsdoc; if the member is the first after an opening brace, tslint doesn't like it
-                .RegexReplace(blankLineAtBlockEnd, "}" + NewLine) //removes the blank line after the last interface in the namespace; including nested namespaces
+                .RegexReplace(blankLineAtBlockEnd, "$1" + NewLine) //removes the blank line after the last interface in the namespace; including nested namespaces
                 .Trim() + NewLine;
 
             var ret = new NamespaceOutput() {
