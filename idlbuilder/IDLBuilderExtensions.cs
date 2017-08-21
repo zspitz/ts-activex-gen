@@ -11,7 +11,7 @@ namespace TsActivexGen.idlbuilder {
             while (ret.StartsWith(".")) {
                 ret = ret.Substring(1);
             }
-            return ret;
+            return ret.Trim();
         }
     }
 }

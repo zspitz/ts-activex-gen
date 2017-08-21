@@ -74,6 +74,7 @@ namespace TsActivexGen {
         public static void AppendTo(this string s, StringBuilder sb) => sb.Append(s);
 
         public static bool Contains(this string source, string toCheck, StringComparison comp) => source.IndexOf(toCheck, comp) >= 0;
+        public static bool ContainsAny(this string source, params char[] toCheck) => toCheck.Any(x => source.IndexOf(x) != -1);
 
         public static string ForceEndsWith(this string s, string end, StringComparison comparisonType = OrdinalIgnoreCase) {
             var ret = s;

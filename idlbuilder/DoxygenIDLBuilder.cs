@@ -15,7 +15,13 @@ namespace TsActivexGen.idlbuilder {
         private string idlPath;
         public DoxygenIDLBuilder(string idlPath) {
             this.idlPath = idlPath;
-            refIDs = XDocument.Load(Combine(idlPath, "index.xml")).Root.Elements("compound").Select(x => KVP(x.Attribute("refid").Value, x.Element("name").Value)).ToDictionary();
+            var indexRoot = XDocument.Load(Combine(idlPath, "index.xml")).Root;
+            refIDs = indexRoot.Elements("compound").Select(x => KVP(x.Attribute("refid").Value, x.Element("name").Value)).ToDictionary();
+            indexRoot.Elements("compound")
+                .Where(x => x.Attribute("kind").Value == "namespace")
+                .SelectMany(x => x.Elements("member").Where(y => y.Attribute("kind").Value.In("enum","typedef")))
+                .Select(x => KVP(x.Attribute("refid").Value, $"{x.Parent.Element("name").Value}::{x.Element("name").Value}"))
+                .AddRangeTo(refIDs);
         }
 
         private Dictionary<string, string> refIDs;
@@ -83,7 +89,7 @@ namespace TsActivexGen.idlbuilder {
         }
 
         private KeyValuePair<string, TSEnumDescription> parseEnum(XElement x, string ns) {
-            var fullname = $"{ns}.{x.Element("name")}";
+            var fullname = $"{ns}.{x.Element("name").Value}";
             var ret = new TSEnumDescription();
 
             long currentValue = 0;
@@ -97,8 +103,7 @@ namespace TsActivexGen.idlbuilder {
             var initializer = x.Element("initializer");
             if (initializer != null) {
                 var initializerValue = initializer.Value.TrimStart(' ', '=');
-                if ('x'.In(initializerValue)) { initializerValue = initializerValue.Substring(2); } //handles values like 0x00020000
-                currentValue = long.Parse(initializerValue);
+                currentValue = ParseNumber(initializerValue);
             }
             var ret = KVP(x.Element("name").Value, currentValue.ToString());
             currentValue += 1;
@@ -106,7 +111,7 @@ namespace TsActivexGen.idlbuilder {
         }
 
         private KeyValuePair<string, TSAliasDescription> parseTypedef(XElement x, string ns) {
-            var fullname = $"{ns}.{x.Element("name")}";
+            var fullname = $"{ns}.{x.Element("name").Value}";
             var ret = new TSAliasDescription();
             ret.TargetType = parseType(x);
             buildJsDoc(x, ret.JsDoc);
@@ -171,16 +176,25 @@ namespace TsActivexGen.idlbuilder {
 
         private ITSType parseType(XElement x) {
             var type = x.Element("type");
-            string ret;
-            if (!type.HasElements) {
-                ret = type.Value;
-            } else if (refIDs.TryGetValue(type.Element("ref").Attribute("refid").Value, out ret)) {
-                //TODO even if there are elements, there might also be text around it
-                //  we have to treat this as an entire tree; replacing the ref elements with their actual names, and using the entire text
-            } else {
-                ret = type.Element("ref").Value;
+            var name = type.Nodes().Joined("", nodeMapper);
+            return ParseTypeName(name, typeMapping);
+
+            string nodeMapper(XNode node) {
+                string ret1;
+                switch (node) {
+                    case XText txt:
+                        ret1 = txt.Value;
+                        break;
+                    case XElement elem when elem.Name == "ref":
+                        if (!refIDs.TryGetValue(elem.Attribute("refid").Value, out ret1)) {
+                            ret1 = elem.Value;
+                        }
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+                return ret1.DeJavaName();
             }
-            return ParseTypeName(ret.DeJavaName(), typeMapping);
         }
 
         static Regex reNewLine = new Regex(@"(?:\r\n|\r|\n)\s*");

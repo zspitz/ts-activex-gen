@@ -5,6 +5,8 @@ using Microsoft.Win32;
 using static TsActivexGen.TSParameterType;
 using static System.Environment;
 using static System.Linq.Enumerable;
+using System.Text.RegularExpressions;
+using static System.Globalization.NumberStyles;
 
 namespace TsActivexGen {
     public static class Functions {
@@ -202,5 +204,13 @@ namespace TsActivexGen {
             throw new Exception($"Unable to generate string representation of value '{value}' of type '{t.Name}'");
         }
 
+        private static Regex reHex = new Regex("(-)?(0x)?(.+)");
+        public static long ParseNumber(string s) {
+            if (!s.ContainsAny('x','X','&')) { return long.Parse(s); }
+            var groups = reHex.Match(s).Groups.Cast<Group>().ToList();
+            var ret = long.Parse(groups[3].Value, HexNumber);
+            if (groups[1].Success) { ret = -ret; }
+            return ret;
+        }
     }
 }
