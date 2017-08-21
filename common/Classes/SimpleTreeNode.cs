@@ -33,6 +33,13 @@ namespace TsActivexGen {
         };
         public SimpleTreeNode<TData> AddSibling(TData data = default(TData)) => Parent?.AddChild(data);
 
-        public IEnumerable<SimpleTreeNode<TData>> Descendants() => _children.SelectMany(child => child.Descendants());
+        public IEnumerable<SimpleTreeNode<TData>> Descendants() {
+            foreach (var child in Children) {
+                yield return child;
+                foreach (var descendant in child.Descendants()) {
+                    yield return descendant;
+                }
+            }
+        }
     }
 }

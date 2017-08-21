@@ -22,22 +22,8 @@ namespace TsActivexGen {
             }
 
             var (typeNamespace, typeOnly) = SplitName(absoluteType);
-            if (typeNamespace.Length == 0) { return absoluteType; }
-
-            var typeNamespaceParts = typeNamespace.Split('.');
-            var partsOfWithinNamespace = withinNamespace.Split('.');
-            var retParts = new List<string>();
-            var pathMismatch = false;
-            for (int i = 0; i < typeNamespaceParts.Length; i++) {
-                if (partsOfWithinNamespace.Length <= i || typeNamespaceParts[i] != partsOfWithinNamespace[i]) {
-                    pathMismatch = true;
-                }
-                if (pathMismatch) {
-                    retParts.Add(typeNamespaceParts[i]);
-                }
-            }
-            retParts.Add(typeOnly);
-            return retParts.Joined(".");
+            if (typeNamespace.Length == 0 || typeNamespace != withinNamespace) { return absoluteType; }
+            return typeOnly;
         }
         public static (string @namespace, string name) SplitName(string typename, string delimiter = ".") {
             if (IsLiteralTypeName(typename)) { return ("", typename); }
