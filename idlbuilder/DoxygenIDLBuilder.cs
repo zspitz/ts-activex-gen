@@ -13,8 +13,12 @@ using static System.IO.Path;
 namespace TsActivexGen.idlbuilder {
     public class DoxygenIDLBuilder {
         private string idlPath;
-        public DoxygenIDLBuilder(string idlPath) {
+        private readonly Context context;
+
+        public DoxygenIDLBuilder(string idlPath, Context context) {
             this.idlPath = idlPath;
+            this.context = context;
+
             var indexRoot = XDocument.Load(Combine(idlPath, "index.xml")).Root;
             refIDs = indexRoot.Elements("compound").Select(x => KVP(x.Attribute("refid").Value, x.Element("name").Value)).ToDictionary();
             indexRoot.Elements("compound")
@@ -199,8 +203,6 @@ namespace TsActivexGen.idlbuilder {
 
         static Regex reNewLine = new Regex(@"(?:\r\n|\r|\n)\s*");
         private void buildJsDoc(XElement x, List<KeyValuePair<string, string>> dest) {
-            return; //TODO fix
-
             var description = x.Elements("detaileddescription").SingleOrDefault();
             if (description == null) { return; }
 

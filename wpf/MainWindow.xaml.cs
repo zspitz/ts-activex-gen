@@ -20,6 +20,7 @@ using static TsActivexGen.Wpf.Misc;
 using static System.Environment;
 using TsActivexGen.tlibuilder;
 using TsActivexGen.idlbuilder;
+using static TsActivexGen.idlbuilder.Context;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -155,8 +156,8 @@ namespace TsActivexGen.Wpf {
         private void addFiles() {
             TSNamespaceSet nsset;
             var selected = cmbDefinitionType.SelectedIndex;
-            if (selected==4) {
-                var idlBuilder = new DoxygenIDLBuilder(txbXMLPath.Text);
+            if (selected == 4) {
+                var idlBuilder = new DoxygenIDLBuilder(txbXMLPath.Text, Automation);
                 nsset = idlBuilder.Generate();
             } else {
                 switch (selected) {
