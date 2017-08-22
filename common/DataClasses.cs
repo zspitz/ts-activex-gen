@@ -210,7 +210,7 @@ namespace TsActivexGen {
             }
         }
         
-        //TODO if an interface extends other interfaces, it's considered not equal to any other interface; ideally equality would involve checcking that the sum of all inherited members are equal
+        //TODO if an interface extends other interfaces, it's considered not equal to any other interface; ideally equality would involve checking that the sum of all inherited members are equal
         public override bool Equals(TSInterfaceDescription other) => Extends.None() && Members.SequenceEqual(other.Members) && Constructors.SequenceEqual(other.Constructors);
 
         public override int GetHashCode() {

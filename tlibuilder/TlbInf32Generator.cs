@@ -9,6 +9,7 @@ using static TLI.TliVarType;
 using System.Diagnostics;
 using static System.StringComparison;
 using static TsActivexGen.Functions;
+using static TsActivexGen.tlibuilder.Functions;
 
 namespace TsActivexGen.tlibuilder {
     public class TlbInf32Generator {

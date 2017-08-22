@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Win32;
 using static TsActivexGen.TSParameterType;
 using static System.Environment;
 using static System.Linq.Enumerable;
@@ -48,16 +47,6 @@ namespace TsActivexGen {
                 return part1 + part2;
             } else {
                 return $"{part1}.{part2}";
-            }
-        }
-
-        //public static bool IsGenericTypeName(string fullName) => !IsLiteralTypeName(fullName) && fullName.Contains("<");
-
-        public static string GetProgIDFromCLSID(string clsid) {
-            using (var key = Registry.ClassesRoot.OpenSubKey($"CLSID\\{clsid}")) {
-                using (var subkey = key?.OpenSubKey("VersionIndependentProgID") ?? key?.OpenSubKey("ProgID")) {
-                    return (string)subkey?.GetValue("");
-                }
             }
         }
 
