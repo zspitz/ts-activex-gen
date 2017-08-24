@@ -21,7 +21,6 @@ using static System.Environment;
 using TsActivexGen.tlibuilder;
 using TsActivexGen.idlbuilder;
 using static TsActivexGen.idlbuilder.Context;
-using System.IO;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -100,7 +99,7 @@ namespace TsActivexGen.Wpf {
                         Directory.CreateDirectory(x.PackagedFolderPath);
 
                         //create tsconfig.json
-                        x.WritePackageFile("tsconfig.json", GetTsConfig(x.FormattedName));
+                        x.WritePackageFile("tsconfig.json", GetTsConfig(x.FormattedName), true);
 
                         //create index.d.ts
                         var s1 = GetHeaders(x.Name, x.Description, x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text, x.MajorVersion, x.MinorVersion);
@@ -108,8 +107,12 @@ namespace TsActivexGen.Wpf {
                         s1 += x.Output.MainFile;
                         WriteAllText(x.PackagedFilePath, s1);
 
-                        //create tests file
-                        x.WriteTestsFile(x.Output.TestsFile);
+                        //create tests file; prompt if it exists already
+                        var overwrite = false;
+                        if (Exists(x.TestsFilePath) && MessageBox.Show("Overwrite tests file?","",YesNo) == Yes {
+                            overwrite = true;
+                        }
+                        x.WriteTestsFile(x.Output.TestsFile, overwrite);
 
                         //create tslint.json
                         x.WritePackageFile("tslint.json", @"
@@ -118,10 +121,10 @@ namespace TsActivexGen.Wpf {
     ""rules"": {
         ""interface-name"": [false]
     }
-}".TrimStart());
+}".TrimStart(), true);
 
                         //create package.json
-                        x.WritePackageFile("package.json", @"{ ""dependencies"": { ""activex-helpers"": ""*""}}");
+                        x.WritePackageFile("package.json", @"{ ""dependencies"": { ""activex-helpers"": ""*""}}", true);
                     });
                     selectedPath = toOutput.First().PackagedFolderPath;
                 } else {

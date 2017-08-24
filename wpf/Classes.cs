@@ -20,6 +20,7 @@ namespace TsActivexGen.Wpf {
         public string SingleFilePath  => Combine(OutputFolderRoot, FormattedName + ".d.ts");
         public string PackagedFolderPath => Combine(OutputFolderRoot, FormattedName);
         public string PackagedFilePath  => Combine(OutputFolderRoot, FormattedName, "index.d.ts");
+        public string TestsFilePath => Combine(PackagedFolderPath, $"{FormattedName}-tests.ts");
 
         public string LibraryUrl { get; set; }
 
@@ -28,8 +29,12 @@ namespace TsActivexGen.Wpf {
 
         public NamespaceOutput Output { get; set; }
 
-        public void WritePackageFile(string fileName, string contents) => WriteAllText(Combine(PackagedFolderPath, fileName), contents);
-        public void WriteTestsFile(string contents) => WritePackageFile(Combine(PackagedFolderPath, $"{FormattedName}-tests.ts"), contents);
+        public void WritePackageFile(string fileName, string contents, bool overwrite = false) {
+            var destinationPath = Combine(PackagedFolderPath, fileName);
+            if (!overwrite && Exists(destinationPath)) { return; }
+            WriteAllText(Combine(PackagedFolderPath, fileName), contents);
+        }
+        public void WriteTestsFile(string contents, bool overwrite=false) => WritePackageFile(TestsFilePath, contents, overwrite);
 
         public OutputFileDetails(string initialName) {
             InitialName = initialName;
