@@ -62,7 +62,6 @@ namespace TsActivexGen.idlbuilder {
                         break;
 
                     case "namespace":
-                        Debug.Print(x.path);
                         ns = compounddef.Element("compoundname").Value.DeJavaName();
                         var nsDesc = ret.GetNamespace(ns);
                         foreach (var sectiondef in compounddef.Elements("sectiondef")) {

@@ -247,3 +247,4 @@ ModelManifest.xml
 /activex-ts-todo.txt
 *.diagsession
 /Report20170705-0757.diagsession
+/idlbuilder/output/xml

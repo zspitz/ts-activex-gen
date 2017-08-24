@@ -21,6 +21,7 @@ using static System.Environment;
 using TsActivexGen.tlibuilder;
 using TsActivexGen.idlbuilder;
 using static TsActivexGen.idlbuilder.Context;
+using System.IO;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -57,6 +58,8 @@ namespace TsActivexGen.Wpf {
             btnLoadDefaultLibs.Click += (s, e) => addFiles();
 
             btnIDLGenerate.Click += (s, e) => addFiles();
+
+            txbXMLPath.Text = new[] { "../../../idlbuilder/output/xml", "output/xml" }.Select(x=>GetFullPath(Combine(GetDirectoryName(GetEntryAssembly().Location),x))).FirstOrDefault(x=>Directory.Exists(x));
 
             dtgFiles.ItemsSource = fileList;
 
