@@ -95,7 +95,7 @@ string typescriptDefinitions = output.MainFile;
 ```
 Theoretically, definitions could be useful in three contexts:
 * JScript via Automation under WSH
-* Javascript macros embedded in LibreOffice documents, or the local LibreOffice instance
+* Javascript macros embedded in LibreOffice documents, or in the local LibreOffice instance
 * Document / application manipulation under NodeJS (I don't know if this is even possible)
 
 Each context has specific details of the available type mappings. For example, under Automation a method which expects the native `sequence<int>` can also take a `SafeArray<number>`; the Automation bridge is responsible for converting between the two types. However, in embedded Javascript macros, there is no concept of a `SafeArray<T>`, and therefore the definitions will be different.
