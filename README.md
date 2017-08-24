@@ -9,9 +9,12 @@ Optionally, definitions can be packaged for publication on DefinitelyTyped, as o
 
 ## Library
 
-The first step is to generate an instance of `TSNamespaceSet`, which is a data structure describing a set of TypeScript namespaces, interfaces, enums, and their members (see below). That instance is passed to the `GetTypescript` method:
+The first step is to generate an instance of `TSNamespaceSet`, which is a data structure describing a set of TypeScript namespaces, interfaces, enums, and their members (see below).
 ```csharp
 TSNamespaceSet nsset = ...
+```
+That instance is passed to the `GetTypescript` method:
+```csharp
 var builder = new TSBuilder();
 List<KeyValuePair<string, NamespaceOutput>> output = builder.GetTypescript(nsset);
 foreach (var x in output) {
@@ -82,11 +85,19 @@ interface ActiveXObject {
 
 ### Generating a `TSNamespace` for the LibreOffice API
 
-(WIP) LibreOffice supports generating documentation using Doxygen, which provides an intermediate XML format. Using the outputted XML, eventually the following should be possible:
+LibreOffice supports generating documentation using Doxygen, which provides an intermediate XML format. Using the outputted XML, the following is possible:
 ```csharp
-var generator = new DoxygenIDLBuilder(@"c:\path\to\xml\file");
+var generator = new DoxygenIDLBuilder(@"c:\path\to\xml\files", Context.Automation);
 TSNamespaceSet nsset = generator.NSSet;
 var builder = new TSBuilder();
 NamespaceOutput output = builder.GetTypescript(nsset);
 string typescriptDefinitions = output.MainFile;
 ```
+Theoretically, definitions could be useful in three contexts:
+* JScript via Automation under WSH
+* Javascript macros embedded in LibreOffice documents, or in the local LibreOffice instance
+* Document / application manipulation under NodeJS (I don't know if this is even possible)
+
+Each context has specific details of the available type mappings. For example, under Automation a method which expects the native `sequence<int>` can also take a `SafeArray<number>`; the Automation bridge is responsible for converting between the two types. However, in embedded Javascript macros, there is no concept of a `SafeArray<T>`, and therefore the definitions will be different.
+
+Currently only definitions for the Automation context are implemented.
