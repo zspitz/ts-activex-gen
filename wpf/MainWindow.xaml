@@ -109,10 +109,11 @@
                     </ListBoxItem>
                     <ListBoxItem Tag="{StaticResource False}">Single file</ListBoxItem>
                 </ListBox>
-                <UniformGrid Rows="1" Columns="3" Margin="10">
+                <UniformGrid Rows="4" Columns="1" Margin="10">
                     <Button Name="btnOutput" Content="Output" />
                     <Button Name="btnClearFiles" Content="Clear file list" />
-                    <Button Name="btnTest" Content="Test" />
+                    <Button Name="btnTest" Content="Test all subfolders of output folder" />
+                    <Button Name="btnTestListed" Content="Test listed subfolders only" />
                 </UniformGrid>
             </DockPanel>
             <DataGrid Name="dtgFiles" DockPanel.Dock="Top" AutoGenerateColumns="False" CanUserAddRows="False">

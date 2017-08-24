@@ -59,7 +59,7 @@ namespace TsActivexGen.Wpf {
 
             btnIDLGenerate.Click += (s, e) => addFiles();
 
-            txbXMLPath.Text = new[] { "../../../idlbuilder/output/xml", "output/xml" }.Select(x=>GetFullPath(Combine(GetDirectoryName(GetEntryAssembly().Location),x))).FirstOrDefault(x=>Directory.Exists(x));
+            txbXMLPath.Text = new[] { "../../../idlbuilder/output/xml", "output/xml" }.Select(x => GetFullPath(Combine(GetDirectoryName(GetEntryAssembly().Location), x))).FirstOrDefault(x => Directory.Exists(x));
 
             dtgFiles.ItemsSource = fileList;
 
@@ -139,11 +139,13 @@ namespace TsActivexGen.Wpf {
                 fileList.Clear();
             };
 
-            btnTest.Click += (s, e) => {
-                Directory.EnumerateFiles(txbOutputFolder.Text, "tsconfig.json", SearchOption.AllDirectories).ForEach(x => {
+            void RunTests(IEnumerable<string> jsonPaths) =>
+                jsonPaths.ForEach(x => {
                     RunCommandlineAsync($"tsc -p {x} && tslint -p {x}");
                 });
-            };
+
+            btnTest.Click += (s, e) => RunTests(Directory.EnumerateFiles(txbOutputFolder.Text, "tsconfig.json", SearchOption.AllDirectories));
+            btnTestListed.Click+=(s,e) => RunTests(fileList.Select(x => Combine(x.PackagedFolderPath, "tsconfig.json")));
         }
 
         private bool createFile(string path) {
