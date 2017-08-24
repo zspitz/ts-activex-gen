@@ -40,5 +40,8 @@ namespace TsActivexGen {
             key = kvp.Key;
             value = kvp.Value;
         }
+
+        public static void AddRangeTo(this IEnumerable<KeyValuePair<string,string>> toAdd, Dictionary<string, TSEnumValueDescription> dest) =>
+            toAdd.SelectKVP((key, value) => KVP(key, new TSEnumValueDescription() { Value = value })).AddRangeTo(dest);
     }
 }

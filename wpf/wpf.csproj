@@ -142,10 +142,6 @@
       <Project>{a916f574-6ab0-4bed-9ed1-f0d4e4866f5a}</Project>
       <Name>tlibuilder</Name>
     </ProjectReference>
-    <ProjectReference Include="..\writer\writer.csproj">
-      <Project>{491fe1ec-1882-4c62-8625-949b09c0004a}</Project>
-      <Name>writer</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="FodyWeavers.xml" />

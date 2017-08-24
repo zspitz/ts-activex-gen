@@ -4,11 +4,9 @@ using System.Linq;
 using System.Xml.Linq;
 using static System.IO.Directory;
 using static TsActivexGen.Functions;
-using System.Diagnostics;
-using static System.Environment;
-using System.Text.RegularExpressions;
 using static TsActivexGen.MiscExtensions;
 using static System.IO.Path;
+using System.Diagnostics;
 
 namespace TsActivexGen.idlbuilder {
     public class DoxygenIDLBuilder {
@@ -23,7 +21,7 @@ namespace TsActivexGen.idlbuilder {
             refIDs = indexRoot.Elements("compound").Select(x => KVP(x.Attribute("refid").Value, x.Element("name").Value)).ToDictionary();
             indexRoot.Elements("compound")
                 .Where(x => x.Attribute("kind").Value == "namespace")
-                .SelectMany(x => x.Elements("member").Where(y => y.Attribute("kind").Value.In("enum","typedef")))
+                .SelectMany(x => x.Elements("member").Where(y => y.Attribute("kind").Value.In("enum", "typedef")))
                 .Select(x => KVP(x.Attribute("refid").Value, $"{x.Parent.Element("name").Value}::{x.Element("name").Value}"))
                 .AddRangeTo(refIDs);
         }
@@ -57,12 +55,14 @@ namespace TsActivexGen.idlbuilder {
                     case "service":
                     case "singleton":
                     case "struct":
+                        Debug.Print(x.path);
                         var kvp = parseCompound(compounddef);
                         (ns, _) = SplitName(kvp.Key);
                         kvp.AddInterfaceTo(ret.GetNamespace(ns));
                         break;
 
                     case "namespace":
+                        Debug.Print(x.path);
                         ns = compounddef.Element("compoundname").Value.DeJavaName();
                         var nsDesc = ret.GetNamespace(ns);
                         foreach (var sectiondef in compounddef.Elements("sectiondef")) {
@@ -83,7 +83,7 @@ namespace TsActivexGen.idlbuilder {
                 }
             }
 
-            ret.Namespaces.ForEachKVP((key, rootNs) => new[] { "type", "sequence<>" }.AddRangeTo( rootNs.NominalTypes));
+            ret.Namespaces.ForEachKVP((key, rootNs) => new[] { "type", "sequence<>" }.AddRangeTo(rootNs.NominalTypes));
 
             if (ret.GetUndefinedTypes().Any()) {
                 throw new Exception("Undefined types");
@@ -103,15 +103,17 @@ namespace TsActivexGen.idlbuilder {
             return KVP(fullname, ret);
         }
 
-        private KeyValuePair<string, string> parseEnumValue(XElement x, ref long currentValue) {
+        private KeyValuePair<string, TSEnumValueDescription> parseEnumValue(XElement x, ref long currentValue) {
             var initializer = x.Element("initializer");
             if (initializer != null) {
                 var initializerValue = initializer.Value.TrimStart(' ', '=');
                 currentValue = ParseNumber(initializerValue);
             }
-            var ret = KVP(x.Element("name").Value, currentValue.ToString());
+            var name = x.Element("name").Value;
+            var ret = new TSEnumValueDescription() { Value = currentValue.ToString() };
+            buildJsDoc(x, ret.JsDoc);
             currentValue += 1;
-            return ret;
+            return KVP(name, ret);
         }
 
         private KeyValuePair<string, TSAliasDescription> parseTypedef(XElement x, string ns) {
@@ -122,13 +124,8 @@ namespace TsActivexGen.idlbuilder {
             return KVP(fullname, ret);
         }
 
-        int counter = 0;
         private KeyValuePair<string, TSInterfaceDescription> parseCompound(XElement x) {
             var fullName = x.Element("compoundname").Value.DeJavaName();
-            if (counter % 100 == 0) {
-                Debug.Print($"{counter} -- {fullName}");
-            }
-            counter += 1;
 
             var ret = new TSInterfaceDescription();
 
@@ -201,210 +198,262 @@ namespace TsActivexGen.idlbuilder {
             }
         }
 
-        static Regex reNewLine = new Regex(@"(?:\r\n|\r|\n)\s*");
+        //static Regex reNewLine = new Regex(@"(?:\r\n|\r|\n)\s*");
         private void buildJsDoc(XElement x, List<KeyValuePair<string, string>> dest) {
             var description = x.Elements("detaileddescription").SingleOrDefault();
             if (description == null) { return; }
 
-            var parts = parseNode(description);
-            var results = new List<(string tag, string value)>();
-            foreach (var part in parts) {
-                switch (part) {
-                    case string s:
-                        if (results.None()) { results.Add("", ""); }
-                        var (tag, value) = results.Last();
-                        var newValue = (value + s).RegexReplace(reNewLine, "; ");
-                        results[0] = (tag, value += s);
-                        break;
-                    case ValueTuple<string, string> t:
-                        t = (t.Item1, t.Item2.RegexReplace(reNewLine, "; "));
-                        results.Add(t);
-                        break;
+            var parts = parseDescriptionNode(description);
+            if (parts.Count(y => y.tag == "description") > 1) { throw new InvalidOperationException("Multiple description tags"); }
 
+            for (int i = 0; i < parts.Count;) {
+                var (currentTag, aggregateString) = parts[i];
+                i++;
+                while (i < parts.Count && parts[i].tag.IsNullOrEmpty()) {
+                    aggregateString += parts[i].value; //TODO what happens if there is a newline within the text? both for description tag and for other tagswritejsdoc
+                    i++;
                 }
+                dest.Add(currentTag, aggregateString.Trim());
             }
-            results.Select(y => KVP(y.tag, y.value)).AddRangeTo(dest);
         }
 
-        /// <returns>null or string or value tuple of two strings</returns>
-        private List<object> parseNode(XNode node) {
-            var parts = new List<object>();
+        private List<(string tag, string value)> parseDescriptionNode(XNode node, string currentTag = "") {
+            var multiline = currentTag == "description";
+
+            var parts = new List<(string tag, string value)>();
             if (node is XText txt) {
-                addPart(txt.Value);
+                var prepend = txt.PreviousNode == null ? "" : " ";
+                var append = txt.NextNode == null ? "" : " ";
+                addInlineText($"{prepend}{txt.Value.Trim()}{append}");
                 return parts;
             }
 
             var elem = (XElement)node;
             var id = (string)elem.Attribute("id");
-            List<object> nodeResults;
+            var kind = (string)elem.Attribute("kind");
             switch (elem.LocalName()) {
-                case "para":
-                case "parameternamelist":
-                case "parameterdescription":
-                case "parametername":
-                    addNodeResults();
-                    break;
-
-                case "anchor":
-                    break;
-
-                case "detaileddescription":
+                case "detaileddescription": //com.sun.star.accessibility.IllegalAccessibleComponentStateException
                     if (elem.AnyChildNot("para")) { @throw("Unknown detaileddescription part"); }
-                    addNodeResults();
+                    addNodeResults("description");
                     break;
-                case "ref":
-                    addPart($"{{@link {elem.Value.DeJavaName()}}}");
+                case "para": //com.sun.star.accessibility.IllegalAccessibleComponentStateException
+                    addNodeResults(currentTag);
+                    if (elem.NodesAfterSelf().Any()) {
+                        var separator = multiline ? "\n" : "; ";
+                        parts.Add("", separator);
+                    }
+                    break;
+                case "ref": //exceptioncom_1_1sun_1_1star_1_1accessibility_1_1_illegal_accessible_component_state_exception.xml
+                    addInlineText($"{{@link {elem.Value.DeJavaName()}}}");
                     break;
                 case "computeroutput":
                 case "preformatted":
-                    addPart($"`{elem.Value}`");
+                    addInlineText($"`{elem.Value}`");
                     break;
+
                 case "simplesect":
-                    switch ((string)elem.Attribute("kind")) {
-                        case var kind when kind.In("since", "author", "version"):
+                    switch (kind) {
+                        case "attention":
+                        case "note":
+                            break;
+                        case "since":
+                        case "author":
+                        case "version":
                             addPair(kind, elem.Value);
                             break;
-                        case "see":
+                        case "see": //exceptioncom_1_1sun_1_1star_1_1accessibility_1_1_illegal_accessible_component_state_exception.xml
                             addPair("see", elem.Value.DeJavaName());
                             break;
                         case "return":
-                            nodeResults = elem.Nodes().SelectMany(parseNode).ToList();
-                            if (nodeResults.OfType<(string, string)>().Count() > 1) {
-                                Debug.Print("Nested block tag within return section"); //com.sun.star.i18n.XCollator
-                                nodeResults = nodeResults.Select(y => {
-                                    object ret = null;
-                                    switch (y) {
-                                        case string s:
-                                            ret = y;
-                                            break;
-                                        case ValueTuple<string, string> t when t.Item1.IsNullOrEmpty():
-                                            if (t.Item2.IsNullOrEmpty()) {
-                                                ret = ";";
-                                            } else {
-                                                ret = t.Item2;
-                                            }
-                                            break;
-                                        default:
-                                            @throw("Unrecognized node result type");
-                                            break;
-                                    }
-                                    return ret;
-                                }).Where(y => y != null).ToList();
-                            }
-                            addParts(nodeResults);
+                            parts.Add("returns", "");
+                            addNodeResults("returns");
+                            break;
+                        case "pre":
+                        case "remark":
+                            var intro = kind == "pre" ? "Precondition" : "Remark";
+                            parts.Add("", "\n");
+                            parts.Add("", $"**{intro}**: ");
+                            addNodeResults("");
+                            break;
+                        default:
+                            @throw("Unhandled simplesect");
                             break;
                     }
                     break;
-                case "xrefsect" when id?.StartsWith("deprecated") ?? false:
+
+                case "xrefsect" when id?.StartsWith("deprecated") ?? false: //exceptioncom_1_1sun_1_1star_1_1beans_1_1_introspection_exception.xm
                     addPair("deprecated", elem.Value);
                     break;
                 case "xrefsect" when id?.StartsWith("todo") ?? false:
                     addPair("todo", elem.Value);
                     break;
+
                 case "itemizedlist":
                     if (elem.AnyChildNot("listitem")) { @throw("Unrecognized child of itemizedlist"); }
-                    addNodeResults();
+                    addNodeResults(currentTag);
                     break;
                 case "listitem":
                     if (elem.AnyChildNot("para")) { @throw("Unrecognized child of listitem"); }
-                    addNodeResults();
+                    addNodeResults(currentTag);
                     break;
                 case "emphasis":
                 case "bold":
                 case "term":
-                    addPart($"**{elem.Value}**");
-                    break;
-                case "linebreak":
-                    addPair("", "");
-                    break;
-                case "ulink":
-                    nodeResults = elem.Nodes().SelectMany(parseNode).ToList();
-                    if (nodeResults.OfType<(string, string)>().Any()) { @throw("Nested block tag within ulink"); }
-                    addPart("[");
-                    addParts(nodeResults);
-                    addPart($"]{{@link {elem.Attribute("url")}}}");
-                    break;
-                case "nonbreakablespace":
-                    addPart(" ");
-                    break;
-                case "parameterlist":
-                    if (elem.AnyChildNot("parameteritem")) { @throw("Unrecognized child of parameterlist"); }
-                    addNodeResults();
-                    break;
-                case "parameteritem":
-                    if (elem.AnyChildNot("parameternamelist", "parameterdescription")) { @throw("Unrecognized child of parameteritem"); }
-                    addPair("param", "");
-                    nodeResults = elem.Nodes().SelectMany(parseNode).ToList();
-                    if (nodeResults.OfType<(string, string)>().Any()) {
-                        Debug.Print($"file:{elem.BaseUri}, element:{elem.LocalName()}, msg:Nested block tags within parameter description");
-                        nodeResults = nodeResults.TakeWhile(y => !(y is ValueType)).ToList();
-                    }
-                    addParts(nodeResults);
-                    break;
-                case "ndash":
-                    addPart(" - ");
-                    break;
-                case "orderedlist": //com.sun.star.awt.XContainerWindowProvider
-                    if (elem.AnyChildNot("listitem")) { @throw("Unrecognized child of orderedlist"); }
-                    addNodeResults();
-                    break;
-                case "table":
-                    addPart("{{table here, see documentation}}");
-                    break;
-                case "variablelist": //com.sun.star.beans.XIntrospection
-                    addParts(elem.Elements("varlistentry").Select(parseNode));
-                    break;
-                case "varlistentry":
-                    if (elem.NextNode is XElement elem1 && elem1.LocalName() != "listitem") { @throw("Unrecognized element after varlistentry"); }
-                    addNodeResults();
-                    addPart(": ");
-                    addParts(parseNode(elem.NextNode));
+                    addInlineText($"**{elem.Value}**");
                     break;
                 case "superscript":
-                    addPart($"<sup>{elem.Value}</sup>");
-                    break;
-                case "verbatim":
-                    var text = elem.Value;
-                    var lines = text.Split(new[] { NewLine }, StringSplitOptions.RemoveEmptyEntries);
-                    if (text.StartsWith("@")) {
-                        lines.ForEach(line => {
-                            var (first, rest) = FirstPathPart(line, " ");
-                            if (!first.StartsWith("@")) { @throw("Invalid jsdoc tag"); }
-                            addPair(first.Substring(1), rest);
-                        });
-                    } else { //com.sun.star.drawing.XEnhancedCustomShapeDefaulter
-                        lines.ForEach(line => addPair("", line));
-                    }
-                    break;
-                case "programlisting": //com.sun.star.container.XContentEnumerationAccess
-                    addPart("{{program example here, see documentation}}");
+                    addInlineText($"<sup>{elem.Value}</sup>");
                     break;
                 case "heading":
-                    addPart("**");
-                    addNodeResults();
-                    addPart("**: ");
+                    parts.Add("", "**");
+                    addNodeResults("");
+                    parts.Add("", "**");
+                    break;
+
+                case "anchor":
+                    break;
+
+                case "linebreak":
+                    if (multiline) {
+                        addPair("", "\n");
+                    } else {
+                        addInlineText("\n");
+                    }
+                    break;
+                case "ulink":
+                    addInlineText("[");
+                    addNodeResults(""); //forces inline
+                    addInlineText($"]{{@link {elem.Attribute("url")}}}");
+                    break;
+
+                case "nonbreakablespace":
+                    addInlineText(" ");
+                    break;
+                case "ndash":
+                    addInlineText(" - ");
                     break;
                 case "mdash": //com.sun.star.io.XAsyncOutputMonitor
-                    addPart(" -- ");
+                    addInlineText(" -- ");
                     break;
                 case "ldquo": //com.sun.star.reflection.XPublished
                 case "rdquo":
-                    addPart("\"");
+                    addInlineText("\"");
                     break;
                 case "prime": //com.sun.star.uri.UriReferenceFactory
-                    addPart("'");
+                    addInlineText("'");
                     break;
+
+                case "parameterlist" when kind == "param" || kind == "exception":
+                    if (elem.AnyChildNot("parameteritem")) { @throw("Unrecognized child of parameterlist"); }
+                    var nextTag = kind == "param" ? "param" : "throws";
+                    addNodeResults(nextTag);
+                    break;
+                case "parameteritem":
+                    if (elem.AnyChildNot("parameternamelist", "parameterdescription")) { @throw("Unrecognized child of parameteritem"); }
+                    var parameterName = elem.Elements("parameternamelist").Single().Elements("parametername").First().Value;
+                    addPair(currentTag, parameterName);
+                    parseDescriptionNode(elem.Elements("parameterdescription").Single()).AddRangeTo(parts);
+                    break;
+                case "parameterdescription":
+                    parts.Add("", " ");
+                    addNodeResults("");
+                    break;
+
+                case "orderedlist":
+                    if (!multiline) {
+                        addInlineText("{{ordered list here, see documentation}}");
+                    } else {
+                        if (elem.AnyChildNot("listitem")) { @throw("Unrecognized child of orderedlist"); }
+                        var toAdd = elem.Nodes().SelectMany((y, index) => {
+                            var ret = parseDescriptionNode(y, "description");
+                            ret.Insert(0, ("", $" {index + 1}. "));
+                            return ret;
+                        }).ToList();
+                        if (toAdd.Any(x => !x.tag.IsNullOrEmpty())) { @throw("Block tag inside ordered list item"); }
+                        toAdd.AddRangeTo(parts);
+                    }
+                    break;
+
+                case "table":
+                    addInlineText("{{table here, see documentation}}");
+                    break;
+
+                case "programlisting": //com.sun.star.container.XContentEnumerationAccess
+                    addInlineText("{{program example here, see documentation}}");
+                    if (multiline) { parts.Add("", "\n"); }
+                    break;
+
+                case "variablelist":
+                    elem.Elements("varlistentry").SelectMany(x => parseDescriptionNode(x)).AddRangeTo(parts);
+                    break;
+                case "varlistentry":
+                    if (elem.NextNode is XElement elem1 && elem1.LocalName() != "listitem") { @throw("Unrecognized element after varlistentry"); }
+                    addNodeResults("");
+                    addInlineText(": ");
+                    parseDescriptionNode(elem.NextNode).AddRangeTo(parts);
+                    break;
+
+                case "verbatim":
+                    var value = elem.Value.Trim();
+                    if (!value.IsNullOrEmpty()) {
+                        //TODO advanced verbatim parsing
+                        //if (!value.Contains("</p>")) { value = value.Replace("<p>", ""); } // handles malformed HTML
+                        //if (value.Contains("<")) {
+                        //    //parse as XML, calling parseDescriptionNode on element
+                        //    //wrap with root
+
+                        //    var toParse = XElement.Parse("<root>" + value + "</root>");
+                        //    parseDescriptionNode(toParse, currentTag).AddRangeTo(parts);
+                        //} else {
+                        //    var lines = value.Split(new[] { '\n' });
+                        //    for (int i = 0; i < lines.Length; i++) {
+                        //        var line = lines[i];
+                        //        var (first, rest) = FirstPathPart(line, " ");
+                        //        if (first.Trim().StartsWith("@")) {
+                        //            parts.Add(first.Trim().Substring(1), rest);
+                        //            if (first == "@param") {
+                        //                var paramWords = rest.Split(' ');
+                        //                if (paramWords.Length==1) {
+                        //                    i++;
+                        //                    addInlineText(lines[i]);
+                        //                }
+                        //            }
+                        //        }
+                        //    }
+
+                        //    @throw("");
+                        //}
+                        foreach (var line in value.Split('\n')) {
+                            var trimmed = line.Trim();
+                            if (trimmed.StartsWith("@")) {
+                                var (first, rest) = FirstPathPart(trimmed, " ");
+                                addPair(first.Trim(), rest.Trim());
+                            } else {
+                                parts.Add("", line.TrimEnd());
+                                var separator = multiline ? "\n" : " ";
+                                parts.Add("", separator);
+                            }
+                        }
+                    }
+                    break;
+
                 default:
-                    throw new NotImplementedException("Unrecognized element");
+                    @throw("Unrecognized element");
+                    break;
             }
 
-            return parts.Where(x => x != null).ToList();
+            return parts;
 
+            void addInlineText(string text) {
+                text = text.Replace("\n", "; ");
+                parts.Add("", text);
+            }
+            void addPair(string tag, string text) {
+                text = text.Replace("\n", "; ");
+                parts.Add(tag, text);
+            }
             void @throw(string msg) => throw new NotImplementedException(msg);
-            void addPart(string part) => parts.Add(part);
-            void addPair(string key, string value) => parts.Add((key, value));
-            void addNodeResults() => elem.Nodes().SelectMany(parseNode).AddRangeTo(parts);
-            void addParts(IEnumerable<object> toAdd) => toAdd.AddRangeTo(parts);
+            void addNodeResults(string tag) => elem.Nodes().SelectMany(x => parseDescriptionNode(x, tag)).AddRangeTo(parts);
         }
     }
 }

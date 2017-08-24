@@ -6,6 +6,7 @@ using static System.Environment;
 using System.Text.RegularExpressions;
 using static TsActivexGen.Functions;
 using System.Diagnostics;
+using JsDoc = System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, string>>;
 
 namespace TsActivexGen {
     public class TSBuilder {
@@ -15,28 +16,39 @@ namespace TsActivexGen {
 
         private string jsDocLine(KeyValuePair<string, string> entry) {
             var key = entry.Key;
+            if (key=="description") { key = ""; }
             if (key != "") { key = $"@{key} "; }
             return $" {key}{entry.Value}";
         }
 
         private Regex spaceBreaker = new Regex(@".{0,150}(?:\s|$)");
-        private void writeJsDoc(List<KeyValuePair<string, string>> JsDoc, int indentationLevel, bool newLine = false) {
+        private void writeJsDoc(JsDoc JsDoc, int indentationLevel, bool newLine = false) {
             JsDoc = JsDoc.WhereKVP((key, value) => !key.IsNullOrEmpty() || !value.IsNullOrEmpty()).SelectMany(kvp => {
-                if (kvp.Value.Length <= 150) { return new[] { kvp }; }
-                if (!kvp.Key.IsNullOrEmpty()) {
-                    Debug.Print($"Unhandled long line in JSDoc parameter {kvp.Key}");
-                    return new[] { KVP(kvp.Key, kvp.Value.Substring(0, 145)) };
+                var valueLines = kvp.Value.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                var key = kvp.Key;
+                if (key=="description") { key = ""; }
+                if (!key.IsNullOrEmpty() && valueLines.Length>1) {
+                    valueLines = new[] { valueLines.Joined(" ") };
                 }
 
-                var lines = new List<KeyValuePair<string, string>>();
-                var matches = spaceBreaker.Matches(kvp.Value);
-                if (matches.Count == 0) { throw new Exception("Unhandled long line in JSDoc"); }
-                foreach (Match match in matches) {
-                    if (match.Length == 0) { continue; }
-                    lines.Add("", match.Value);
-                }
-                return lines.ToArray();
+                return valueLines.SelectMany(line=> {
+                    if (line.Length<=150) { return new[] { KVP(key, line) }; }
+                    if (!key.IsNullOrEmpty()) {
+                        Debug.Print($"Unhandled long line in JSDoc non-description tag {key}");
+                        return new[] { KVP(key, line.Substring(0, 145)) };
+                    }
+
+                    var returnedLines = new JsDoc();
+                    var matches = spaceBreaker.Matches(line);
+                    if (matches.Count == 0) { throw new Exception("Unhandled long line in JSDoc"); }
+                    foreach (Match match in matches) {
+                        if (match.Length == 0) { continue; }
+                        returnedLines.Add("", match.Value);
+                    }
+                    return returnedLines.ToArray();
+                }).ToArray();
             }).ToList();
+
             if (JsDoc.Count == 0) { return; }
             if (newLine) { sb.AppendLine(); }
             if (JsDoc.Count == 1) {
@@ -53,10 +65,13 @@ namespace TsActivexGen {
             var @enum = x.Value;
             var members = @enum.Members.OrderBy(y => y.Key);
 
-            writeJsDoc(@enum.JsDoc, 1);
+            writeJsDoc(@enum.JsDoc, indentationLevel);
 
             $"const enum {name} {{".AppendLineTo(sb, indentationLevel);
-            members.AppendLinesTo(sb, (memberName, value) => $"{memberName} = {value}", indentationLevel + 1, ",");
+            foreach (var (memberName, memberDescription) in members) {
+                writeJsDoc(memberDescription.JsDoc, indentationLevel + 1);
+                $"{memberName} = {memberDescription.Value},".AppendLineTo(sb, indentationLevel+1);
+            }
             "}".AppendWithNewSection(sb, indentationLevel);
         }
 

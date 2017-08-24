@@ -4,6 +4,7 @@ using System.Linq;
 using static TsActivexGen.TSParameterType;
 using System.Diagnostics;
 using static TsActivexGen.Functions;
+using JsDoc = System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, string>>;
 
 namespace TsActivexGen {
     public abstract class EqualityBase<T> : IEquatable<T> where T : class {
@@ -23,9 +24,14 @@ namespace TsActivexGen {
     }
 
     public class TSEnumDescription {
-        //TODO make this a Dictionary<string, object>?
-        public Dictionary<string, string> Members { get; } = new Dictionary<string, string>(); //values -> string representation of value
-        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
+        public Dictionary<string, TSEnumValueDescription> Members { get; } = new Dictionary<string, TSEnumValueDescription>(); //values -> string representation of value
+        public JsDoc JsDoc { get; } = new JsDoc();
+    }
+
+    public class TSEnumValueDescription {
+        /// <summary>String representation of value</summry>
+        public string Value { get; set; } //TODO should this be an object?
+        public JsDoc JsDoc { get; } = new JsDoc();
     }
 
     public class TSParameterDescription : EqualityBase<TSParameterDescription> {
@@ -67,7 +73,7 @@ namespace TsActivexGen {
         public List<KeyValuePair<string, TSParameterDescription>> Parameters { get; set; } //(null means a property, empty means empty parameter list); this mut be a list, becaus parameter order is important
         public ITSType ReturnType { get; set; }
         public bool? ReadOnly { get; set; }
-        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
+        public JsDoc JsDoc { get; } = new JsDoc();
 
         public void AddParameter(string name, ITSType type) {
             if (Parameters == null) { Parameters = new List<KeyValuePair<string, TSParameterDescription>>(); }
@@ -153,7 +159,7 @@ namespace TsActivexGen {
     public class TSInterfaceDescription : EqualityBase<TSInterfaceDescription> {
         public List<KeyValuePair<string, TSMemberDescription>> Members { get; } = new List<KeyValuePair<string, TSMemberDescription>>();
         public List<TSMemberDescription> Constructors { get; } = new List<TSMemberDescription>();
-        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
+        public JsDoc JsDoc { get; } = new JsDoc();
         public HashSet<string> Extends { get; } = new HashSet<string>();
 
         public void ConsolidateMembers() {
@@ -228,7 +234,7 @@ namespace TsActivexGen {
         public Dictionary<string, TSInterfaceDescription> Interfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
         public Dictionary<string, TSAliasDescription> Aliases { get; } = new Dictionary<string, TSAliasDescription>();
         public Dictionary<string, TSNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSNamespaceDescription>();
-        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
+        public JsDoc JsDoc { get; } = new JsDoc();
 
         protected virtual IEnumerable<TSInterfaceDescription> allInterfaces => Interfaces.Values;
 
@@ -287,7 +293,7 @@ namespace TsActivexGen {
 
     public class TSAliasDescription : EqualityBase<TSAliasDescription> {
         public ITSType TargetType { get; set; }
-        public List<KeyValuePair<string, string>> JsDoc { get; } = new List<KeyValuePair<string, string>>();
+        public JsDoc JsDoc { get; } = new JsDoc();
 
         public override bool Equals(TSAliasDescription other) => TargetType.Equals(other.TargetType);
         public override int GetHashCode() => unchecked(17 * 486187739 + TargetType.GetHashCode());
