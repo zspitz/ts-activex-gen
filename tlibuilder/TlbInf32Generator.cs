@@ -295,7 +295,7 @@ VT_NULL	1
             var itemTypeName = kvp.Value;
             var ret = new TSMemberDescription();
             ret.AddParameter("col", collectionTypeName);
-            ret.ReturnType = new TSSimpleType($"Enumerator<{itemTypeName}>");
+            ret.ReturnType = ParseTypeName($"Enumerator<{itemTypeName}>");
             return ret;
         }
 
@@ -348,6 +348,9 @@ VT_NULL	1
                 ret.MajorVersion = tld.MajorVersion;
                 ret.MinorVersion = tld.MinorVersion;
             }
+
+            ret.NominalTypes.Add("VarDate");
+            ret.NominalTypes.Add("SafeArray<>");
 
             return ret;
         }
@@ -461,9 +464,6 @@ VT_NULL	1
                     enumerables.Select(ToEnumeratorConstructorDescription).AddRangeTo(enumerable.Constructors);
                     ns.GlobalInterfaces["EnumeratorConstructor"] = enumerable;
                 }
-
-                ns.NominalTypes.Add("VarDate");
-                ns.NominalTypes.Add("SafeArray<>");
             });
         }
 

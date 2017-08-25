@@ -1,10 +1,14 @@
 ﻿using System.Linq;
 using System.Collections.Generic;
 using static System.Linq.Enumerable;
+using System.Text.RegularExpressions;
+using System;
 
 namespace TsActivexGen {
     /// <summary>Describes namespace+name types, literal types, built-ins, and open generic types</summary>
     public class TSSimpleType : ITSType {
+        private static Regex reGenericPart = new Regex("<.*>$");
+
         public static readonly TSSimpleType Any = "any";
         public static readonly TSSimpleType Void = "void";
         public static readonly TSSimpleType Undefined = "undefined";
@@ -26,7 +30,11 @@ namespace TsActivexGen {
         public bool Equals(ITSType other) => other is TSSimpleType x && FullName == x.FullName;
 
         public TSSimpleType(string fullName = null) {
-            //TODO throw an exception on non-open generic types -- e.g. SafeArray<int>; SafeArray<> should be allowed
+            if (fullName == null) { return; }
+            var match = reGenericPart.Match(fullName);
+            if (match.Success && !match.Value.ContainsOnly('<', '>', ' ', ',')) {
+                throw new InvalidOperationException("Only use unbound generic signatures with TSSimpleType");
+            }
             FullName = fullName.Trim();
         }
 

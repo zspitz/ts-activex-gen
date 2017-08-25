@@ -59,29 +59,10 @@
                     </DockPanel>
                 </TabItem>
                 <TabItem>
-                    <my:PathBrowser x:Name="brTypeLibFile" Folders="False" />
+                    <my:PathBrowser x:Name="brTypeLibFile" Folders="False" Caption="Type library file" />
                 </TabItem>
                 <TabItem>
-                    <TextBox Name="txbKeywords" VerticalAlignment="Stretch">
-                        ole automation
-                        scripting runtime
-                        wmi scripting
-                        activex data objects 6.1
-                        access database engine
-                        microsoft xml, v6.0
-                        microsoft access 14.0 object library
-                        microsoft excel
-                        microsoft word
-                        microsoft powerpoint
-                        microsoft outlook 14.0 object library
-                        infopath 3.0 type library
-                        fax service extended com library
-                        internet controls
-                        shell controls and automation
-                        speech
-                        acquisition
-                    </TextBox>
-                    <!--<Button HorizontalAlignment="Center" VerticalAlignment="Center" Content="Load default libraries" Name="btnLoadDefaultLibs" />-->
+                    <TextBox Name="txbKeywords" VerticalAlignment="Stretch" AcceptsReturn="True" />
                 </TabItem>
                 <TabItem>
                     WMI classes - not yet implemented
@@ -144,7 +125,7 @@
                         <DataGridCheckBoxColumn.Binding>
                             <MultiBinding Converter="{StaticResource ExistsConverter}" Mode="OneWay">
                                 <Binding />
-                                <Binding Path="SelectedValue" ElementName="lbPackaging" />
+                                <Binding Path="SelectedValue" ElementName="lbPackageForDefinitelyTyped" />
                             </MultiBinding>
                         </DataGridCheckBoxColumn.Binding>
                     </DataGridCheckBoxColumn>

@@ -75,6 +75,7 @@ namespace TsActivexGen {
 
         public static bool Contains(this string source, string toCheck, StringComparison comp) => source.IndexOf(toCheck, comp) >= 0;
         public static bool ContainsAny(this string source, params char[] toCheck) => toCheck.Any(x => source.IndexOf(x) != -1);
+        public static bool ContainsOnly(this string source, params char[] toCheck) => source.All(x => toCheck.Contains(x));
 
         public static string ForceEndsWith(this string s, string end, StringComparison comparisonType = OrdinalIgnoreCase) {
             var ret = s;

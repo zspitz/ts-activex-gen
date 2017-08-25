@@ -39,6 +39,25 @@ namespace TsActivexGen.Wpf {
 
             txbFilter.TextChanged += (s, e) => applyFilter();
 
+            //we're setting this in code because it's easier to do so than in XAML
+            txbKeywords.Text = @"ole automation
+scripting runtime
+wmi scripting
+activex data objects 6.1
+access database engine
+microsoft xml, v6.0
+microsoft access 14.0 object library
+microsoft excel
+microsoft word
+microsoft powerpoint
+microsoft outlook 14.0 object library
+infopath 3.0 type library
+fax service extended com library
+internet controls
+shell controls and automation
+speech
+acquisition";
+
             brOutputFolder.Path = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
             brOutputFolder.SelectionChanged += (s, e) => ((IList<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.OutputFolderRoot = brOutputFolder.Path);
 
@@ -160,7 +179,7 @@ namespace TsActivexGen.Wpf {
                         break;
                     case 1:
                         if (brOutputFolder.Path.IsNullOrEmpty()) { return; }
-                        tlbGenerator.AddFromFile(brOutputFolder.Path);
+                        tlbGenerator.AddFromFile(brTypeLibFile.Path);
                         break;
                     case 2:
                         if (txbKeywords.Text.IsNullOrEmpty()) { return; }
