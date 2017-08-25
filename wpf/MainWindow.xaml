@@ -21,10 +21,10 @@
     </Window.Resources>
     <DockPanel>
         
-        <DockPanel>
+        <DockPanel Margin="10">
             <DockPanel DockPanel.Dock="Top">
-                <Button Content="Generate" Name="btnGenerate" Margin="10" DockPanel.Dock="Right" />
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
+                <Button Content="Generate" Name="btnGenerate" Padding="10" DockPanel.Dock="Right" />
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Top" VerticalAlignment="Center">
                     <Label Content="Source" />
                     <my:DefinitionTypesComboBox x:Name="cmbDefinitionType" />
                 </StackPanel>
@@ -41,18 +41,19 @@
                             <Label Content="Filter text" />
                             <TextBox x:Name="txbFilter" />
                         </DockPanel>
-                        <DataGrid x:Name="dgTypeLibs" AutoGenerateColumns="False" CanUserSortColumns="False" IsReadOnly="True">
+                        <DataGrid x:Name="dgTypeLibs" AutoGenerateColumns="False" CanUserSortColumns="False" CanUserAddRows="False" CanUserDeleteRows="False">
                             <DataGrid.Resources>
                                 <Style TargetType="{x:Type DataGridCell}">
                                     <Setter Property="ToolTip" Value="{Binding RegistryKey}" />
                                 </Style>
                             </DataGrid.Resources>
                             <DataGrid.Columns>
-                                <DataGridTextColumn Binding="{Binding Name}" Header="Name" />
-                                <DataGridTextColumn Binding="{Binding Version}" Header="Version" />
-                                <DataGridCheckBoxColumn Binding="{Binding Is32bit}" Header="32-bit" />
-                                <DataGridCheckBoxColumn Binding="{Binding Is64bit}" Header="64-bit" />
-                                <DataGridTextColumn Binding="{Binding LCID}" Header="LCID" />
+                                <DataGridCheckBoxColumn Binding="{Binding Selected}" Header="Selected" SortDirection="Ascending"/>
+                                <DataGridTextColumn Binding="{Binding Name}" Header="Name" IsReadOnly="True" />
+                                <DataGridTextColumn Binding="{Binding Version}" Header="Version" IsReadOnly="True" />
+                                <DataGridCheckBoxColumn Binding="{Binding Is32bit}" Header="32-bit" IsReadOnly="True" />
+                                <DataGridCheckBoxColumn Binding="{Binding Is64bit}" Header="64-bit" IsReadOnly="True"/>
+                                <DataGridTextColumn Binding="{Binding LCID}" Header="LCID" IsReadOnly="True" />
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>
@@ -61,7 +62,26 @@
                     <my:PathBrowser x:Name="brTypeLibFile" Folders="False" />
                 </TabItem>
                 <TabItem>
-                    <Button HorizontalAlignment="Center" VerticalAlignment="Center" Content="Load default libraries" Name="btnLoadDefaultLibs" />
+                    <TextBox Name="txbKeywords" VerticalAlignment="Stretch">
+                        ole automation
+                        scripting runtime
+                        wmi scripting
+                        activex data objects 6.1
+                        access database engine
+                        microsoft xml, v6.0
+                        microsoft access 14.0 object library
+                        microsoft excel
+                        microsoft word
+                        microsoft powerpoint
+                        microsoft outlook 14.0 object library
+                        infopath 3.0 type library
+                        fax service extended com library
+                        internet controls
+                        shell controls and automation
+                        speech
+                        acquisition
+                    </TextBox>
+                    <!--<Button HorizontalAlignment="Center" VerticalAlignment="Center" Content="Load default libraries" Name="btnLoadDefaultLibs" />-->
                 </TabItem>
                 <TabItem>
                     WMI classes - not yet implemented

@@ -72,6 +72,7 @@ namespace TsActivexGen.tlibuilder {
         public bool Is32bit { get; set; }
         public bool Is64bit { get; set; }
         public string RegistryKey { get; set; }
+        public bool Selected { get; set; }
 
         public override string ToString() {
             var bittedness = "AnyCPU";

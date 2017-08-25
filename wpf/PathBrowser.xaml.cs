@@ -49,6 +49,6 @@ namespace TsActivexGen.Wpf {
             set => lbl.Content = value;
         }
         public bool Folders { get; set; } = true;
-        public event Action<object, EventArgs> SelectionChanged;
+        public event Action<object, EventArgs> SelectionChanged = (s,e) => { };
     }
 }
