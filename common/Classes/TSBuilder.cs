@@ -170,7 +170,7 @@ namespace TsActivexGen {
         }
 
         private static Regex blankLineAtBlockEnd = new Regex(@"(}|;)(" + NewLine + @"){2}(?=\s*})");
-        public NamespaceOutput GetTypescript(KeyValuePair<string, TSRootNamespaceDescription> x) {
+        private NamespaceOutput GetTypescript(KeyValuePair<string, TSRootNamespaceDescription> x) {
             var ns = x.Value;
 
             sb = new StringBuilder();

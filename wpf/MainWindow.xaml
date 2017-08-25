@@ -1,4 +1,4 @@
-﻿<Window x:Class="TsActivexGen.Wpf.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ag="clr-namespace:WpfAutoGrid;assembly=WpfAutoGrid" xmlns:my="clr-namespace:TsActivexGen.Wpf" xmlns:s="clr-namespace:System;assembly=mscorlib">
+﻿<Window x:Class="TsActivexGen.Wpf.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ag="clr-namespace:WpfAutoGrid;assembly=WpfAutoGrid" xmlns:my="clr-namespace:TsActivexGen.Wpf">
     <Window.Resources>
         <ToolTip x:Key="ttOutput">
             Path to output generated files. Will be created if it doesn't exist.
@@ -20,14 +20,15 @@
         <s:Boolean x:Key="False">False</s:Boolean>
     </Window.Resources>
     <DockPanel>
+        
         <DockPanel>
-            <ag:AutoGrid DockPanel.Dock="Top" ColumnCount="2" RowCount="2">
-                <Label Content="Source" />
-                <my:DefinitionTypesComboBox x:Name="cmbDefinitionType" />
-                <Label Content="Filter text" />
-                <TextBox x:Name="txbFilter" />
-                <!-- more fields in here, for use with @types headers-->
-            </ag:AutoGrid>
+            <DockPanel DockPanel.Dock="Top">
+                <Button Content="Generate" Name="btnGenerate" Margin="10" DockPanel.Dock="Right" />
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
+                    <Label Content="Source" />
+                    <my:DefinitionTypesComboBox x:Name="cmbDefinitionType" />
+                </StackPanel>
+            </DockPanel>
             <TabControl SelectedIndex="{Binding SelectedIndex,ElementName=cmbDefinitionType}" BorderThickness="0">
                 <TabControl.Resources>
                     <Style TargetType="TabItem">
@@ -35,27 +36,29 @@
                     </Style>
                 </TabControl.Resources>
                 <TabItem>
-                    <DataGrid x:Name="dgTypeLibs" AutoGenerateColumns="False" CanUserSortColumns="False" IsReadOnly="True">
-                        <DataGrid.Resources>
-                            <Style TargetType="{x:Type DataGridCell}">
-                                <Setter Property="ToolTip" Value="{Binding RegistryKey}" />
-                            </Style>
-                        </DataGrid.Resources>
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Binding="{Binding Name}" Header="Name" />
-                            <DataGridTextColumn Binding="{Binding Version}" Header="Version" />
-                            <DataGridCheckBoxColumn Binding="{Binding Is32bit}" Header="32-bit" />
-                            <DataGridCheckBoxColumn Binding="{Binding Is64bit}" Header="64-bit" />
-                            <DataGridTextColumn Binding="{Binding LCID}" Header="LCID" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top">
+                            <Label Content="Filter text" />
+                            <TextBox x:Name="txbFilter" />
+                        </DockPanel>
+                        <DataGrid x:Name="dgTypeLibs" AutoGenerateColumns="False" CanUserSortColumns="False" IsReadOnly="True">
+                            <DataGrid.Resources>
+                                <Style TargetType="{x:Type DataGridCell}">
+                                    <Setter Property="ToolTip" Value="{Binding RegistryKey}" />
+                                </Style>
+                            </DataGrid.Resources>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Binding="{Binding Name}" Header="Name" />
+                                <DataGridTextColumn Binding="{Binding Version}" Header="Version" />
+                                <DataGridCheckBoxColumn Binding="{Binding Is32bit}" Header="32-bit" />
+                                <DataGridCheckBoxColumn Binding="{Binding Is64bit}" Header="64-bit" />
+                                <DataGridTextColumn Binding="{Binding LCID}" Header="LCID" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
                 </TabItem>
                 <TabItem>
-                    <DockPanel VerticalAlignment="Top">
-                        <Button Content="..." Name="btnBrowseTypeLibFile" DockPanel.Dock="Right" />
-                        <Label Content="Filename" />
-                        <TextBox Name="txbTypeLibFromFile" />
-                    </DockPanel>
+                    <my:PathBrowser x:Name="brTypeLibFile" Folders="False" />
                 </TabItem>
                 <TabItem>
                     <Button HorizontalAlignment="Center" VerticalAlignment="Center" Content="Load default libraries" Name="btnLoadDefaultLibs" />
@@ -64,57 +67,49 @@
                     WMI classes - not yet implemented
                 </TabItem>
                 <TabItem>
-                    <StackPanel HorizontalAlignment="Center" Orientation="Vertical">
-                        <Label Content="Path to Doxygen XML files" />
-                        <TextBox Name="txbXMLPath" />
-                        <Button Name="btnIDLGenerate" Content="Generate" />
-                    </StackPanel>
+                    <my:PathBrowser x:Name="brDoxygenXMLFolder" Caption="Doxygen XML folder" Folders="True" />
                 </TabItem>
             </TabControl>
         </DockPanel>
+        
         <DockPanel>
             <DockPanel DockPanel.Dock="Top">
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Top" Margin="10">
-                    <Label Content="Output folder" ToolTip="{StaticResource ttOutput}" />
-                    <DockPanel ToolTip="{StaticResource ttOutput}">
-                        <Button Content="..." Name="btnBrowseOutputFolder" DockPanel.Dock="Right" />
-                        <TextBox x:Name="txbOutputFolder" />
-                    </DockPanel>
-                </StackPanel>
-                <ListBox BorderBrush="{x:Null}" Margin="10" Name="lbPackaging" SelectedValuePath="Tag">
-                    <ListBox.Resources>
-                        <Style TargetType="{x:Type ListBoxItem}">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
-                                        <RadioButton Content="{TemplateBinding Content}" IsChecked="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=IsSelected}" />
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                        <Style TargetType="{x:Type ag:AutoGrid}">
-                            <Setter Property="IsEnabled" Value="{Binding RelativeSource={RelativeSource AncestorType=RadioButton}, Path=IsChecked}" />
-                        </Style>
-                    </ListBox.Resources>
-                    <ListBoxItem IsSelected="True" Tag="{StaticResource True}">
-                        <StackPanel>
-                            <TextBlock>Package for DefinitelyTyped</TextBlock>
-                            <ag:AutoGrid RowCount="2" ColumnCount="2" Columns="*,300">
-                                <Label Content="Author name" />
-                                <TextBox x:Name="txbAuthorName" Text="Zev Spitz" />
-                                <Label Content="Author URL" />
-                                <TextBox x:Name="txbAuthorURL" Text="https://github.com/zspitz" />
-                            </ag:AutoGrid>
-                        </StackPanel>
-                    </ListBoxItem>
-                    <ListBoxItem Tag="{StaticResource False}">Single file</ListBoxItem>
-                </ListBox>
-                <UniformGrid Rows="4" Columns="1" Margin="10">
+                <UniformGrid Rows="4" Columns="1" Margin="10" DockPanel.Dock="Right">
                     <Button Name="btnOutput" Content="Output" />
                     <Button Name="btnClearFiles" Content="Clear file list" />
                     <Button Name="btnTest" Content="Test all subfolders of output folder" />
                     <Button Name="btnTestListed" Content="Test listed subfolders only" />
                 </UniformGrid>
+
+                <StackPanel Orientation="Vertical" DockPanel.Dock="Top" Margin="10">
+                    <my:PathBrowser ToolTip="{StaticResource ttOutput}" Caption="Output folder" x:Name="brOutputFolder" Folders="True" />
+                    <my:RadioButtonListBox x:Name="lbFilePerNamespace">
+                        <ListBoxItem IsSelected="True" Tag="{StaticResource True}">File per namespace</ListBoxItem>
+                        <ListBoxItem Tag="{StaticResource False}">
+                            <StackPanel>
+                                <TextBlock>Single file</TextBlock>
+                                <ag:AutoGrid RowCount="2" ColumnCount="1" Columns="*,300">
+                                    <Label Content="File base name" />
+                                    <TextBox Tag="txbFileBaseName" Loaded="TextBox_Loaded" />
+                                </ag:AutoGrid>
+                            </StackPanel>
+                        </ListBoxItem>
+                    </my:RadioButtonListBox>
+                    <my:RadioButtonListBox x:Name="lbPackageForDefinitelyTyped">
+                        <ListBoxItem IsSelected="True" Tag="{StaticResource True}">
+                            <StackPanel>
+                                <TextBlock>Package for DefinitelyTyped</TextBlock>
+                                <ag:AutoGrid RowCount="2" ColumnCount="2" Columns="*,300">
+                                    <Label Content="Author name" />
+                                    <TextBox Tag="txbAuthorName" Text="Zev Spitz" Loaded="TextBox_Loaded" />
+                                    <Label Content="Author URL" />
+                                    <TextBox Tag="txbAuthorURL" Text="https://github.com/zspitz" Loaded="TextBox_Loaded" />
+                                </ag:AutoGrid>
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem Tag="{StaticResource False}">Output .d.ts only</ListBoxItem>
+                    </my:RadioButtonListBox>
+                </StackPanel>
             </DockPanel>
             <DataGrid Name="dtgFiles" DockPanel.Dock="Top" AutoGenerateColumns="False" CanUserAddRows="False">
                 <DataGrid.Columns>

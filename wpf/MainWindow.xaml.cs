@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using TsActivexGen.Util;
-using Ookii.Dialogs;
-using Forms = System.Windows.Forms;
 using static System.IO.Path;
 using static System.IO.File;
 using static System.Windows.MessageBoxButton;
@@ -21,10 +19,14 @@ using static System.Environment;
 using TsActivexGen.tlibuilder;
 using TsActivexGen.idlbuilder;
 using static TsActivexGen.idlbuilder.Context;
+using System.Windows.Controls;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
         ObservableCollection<OutputFileDetails> fileList = new ObservableCollection<OutputFileDetails>();
+        TextBox txbFileBaseName;
+        TextBox txbAuthorName;
+        TextBox txbAuthorURL;
 
         public MainWindow() {
             InitializeComponent();
@@ -38,27 +40,15 @@ namespace TsActivexGen.Wpf {
                 addFiles();
             };
 
-            var fileDlg = new VistaOpenFileDialog() {
-                CheckFileExists = true,
-                CheckPathExists = true,
-                Multiselect = false
-            };
-            btnBrowseTypeLibFile.Click += (s, e) => {
-                if (!txbTypeLibFromFile.Text.IsNullOrEmpty()) { fileDlg.FileName = txbTypeLibFromFile.Text; }
-                if (fileDlg.ShowDialog() == Forms.DialogResult.Cancel) { return; }
-                txbTypeLibFromFile.Text = fileDlg.FileName;
-                addFiles();
-            };
+            brTypeLibFile.SelectionChanged += (s, e) => addFiles();
 
-            txbOutputFolder.Text = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
-            txbOutputFolder.TextChanged += (s, e) => ((IList<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.OutputFolderRoot = txbOutputFolder.Text);
-            btnBrowseOutputFolder.Click += (s, e) => fillFolder();
+            brOutputFolder.Path= Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
+            brOutputFolder.SelectionChanged += (s, e) => ((IList<OutputFileDetails>)dtgFiles.ItemsSource).ForEach(x => x.OutputFolderRoot = brOutputFolder.Path);
 
             btnLoadDefaultLibs.Click += (s, e) => addFiles();
 
-            btnIDLGenerate.Click += (s, e) => addFiles();
-
-            txbXMLPath.Text = new[] { "../../../idlbuilder/output/xml", "output/xml" }.Select(x => GetFullPath(Combine(GetDirectoryName(GetEntryAssembly().Location), x))).FirstOrDefault(x => Directory.Exists(x));
+            brDoxygenXMLFolder.Path = new[] { "../../../idlbuilder/output/xml", "output/xml" }.Select(x => GetFullPath(Combine(GetDirectoryName(GetEntryAssembly().Location), x))).FirstOrDefault(x => Directory.Exists(x));
+            brDoxygenXMLFolder.SelectionChanged += (s, e) => addFiles();
 
             dtgFiles.ItemsSource = fileList;
 
@@ -66,56 +56,57 @@ namespace TsActivexGen.Wpf {
                 var toOutput = dtgFiles.Items<OutputFileDetails>().Where(x => x.WriteOutput && !x.Name.IsNullOrEmpty()).ToList();
                 if (toOutput.None()) { return; }
 
-                Directory.CreateDirectory(txbOutputFolder.Text);
+                Directory.CreateDirectory(brOutputFolder.Path);
 
-                string selectedPath;
+                string selectedPath = "";
 
-                if (lbPackaging.SelectedValue<bool>()) {
-                    //package for DefinitelyTyped
+                if (lbFilePerNamespace.SelectedValue<bool>()) {
+                    if (lbPackageForDefinitelyTyped.SelectedValue<bool>()) {
+                        //package for DefinitelyTyped
 
-                    //prompt about missing common details
-                    var missingCommon = new(string description, string value)[] { ("author name", txbAuthorName.Text), ("author URL", txbAuthorURL.Text) }.Where(x => x.value.IsNullOrEmpty());
-                    var errors = new List<(string description, string library)>();
-                    foreach (var x in toOutput) {
-                        if (x.MajorVersion == 0 && x.MinorVersion == 0) { errors.Add("version", x.Name); }
-                        if (x.LibraryUrl.IsNullOrEmpty()) { errors.Add("library url", x.Name); }
-                    }
-                    var missingDetails = errors.GroupBy(x => x.description, (description, x) => (description: description, libs: x.Joined(", ", y => y.library))).ToList();
-
-                    var msg = "";
-                    if (missingCommon.Any()) {
-                        msg += "The following shared details are missing:" + NewLines(2) + missingCommon.Joined(NewLine, x => $" - {x.description}") + NewLines(2);
-                    }
-                    if (missingDetails.Any()) {
-                        msg += "The following details are missing from individual lbraries:" + NewLines(2) + missingDetails.Joined(NewLine, x => $" - {x.description} ({x.libs})") + NewLines(2);
-                    }
-                    if (!msg.IsNullOrEmpty()) {
-                        if (MessageBox.Show(msg + "Continue anyway?", "Missing details", YesNo) == No) { return; }
-                    }
-
-                    //begin output
-                    toOutput.ForEach(x => {
-                        //create subdirectory for all files
-                        Directory.CreateDirectory(x.PackagedFolderPath);
-
-                        //create tsconfig.json
-                        x.WritePackageFile("tsconfig.json", GetTsConfig(x.FormattedName), true);
-
-                        //create index.d.ts
-                        var s1 = GetHeaders(x.Name, x.Description, x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text, x.MajorVersion, x.MinorVersion);
-                        s1 += ReferenceDirectives(x.Output.Dependencies);
-                        s1 += x.Output.MainFile;
-                        WriteAllText(x.PackagedFilePath, s1);
-
-                        //create tests file; prompt if it exists already
-                        var overwrite = false;
-                        if (Exists(x.TestsFilePath) && MessageBox.Show("Overwrite tests file?","",YesNo) == Yes {
-                            overwrite = true;
+                        //prompt about missing common details
+                        var missingCommon = new(string description, string value)[] { ("author name", txbAuthorName.Text), ("author URL", txbAuthorURL.Text) }.Where(x => x.value.IsNullOrEmpty());
+                        var errors = new List<(string description, string library)>();
+                        foreach (var x in toOutput) {
+                            if (x.MajorVersion == 0 && x.MinorVersion == 0) { errors.Add("version", x.Name); }
+                            if (x.LibraryUrl.IsNullOrEmpty()) { errors.Add("library url", x.Name); }
                         }
-                        x.WriteTestsFile(x.Output.TestsFile, overwrite);
+                        var missingDetails = errors.GroupBy(x => x.description, (description, x) => (description: description, libs: x.Joined(", ", y => y.library))).ToList();
 
-                        //create tslint.json
-                        x.WritePackageFile("tslint.json", @"
+                        var msg = "";
+                        if (missingCommon.Any()) {
+                            msg += "The following shared details are missing:" + NewLines(2) + missingCommon.Joined(NewLine, x => $" - {x.description}") + NewLines(2);
+                        }
+                        if (missingDetails.Any()) {
+                            msg += "The following details are missing from individual lbraries:" + NewLines(2) + missingDetails.Joined(NewLine, x => $" - {x.description} ({x.libs})") + NewLines(2);
+                        }
+                        if (!msg.IsNullOrEmpty()) {
+                            if (MessageBox.Show(msg + "Continue anyway?", "Missing details", YesNo) == No) { return; }
+                        }
+
+                        //begin output
+                        toOutput.ForEach(x => {
+                            //create subdirectory for all files
+                            Directory.CreateDirectory(x.PackagedFolderPath);
+
+                            //create tsconfig.json
+                            x.WritePackageFile("tsconfig.json", GetTsConfig(x.FormattedName), true);
+
+                            //create index.d.ts
+                            var s1 = GetHeaders(x.Name, x.Description, x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text, x.MajorVersion, x.MinorVersion);
+                            s1 += ReferenceDirectives(x.Output.Dependencies);
+                            s1 += x.Output.MainFile;
+                            WriteAllText(x.PackagedFilePath, s1);
+
+                            //create tests file; prompt if it exists already
+                            var overwrite = false;
+                            if (Exists(x.TestsFilePath) && MessageBox.Show("Overwrite tests file?", "", YesNo) == Yes) {
+                                overwrite = true;
+                            }
+                            x.WriteTestsFile(x.Output.TestsFile, overwrite);
+
+                            //create tslint.json
+                            x.WritePackageFile("tslint.json", @"
 {
     ""extends"": ""dtslint/dt.json"",
     ""rules"": {
@@ -123,15 +114,87 @@ namespace TsActivexGen.Wpf {
     }
 }".TrimStart(), true);
 
-                        //create package.json
-                        x.WritePackageFile("package.json", @"{ ""dependencies"": { ""activex-helpers"": ""*""}}", true);
-                    });
-                    selectedPath = toOutput.First().PackagedFolderPath;
+                            //create package.json
+                            x.WritePackageFile("package.json", @"{ ""dependencies"": { ""activex-helpers"": ""*""}}", true);
+                        });
+                        selectedPath = toOutput.First().PackagedFolderPath;
+                    } else {
+                        toOutput.ForEach(x => WriteAllText(x.SingleFilePath, x.Output.MainFile));
+                        selectedPath = toOutput.First().SingleFilePath;
+                    }
                 } else {
-                    //single file
-                    toOutput.ForEach(x => WriteAllText(x.SingleFilePath, x.Output.MainFile));
-                    selectedPath = toOutput.First().SingleFilePath;
+                    throw new NotImplementedException();
                 }
+
+//                switch (lbPackaging.SelectedValue<PackagingMethod>()) {
+//                    case PackagePerNamspace:
+//                        //package for DefinitelyTyped
+
+//                        //prompt about missing common details
+//                        var missingCommon = new(string description, string value)[] { ("author name", txbAuthorName.Text), ("author URL", txbAuthorURL.Text) }.Where(x => x.value.IsNullOrEmpty());
+//                        var errors = new List<(string description, string library)>();
+//                        foreach (var x in toOutput) {
+//                            if (x.MajorVersion == 0 && x.MinorVersion == 0) { errors.Add("version", x.Name); }
+//                            if (x.LibraryUrl.IsNullOrEmpty()) { errors.Add("library url", x.Name); }
+//                        }
+//                        var missingDetails = errors.GroupBy(x => x.description, (description, x) => (description: description, libs: x.Joined(", ", y => y.library))).ToList();
+
+//                        var msg = "";
+//                        if (missingCommon.Any()) {
+//                            msg += "The following shared details are missing:" + NewLines(2) + missingCommon.Joined(NewLine, x => $" - {x.description}") + NewLines(2);
+//                        }
+//                        if (missingDetails.Any()) {
+//                            msg += "The following details are missing from individual lbraries:" + NewLines(2) + missingDetails.Joined(NewLine, x => $" - {x.description} ({x.libs})") + NewLines(2);
+//                        }
+//                        if (!msg.IsNullOrEmpty()) {
+//                            if (MessageBox.Show(msg + "Continue anyway?", "Missing details", YesNo) == No) { return; }
+//                        }
+
+//                        //begin output
+//                        toOutput.ForEach(x => {
+//                            //create subdirectory for all files
+//                            Directory.CreateDirectory(x.PackagedFolderPath);
+
+//                            //create tsconfig.json
+//                            x.WritePackageFile("tsconfig.json", GetTsConfig(x.FormattedName), true);
+
+//                            //create index.d.ts
+//                            var s1 = GetHeaders(x.Name, x.Description, x.LibraryUrl, txbAuthorName.Text, txbAuthorURL.Text, x.MajorVersion, x.MinorVersion);
+//                            s1 += ReferenceDirectives(x.Output.Dependencies);
+//                            s1 += x.Output.MainFile;
+//                            WriteAllText(x.PackagedFilePath, s1);
+
+//                            //create tests file; prompt if it exists already
+//                            var overwrite = false;
+//                            if (Exists(x.TestsFilePath) && MessageBox.Show("Overwrite tests file?", "", YesNo) == Yes) {
+//                                overwrite = true;
+//                            }
+//                            x.WriteTestsFile(x.Output.TestsFile, overwrite);
+
+//                            //create tslint.json
+//                            x.WritePackageFile("tslint.json", @"
+//{
+//    ""extends"": ""dtslint/dt.json"",
+//    ""rules"": {
+//        ""interface-name"": [false]
+//    }
+//}".TrimStart(), true);
+
+//                            //create package.json
+//                            x.WritePackageFile("package.json", @"{ ""dependencies"": { ""activex-helpers"": ""*""}}", true);
+//                        });
+//                        selectedPath = toOutput.First().PackagedFolderPath;
+//                        break;
+
+//                    case FilePerNamespace:
+//                        toOutput.ForEach(x => WriteAllText(x.SingleFilePath, x.Output.MainFile));
+//                        selectedPath = toOutput.First().SingleFilePath;
+//                        break;
+
+//                    case SingleFile:
+
+//                        break;
+//                }
 
                 var psi = new ProcessStartInfo("explorer.exe", $"/n /e,/select,\"{selectedPath}\"");
                 Process.Start(psi);
@@ -147,8 +210,8 @@ namespace TsActivexGen.Wpf {
                     RunCommandlineAsync($"tsc -p {x} && tslint -p {x}");
                 });
 
-            btnTest.Click += (s, e) => RunTests(Directory.EnumerateFiles(txbOutputFolder.Text, "tsconfig.json", SearchOption.AllDirectories));
-            btnTestListed.Click+=(s,e) => RunTests(fileList.Select(x => Combine(x.PackagedFolderPath, "tsconfig.json")));
+            btnTest.Click += (s, e) => RunTests(Directory.EnumerateFiles(brOutputFolder.Path, "tsconfig.json", SearchOption.AllDirectories));
+            btnTestListed.Click += (s, e) => RunTests(fileList.Select(x => Combine(x.PackagedFolderPath, "tsconfig.json")));
         }
 
         private bool createFile(string path) {
@@ -156,16 +219,12 @@ namespace TsActivexGen.Wpf {
             return MessageBox.Show($"Overwrite '{path}`?", "", YesNo) == Yes;
         }
 
-        VistaFolderBrowserDialog folderDlg = new VistaFolderBrowserDialog() {
-            ShowNewFolderButton = true
-        };
-
         TlbInf32Generator tlbGenerator = new TlbInf32Generator();
         private void addFiles() {
             TSNamespaceSet nsset;
             var selected = cmbDefinitionType.SelectedIndex;
             if (selected == 4) {
-                var idlBuilder = new DoxygenIDLBuilder(txbXMLPath.Text, Automation);
+                var idlBuilder = new DoxygenIDLBuilder(brDoxygenXMLFolder.Path, Automation);
                 nsset = idlBuilder.Generate();
             } else {
                 switch (selected) {
@@ -174,7 +233,8 @@ namespace TsActivexGen.Wpf {
                         tlbGenerator.AddFromRegistry(details.TypeLibID, details.MajorVersion, details.MinorVersion, details.LCID);
                         break;
                     case 1:
-                        tlbGenerator.AddFromFile(txbTypeLibFromFile.Text);
+                        if (brOutputFolder.Path.IsNullOrEmpty()) { return; }
+                        tlbGenerator.AddFromFile(brOutputFolder.Path);
                         break;
                     case 2:
                         tlbGenerator.AddFromKeywords(new[] {
@@ -207,21 +267,38 @@ namespace TsActivexGen.Wpf {
                     });
                 }
                 ret.Output = x;
-                ret.OutputFolderRoot = txbOutputFolder.Text;
+                ret.OutputFolderRoot = brOutputFolder.Path;
                 return ret;
             }).AddRangeTo(fileList);
         }
 
-        private bool fillFolder() {
-            if (!txbOutputFolder.Text.IsNullOrEmpty()) { folderDlg.SelectedPath = txbOutputFolder.Text; }
-            var result = folderDlg.ShowDialog();
-            if (result == Forms.DialogResult.Cancel) { return false; }
-            txbOutputFolder.Text = folderDlg.SelectedPath;
-            return true;
-        }
+        //private bool fillFolder() {
+        //    if (!txbOutputFolder.Text.IsNullOrEmpty()) { folderDlg.SelectedPath = txbOutputFolder.Text; }
+        //    var result = folderDlg.ShowDialog();
+        //    if (result == Forms.DialogResult.Cancel) { return false; }
+        //    txbOutputFolder.Text = folderDlg.SelectedPath;
+        //    return true;
+        //}
 
         private void applyFilter() {
             CollectionViewSource.GetDefaultView(dgTypeLibs.ItemsSource).Filter = x => (((TypeLibDetails)x).Name ?? "").Contains(txbFilter.Text, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void TextBox_Loaded(object sender, RoutedEventArgs e) {
+            //we need this because these controls are all within a RadioButtonListBox, and name cannot be applied in XAML
+            //As long as we don't need any binding, this is good enough
+            var tb = (TextBox)sender;
+            switch (tb.Tag) {
+                case "txbFileBaseName":
+                    txbFileBaseName = tb;
+                    break;
+                case "txbAuthorName":
+                    txbAuthorName = tb;
+                    break;
+                case "txbAuthorURL":
+                    txbAuthorURL = tb;
+                    break;
+            }
         }
     }
 }
