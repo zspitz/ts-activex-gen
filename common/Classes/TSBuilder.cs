@@ -16,7 +16,7 @@ namespace TsActivexGen {
 
         private string jsDocLine(KeyValuePair<string, string> entry) {
             var key = entry.Key;
-            if (key=="description") { key = ""; }
+            if (key == "description") { key = ""; }
             if (key != "") { key = $"@{key} "; }
             return $" {key}{entry.Value}";
         }
@@ -24,15 +24,15 @@ namespace TsActivexGen {
         private Regex spaceBreaker = new Regex(@".{0,150}(?:\s|$)");
         private void writeJsDoc(JsDoc JsDoc, int indentationLevel, bool newLine = false) {
             JsDoc = JsDoc.WhereKVP((key, value) => !key.IsNullOrEmpty() || !value.IsNullOrEmpty()).SelectMany(kvp => {
-                var valueLines = kvp.Value.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                var valueLines = kvp.Value.Split(new[] { '\n', '\r' });
                 var key = kvp.Key;
-                if (key=="description") { key = ""; }
-                if (!key.IsNullOrEmpty() && valueLines.Length>1) {
+                if (key == "description") { key = ""; }
+                if (!key.IsNullOrEmpty() && valueLines.Length > 1) {
                     valueLines = new[] { valueLines.Joined(" ") };
                 }
 
-                return valueLines.SelectMany(line=> {
-                    if (line.Length<=150) { return new[] { KVP(key, line) }; }
+                return valueLines.SelectMany(line => {
+                    if (line.Length <= 150) { return new[] { KVP(key, line) }; }
                     if (!key.IsNullOrEmpty()) {
                         Debug.Print($"Unhandled long line in JSDoc non-description tag {key}");
                         return new[] { KVP(key, line.Substring(0, 145)) };
@@ -70,7 +70,7 @@ namespace TsActivexGen {
             $"const enum {name} {{".AppendLineTo(sb, indentationLevel);
             foreach (var (memberName, memberDescription) in members) {
                 writeJsDoc(memberDescription.JsDoc, indentationLevel + 1);
-                $"{memberName} = {memberDescription.Value},".AppendLineTo(sb, indentationLevel+1);
+                $"{memberName} = {memberDescription.Value},".AppendLineTo(sb, indentationLevel + 1);
             }
             "}".AppendWithNewSection(sb, indentationLevel);
         }
@@ -123,25 +123,6 @@ namespace TsActivexGen {
             $"type {SplitName(x.Key).name} = {GetTypeString(x.Value.TargetType, ns)};".AppendWithNewSection(sb, indentationLevel);
         }
 
-        private void writeNominalType(string typename) {
-            var x = ParseTypeName(typename);
-            switch (x) {
-                case TSSimpleType simpleType:
-                    $"declare class {simpleType.FullName} {{".AppendLineTo(sb);
-                    $"private typekey: {simpleType.FullName};".AppendLineTo(sb, 1); //we can hardcode the indentation level here, because currently nominal types exist at the root level only
-                    "}".AppendWithNewSection(sb);
-                    break;
-                case TSGenericType genericType: //this handles up to 7 generic type parameters -- T-Z
-                    var parameterNames = genericType.Parameters.Select((t, index) => $"{(char)(84 + index)}");
-                    $"declare class {genericType.Name}<{parameterNames.Joined(",", y=>$"{y} = any")}> {{".AppendLineTo(sb);
-                    $"private typekey: {genericType.Name}<{parameterNames.Joined()}>;".AppendLineTo(sb, 1); //we can hardcode the indentation level here, because currently nominal types exist at the root level only
-                    "}".AppendWithNewSection(sb);
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
-        }
-
         private void writeNamespace(KeyValuePair<string, TSNamespaceDescription> x, string ns, int indentationLevel) {
             var nsDescription = x.Value;
             if (nsDescription.IsEmpty) { return; }
@@ -169,15 +150,32 @@ namespace TsActivexGen {
             "}".AppendWithNewSection(sb, indentationLevel);
         }
 
+        private void writeNominalType(string typename, StringBuilder sb) {
+            var x = ParseTypeName(typename);
+            switch (x) {
+                case TSSimpleType simpleType:
+                    $"declare class {simpleType.FullName} {{".AppendLineTo(sb);
+                    $"private typekey: {simpleType.FullName};".AppendLineTo(sb, 1); //we can hardcode the indentation level here, because currently nominal types exist at the root level only
+                    "}".AppendWithNewSection(sb);
+                    break;
+                case TSGenericType genericType: //this handles up to 7 generic type parameters -- T-Z
+                    var parameterNames = genericType.Parameters.Select((t, index) => $"{(char)(84 + index)}");
+                    $"declare class {genericType.Name}<{parameterNames.Joined(",", y => $"{y} = any")}> {{".AppendLineTo(sb);
+                    $"private typekey: {genericType.Name}<{parameterNames.Joined()}>;".AppendLineTo(sb, 1); //we can hardcode the indentation level here, because currently nominal types exist at the root level only
+                    "}".AppendWithNewSection(sb);
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
         private static Regex blankLineAtBlockEnd = new Regex(@"(}|;)(" + NewLine + @"){2}(?=\s*})");
-        private NamespaceOutput GetTypescript(KeyValuePair<string, TSRootNamespaceDescription> x) {
+        private KeyValuePair<string, NamespaceOutput> GetTypescript(KeyValuePair<string, TSRootNamespaceDescription> x) {
             var ns = x.Value;
 
             sb = new StringBuilder();
 
             x.Value.ConsolidateMembers();
-
-            ns.NominalTypes.ForEach(writeNominalType);
 
             writeNamespace(KVP<string, TSNamespaceDescription>(x.Key, x.Value), "", 0);
 
@@ -189,11 +187,8 @@ namespace TsActivexGen {
                 .Trim() + NewLine;
 
             var ret = new NamespaceOutput() {
-                MainFile = mainFile,
-                Description = ns.Description,
-                MajorVersion = ns.MajorVersion,
-                MinorVersion = ns.MinorVersion,
-                Dependencies = ns.Dependencies
+                LocalTypes = mainFile,
+                RootNamespace = ns
             };
 
             //Build the tests file
@@ -201,9 +196,22 @@ namespace TsActivexGen {
                 ret.TestsFile = y.Constructors.Joined(NewLine + NewLine, (z, index) => $"let obj{index} = new ActiveXObject({GetTypeString(z.Parameters[0].Value.Type, "")});") + NewLine;
             });
 
-            return ret;
+            //these have to be written separately, because if the final output is for a single file, these types cannot be repeated
+            var sbNominalTypes = new StringBuilder();
+            ns.NominalTypes.ForEach(y => writeNominalType(y, sbNominalTypes));
+            ret.NominalTypes = sbNominalTypes.ToString();
+
+            return KVP(x.Key, ret);
         }
 
-        public List<KeyValuePair<string, NamespaceOutput>> GetTypescript(TSNamespaceSet namespaceSet) => namespaceSet.Namespaces.Select(kvp => KVP(kvp.Key, GetTypescript(kvp))).ToList();
+        public List<KeyValuePair<string, NamespaceOutput>> GetTypescript(TSNamespaceSet namespaceSet) {
+            var ret = namespaceSet.Namespaces.Select(kvp => GetTypescript(kvp)).ToList();
+
+            var mergedNominalsBuilder = new StringBuilder();
+            var mergedNominals = namespaceSet.Namespaces.SelectMany(x => x.Value.NominalTypes).Distinct().ForEach(x => writeNominalType(x, sb));
+            ret.Values().ForEach(x => x.MergedNominalTypes = sb.ToString());
+
+            return ret;
+        }
     }
 }

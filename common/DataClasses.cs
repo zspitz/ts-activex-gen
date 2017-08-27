@@ -5,6 +5,7 @@ using static TsActivexGen.TSParameterType;
 using System.Diagnostics;
 using static TsActivexGen.Functions;
 using JsDoc = System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, string>>;
+using static System.Environment;
 
 namespace TsActivexGen {
     public abstract class EqualityBase<T> : IEquatable<T> where T : class {
@@ -192,8 +193,7 @@ namespace TsActivexGen {
             Constructors.RemoveMultipleAt(positionsToRemove);
 
 
-            List<int> ConsolidateGroup(IEnumerable<(TSMemberDescription member, int position)> grp)
-            {
+            List<int> ConsolidateGroup(IEnumerable<(TSMemberDescription member, int position)> grp) {
                 var ret = new List<int>();
                 var lst = grp.Reverse().ToList();
                 bool modified;
@@ -215,7 +215,7 @@ namespace TsActivexGen {
                 return ret;
             }
         }
-        
+
         //TODO if an interface extends other interfaces, it's considered not equal to any other interface; ideally equality would involve checking that the sum of all inherited members are equal
         public override bool Equals(TSInterfaceDescription other) => Extends.None() && Members.SequenceEqual(other.Members) && Constructors.SequenceEqual(other.Constructors);
 
@@ -283,7 +283,7 @@ namespace TsActivexGen {
                 next = new TSNamespaceDescription();
                 Namespaces.Add(parts[0], next);
             }
-            if (parts.Length==1) { return next; }
+            if (parts.Length == 1) { return next; }
             path = parts.Skip(1).Joined(".");
             return next.GetNamespace(path);
         }
@@ -344,11 +344,12 @@ namespace TsActivexGen {
     }
 
     public class NamespaceOutput {
-        public string Description { get; set; }
-        public int MajorVersion { get; set; }
-        public int MinorVersion { get; set; }
-        public string MainFile { get; set; }
-        public HashSet<string> Dependencies { get; set; }
+        public TSRootNamespaceDescription RootNamespace { get; set; }
+        public string NominalTypes { get; set; }
+        public string LocalTypes { get; set; }
+        public string MainFile => NominalTypes + LocalTypes;
         public string TestsFile { get; set; }
+        //TODO if there are other declarations that should not be repeated,they should also be removed from the LocalTypes property and placed in NominalTypes and MergedTypes properties (which would be named something else, of course)
+        public string MergedNominalTypes { get; set; } //same across NamespaceSet
     }
 }

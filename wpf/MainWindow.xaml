@@ -6,16 +6,6 @@
         <ToolTip x:Key="ttCreateTestFile">
             DefinitelyTyped requires a test file that uses the declarations. Check this box to create such a tests file.
         </ToolTip>
-        <Style TargetType="{x:Type ListBoxItem}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ListBoxItem}">
-                        <RadioButton Content="{TemplateBinding Content}" IsChecked="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=IsSelected}" />
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <my:ExistsConverter x:Key="ExistsConverter" />
         <s:Boolean x:Key="True">True</s:Boolean>
         <s:Boolean x:Key="False">False</s:Boolean>
     </Window.Resources>
@@ -85,10 +75,10 @@
                 <StackPanel Orientation="Vertical" DockPanel.Dock="Top" Margin="10">
                     <my:PathBrowser ToolTip="{StaticResource ttOutput}" Caption="Output folder" x:Name="brOutputFolder" Folders="True" />
                     <my:RadioButtonListBox x:Name="lbFilePerNamespace">
-                        <ListBoxItem IsSelected="True" Tag="{StaticResource True}">File per namespace</ListBoxItem>
+                        <ListBoxItem IsSelected="True" Tag="{StaticResource True}">Package/file per namespace</ListBoxItem>
                         <ListBoxItem Tag="{StaticResource False}">
                             <StackPanel>
-                                <TextBlock>Single file</TextBlock>
+                                <TextBlock>Single package/file</TextBlock>
                                 <ag:AutoGrid RowCount="2" ColumnCount="1" Columns="*,300">
                                     <Label Content="File base name" />
                                     <TextBox Tag="txbFileBaseName" Loaded="TextBox_Loaded" />
@@ -116,19 +106,13 @@
                 <DataGrid.Columns>
                     <DataGridCheckBoxColumn Binding="{Binding WriteOutput}" Header="Output" />
                     <DataGridTextColumn Binding="{Binding Name}" Header="Name" />
+                    <DataGridCheckBoxColumn Binding="{Binding IsActiveX}" Header="IsActvieX" />
                     <DataGridTextColumn Binding="{Binding FormattedName}" IsReadOnly="True" />
-                    <my:DataGridTextColumnExt Binding="{Binding Output.Description}" IsReadOnly="True" Header="Description" TextTrimming="CharacterEllipsis" />
+                    <my:DataGridTextColumnExt Binding="{Binding Description}" IsReadOnly="True" Header="Description" TextTrimming="CharacterEllipsis" />
                     <DataGridTextColumn Binding="{Binding LibraryUrl}" Header="Library URL" />
                     <DataGridTextColumn Binding="{Binding MajorVersion}" Header="Major" />
                     <DataGridTextColumn Binding="{Binding MinorVersion}" Header="Minor" />
-                    <DataGridCheckBoxColumn Header="Exists">
-                        <DataGridCheckBoxColumn.Binding>
-                            <MultiBinding Converter="{StaticResource ExistsConverter}" Mode="OneWay">
-                                <Binding />
-                                <Binding Path="SelectedValue" ElementName="lbPackageForDefinitelyTyped" />
-                            </MultiBinding>
-                        </DataGridCheckBoxColumn.Binding>
-                    </DataGridCheckBoxColumn>
+                    <DataGridCheckBoxColumn Header="Exists" Binding="{Binding Exists, Mode=OneWay}" />
                 </DataGrid.Columns>
             </DataGrid>
         </DockPanel>

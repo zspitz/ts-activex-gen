@@ -197,7 +197,6 @@ namespace TsActivexGen.idlbuilder {
             }
         }
 
-        //static Regex reNewLine = new Regex(@"(?:\r\n|\r|\n)\s*");
         private void buildJsDoc(XElement x, List<KeyValuePair<string, string>> dest) {
             var description = x.Elements("detaileddescription").SingleOrDefault();
             if (description == null) { return; }
@@ -212,6 +211,7 @@ namespace TsActivexGen.idlbuilder {
                     aggregateString += parts[i].value; //TODO what happens if there is a newline within the text? both for description tag and for other tagswritejsdoc
                     i++;
                 }
+                aggregateString = aggregateString.Replace("\n", "\n\n"); //single newlines are not rendered as newlines in JsDoc
                 dest.Add(currentTag, aggregateString.Trim());
             }
         }
@@ -383,13 +383,14 @@ namespace TsActivexGen.idlbuilder {
                     break;
 
                 case "variablelist":
-                    elem.Elements("varlistentry").SelectMany(x => parseDescriptionNode(x)).AddRangeTo(parts);
+                    elem.Elements("varlistentry").SelectMany(x => parseDescriptionNode(x, currentTag)).AddRangeTo(parts);
                     break;
                 case "varlistentry":
                     if (elem.NextNode is XElement elem1 && elem1.LocalName() != "listitem") { @throw("Unrecognized element after varlistentry"); }
                     addNodeResults("");
                     addInlineText(": ");
                     parseDescriptionNode(elem.NextNode).AddRangeTo(parts);
+                    if (multiline) { parts.Add("", "\n"); }
                     break;
 
                 case "verbatim":
