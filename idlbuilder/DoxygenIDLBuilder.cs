@@ -29,8 +29,6 @@ namespace TsActivexGen.idlbuilder {
 
         private Dictionary<string, string> refIDs;
 
-        private HashSet<string> services = new HashSet<string>();
-
         public TSNamespaceSet Generate() {
             var ret = new TSNamespaceSet();
 
@@ -94,14 +92,6 @@ namespace TsActivexGen.idlbuilder {
                 var @interface = new TSInterfaceDescription();
                 @interface.Constructors.Add(serviceManagerConstructor);
                 ret.Namespaces["com"].GlobalInterfaces["ActiveXObject"] = @interface;
-            }
-
-            var xmsf = ret.GetNamespace("com.sun.star.lang").Interfaces["com.sun.star.lang.XMultiServiceFactory"];
-            foreach (var serviceName in services) {
-                var overload = new TSMemberDescription();
-                overload.AddParameter("aServiceSpecifier", $"'{serviceName}'");
-                overload.ReturnType = (TSSimpleType)serviceName;
-                xmsf.Members.Add("createInstance", overload);
             }
 
             if (ret.GetUndefinedTypes().Any()) {
