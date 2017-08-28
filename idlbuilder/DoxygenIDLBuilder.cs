@@ -7,6 +7,7 @@ using static TsActivexGen.Functions;
 using static TsActivexGen.MiscExtensions;
 using static System.IO.Path;
 using System.Diagnostics;
+using static TsActivexGen.idlbuilder.Context;
 
 namespace TsActivexGen.idlbuilder {
     public class DoxygenIDLBuilder {
@@ -83,6 +84,13 @@ namespace TsActivexGen.idlbuilder {
             }
 
             ret.Namespaces.ForEachKVP((key, rootNs) => new[] { "type", "sequence<>" }.AddRangeTo(rootNs.NominalTypes));
+
+            if (context==Automation) {
+                var serviceManagerConstructor = new TSMemberDescription();
+                serviceManagerConstructor.ReturnType = (TSSimpleType)"com.sun.star.lang.ServiceManager";
+                serviceManagerConstructor.AddParameter("progid", "'com.sun.star.lang.ServiceManager'");
+                ret.Namespaces["com"].GlobalInterfaces["ActiveXObject"].Constructors.Add(serviceManagerConstructor);
+            }
 
             if (ret.GetUndefinedTypes().Any()) {
                 throw new Exception("Undefined types");
