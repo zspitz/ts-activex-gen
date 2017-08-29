@@ -112,6 +112,11 @@ namespace TsActivexGen {
 
             var extends = "";
             if (@interface.Extends.Any()) { extends = "extends " + @interface.Extends.Joined(", ", y => RelativeName(y, ns)) + " "; }
+
+            if (@interface.Members.None() && @interface.Constructors.None()) {
+                $"interface {name} {extends}{{ }}".AppendWithNewSection(sb, indentationLevel);
+                return;
+            }
             $"interface {name} {extends}{{".AppendLineTo(sb, indentationLevel);
             @interface.Members.OrderBy(y => y.Key).ThenBy(y => parametersString(y.Value)).ForEach(y => writeMember(y, ns, indentationLevel + 1));
             @interface.Constructors.OrderBy(parametersString).ForEach(y => writeConstructor(y, ns, indentationLevel + 1));
@@ -208,8 +213,8 @@ namespace TsActivexGen {
             var ret = namespaceSet.Namespaces.Select(kvp => GetTypescript(kvp)).ToList();
 
             var mergedNominalsBuilder = new StringBuilder();
-            var mergedNominals = namespaceSet.Namespaces.SelectMany(x => x.Value.NominalTypes).Distinct().ForEach(x => writeNominalType(x, sb));
-            ret.Values().ForEach(x => x.MergedNominalTypes = sb.ToString());
+            var mergedNominals = namespaceSet.Namespaces.SelectMany(x => x.Value.NominalTypes).Distinct().ForEach(x => writeNominalType(x, mergedNominalsBuilder));
+            ret.Values().ForEach(x => x.MergedNominalTypes = mergedNominalsBuilder.ToString());
 
             return ret;
         }
