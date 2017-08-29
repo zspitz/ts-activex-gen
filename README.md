@@ -94,7 +94,7 @@ NamespaceOutput output = builder.GetTypescript(nsset);
 string typescriptDefinitions = output.MainFile;
 ```
 Theoretically, definitions could be useful in three contexts:
-* JScript via Automation under WSH
+* JScript via Automation under WSH, or other environments supporting the use of the `ActiveXObject` constructor function
 * Javascript macros embedded in LibreOffice documents, or in the local LibreOffice instance
 * Document / application manipulation under NodeJS (I don't know if this is even possible)
 
