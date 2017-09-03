@@ -38,5 +38,6 @@ namespace TsActivexGen {
             }
             return ret;
         }
+        public static List<TKey> Keys<TKey, TElement>(this ILookup<TKey, TElement> lookup) => lookup.Select(grp => grp.Key).ToList();
     }
 }

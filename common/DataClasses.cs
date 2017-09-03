@@ -5,7 +5,8 @@ using static TsActivexGen.TSParameterType;
 using System.Diagnostics;
 using static TsActivexGen.Functions;
 using JsDoc = System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, string>>;
-using static System.Environment;
+using static System.Linq.Enumerable;
+using MoreLinq;
 
 namespace TsActivexGen {
     public abstract class EqualityBase<T> : IEquatable<T> where T : class {
@@ -70,7 +71,7 @@ namespace TsActivexGen {
         }
     }
 
-    public class TSMemberDescription : EqualityBase<TSMemberDescription> {
+    public class TSMemberDescription : EqualityBase<TSMemberDescription>, IClonable<TSMemberDescription> {
         public List<KeyValuePair<string, TSParameterDescription>> Parameters { get; set; } //(null means a property, empty means empty parameter list); this mut be a list, becaus parameter order is important
         public ITSType ReturnType { get; set; }
         public bool? ReadOnly { get; set; }
@@ -81,17 +82,17 @@ namespace TsActivexGen {
             Parameters.Add(name, new TSParameterDescription() { Type = type });
         }
         public void AddParameter(string name, TSSimpleType type) => AddParameter(name, (ITSType)type);
+        public void SetParameter(string name, TSSimpleType type) {
+            var indexOf = Parameters.IndexOf(KVP => KVP.Key == name);
+            Parameters[indexOf] = KVP(name, new TSParameterDescription() { Type = type });
+        }
 
         public override bool Equals(TSMemberDescription other) {
-            bool parameterEquality;
-            if ((Parameters == null) != (other.Parameters == null)) {
-                parameterEquality = false;
-            } else if (Parameters == null) {
-                parameterEquality = true;
-            } else {
-                parameterEquality = Parameters.SequenceEqual(other.Parameters);
-            }
-            return parameterEquality && ReadOnly == other.ReadOnly && ReturnType.Equals(other.ReturnType);
+            if (ReadOnly != other.ReadOnly) { return false; }
+            if (Parameters?.Count != other.Parameters?.Count) { return false; }
+            if (!ReturnType.Equals(other.ReturnType)) { return false; }
+            if (Parameters == null) { return true; }
+            return Parameters.SequenceEqual(other.Parameters);
         }
 
         public override int GetHashCode() {
@@ -111,19 +112,48 @@ namespace TsActivexGen {
         public IEnumerable<TSSimpleType> TypeParts() => Parameters.DefaultIfNull().Values().SelectMany(x => x.Type.TypeParts()).Concat(ReturnType.TypeParts());
 
         public bool TryFoldInto(TSMemberDescription destination) {
-            if (Parameters == null || destination.Parameters == null) { return false; } //property
-            if (!Equals(ReturnType, destination.ReturnType)) { return false; }
-            if (Parameters.Count != destination.Parameters.Count) { return false; }
-            if (!Parameters.Keys().SequenceEqual(destination.Parameters.Keys())) { return false; }
-            if (Parameters.Values().Any(x => x.ParameterType == Rest) || destination.Parameters.Values().Any(x => x.ParameterType == Rest)) { return false; }
+            if (!ReturnType.Equals(destination.ReturnType)) { return false; }
+            if (Parameters == null ^ destination.Parameters == null) { return false; } //one is a property, the other is not
 
-            var parameter1Type = Parameters.Get("obj")?.Type;
-            var destParameter1Type = destination.Parameters.Get("obj")?.Type;
-            var parameter2Type = Parameters.Get("event")?.Type;
-            var destParameter2Type = destination.Parameters.Get("event")?.Type;
-            if (parameter1Type != null && parameter1Type.Equals(destParameter1Type) && parameter2Type != null && parameter2Type.Equals(destParameter2Type)) {
-                Debugger.Break();
+            if (Parameters == null) { return true; }
+
+            var equalTypes = true;
+            var corresponding = Parameters.Zip(destination.Parameters, (sourceP, destP) => (sourceP: sourceP, destP: destP)).ToList();
+            if (!corresponding.All(x => {
+                var (name1, descr1) = x.sourceP;
+                var (name2, descr2) = x.destP;
+                if (name1 != name2) { return false; }
+                if (descr1.Type != descr2.Type) {
+                    equalTypes = false; //it may be possible to fold using union types
+                }
+                return true;
+            })) {
+                return false;
             }
+
+            if (equalTypes) { //if there is only one additional parameter, we can fold using optional (or a rest) parameter
+                var allPairs = Parameters.ZipLongest(destination.Parameters, (sourceP, destP) => (sourceP: sourceP, destP: destP)).ToList();
+                switch (allPairs.Count - corresponding.Count) {
+                    case var x when x > 1:
+                        return false;
+                    case 1:
+                        var extra = allPairs.Last();
+                        var (sourceName, sourceDescr) = extra.sourceP;
+                        var (destName, destDescr) = extra.destP;
+                        if (sourceName.IsNullOrEmpty()) { //extra parameter in destination
+                            if (destDescr.ParameterType == Standard) { destDescr.ParameterType = Optional; }
+                        } else { //extra parameter in source
+                            if (sourceDescr.ParameterType == Standard) { sourceDescr.ParameterType = Optional; }
+                            destination.Parameters.Add(sourceName, sourceDescr);
+                        }
+                        return true;
+                    case 0:
+                        return true;
+                }
+            }
+
+            // TODO it might be possible to fold a method with one differing type, and a rest parameter.
+            if (Parameters.Values().Any(x => x.ParameterType == Rest) || destination.Parameters.Values().Any(x => x.ParameterType == Rest)) { return false; }
 
             var foldableMethod = true;
             var unfoldableParameters = Parameters.Values().Zip(destination.Parameters.Values(), (sourceParam, destParam) => {
@@ -155,6 +185,16 @@ namespace TsActivexGen {
                     return true;
             }
         }
+
+        public TSMemberDescription Clone() {
+            var ret = new TSMemberDescription();
+            if (Parameters != null) {
+                ret.Parameters = Parameters.Select(x => x.Clone()).ToList();
+            }
+            ret.ReturnType = ReturnType.Clone();
+            ret.ReadOnly = ReadOnly;
+            return ret;
+        }
     }
 
     public class TSInterfaceDescription : EqualityBase<TSInterfaceDescription> {
@@ -168,13 +208,11 @@ namespace TsActivexGen {
             //consolidate members
             var membersLookup = Members.Select((kvp, index) => (key: kvp.Key, value: kvp.Value, position: index)).ToLookup(x => new {
                 name = x.key,
-                returnType = x.value.ReturnType,
-                parameterString = x.value.Parameters?.Keys().Joined()
+                returnType = x.value.ReturnType
             });
             var positionsToRemove = new List<int>();
             foreach (var grp in membersLookup) {
                 if (grp.Count() == 1) { continue; }
-                if (grp.Key.parameterString == null) { continue; } //ignore properties
                 ConsolidateGroup(grp.Select(x => (x.value, x.position))).AddRangeTo(positionsToRemove);
             }
             Members.RemoveMultipleAt(positionsToRemove);
@@ -187,7 +225,6 @@ namespace TsActivexGen {
             positionsToRemove = new List<int>();
             foreach (var grp in constructorsLookup) {
                 if (grp.Count() == 1) { continue; }
-                //constructors are always members, never properties; we don't have to check for null parameter collections
                 ConsolidateGroup(grp).AddRangeTo(positionsToRemove);
             }
             Constructors.RemoveMultipleAt(positionsToRemove);
@@ -216,6 +253,27 @@ namespace TsActivexGen {
             }
         }
 
+        //TODO what happens when it extends a generic interface?
+        //TODO what about other types?
+
+        public IEnumerable<(string interfaceName, string memberName, TSMemberDescription descr)> InheritedMembers(TSNamespaceSet nsset) {
+            var ret = new List<(string interfaceName, string memberName, TSMemberDescription descr)>();
+            foreach (var basename in Extends) {
+                var @base = nsset.FindTypeDescription(basename).description as TSInterfaceDescription;
+                if (@base == null) { continue; } //might be a type alias; see AddInterfaceTo method
+                var inheritedMembers = @base.InheritedMembers(nsset);
+                foreach (var inheritedMember in inheritedMembers) {
+                    if (@base.Members.Any(kvp => kvp.Key == inheritedMember.memberName && kvp.Value.Equals(inheritedMember.descr))) { continue; }
+                    ret.Add(inheritedMember);
+                }
+                foreach (var member in @base.Members) {
+                    ret.Add((basename, member.Key, member.Value));
+                }
+            }
+            return ret.Distinct().ToList();
+        }
+
+
         //TODO if an interface extends other interfaces, it's considered not equal to any other interface; ideally equality would involve checking that the sum of all inherited members are equal
         public override bool Equals(TSInterfaceDescription other) => Extends.None() && Members.SequenceEqual(other.Members) && Constructors.SequenceEqual(other.Constructors);
 
@@ -236,11 +294,11 @@ namespace TsActivexGen {
         public Dictionary<string, TSNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSNamespaceDescription>();
         public JsDoc JsDoc { get; } = new JsDoc();
 
-        protected virtual IEnumerable<TSInterfaceDescription> allInterfaces => Interfaces.Values;
+        public virtual IEnumerable<TSInterfaceDescription> AllInterfaces => Interfaces.Values;
 
         public HashSet<string> GetUsedTypes() {
             var types = new List<TSSimpleType>();
-            allInterfaces.SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).AddRangeTo(types);
+            AllInterfaces.SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).AddRangeTo(types);
             Aliases.SelectMany(x => x.Value.TargetType.TypeParts()).AddRangeTo(types);
             types.RemoveAll(x => x.IsLiteralType);
             var ret = types.Select(x => x.FullName).ToHashSet();
@@ -272,7 +330,7 @@ namespace TsActivexGen {
         }
 
         public void ConsolidateMembers() {
-            allInterfaces.ForEach(x => x.ConsolidateMembers());
+            AllInterfaces.ForEach(x => x.ConsolidateMembers());
             Namespaces.ForEachKVP((name, ns) => ns.ConsolidateMembers());
         }
 
@@ -288,7 +346,7 @@ namespace TsActivexGen {
             return next.GetNamespace(path);
         }
 
-        public bool IsEmpty => Enums.None() && allInterfaces.None() && Aliases.None() && (Namespaces.None() || Namespaces.All(x => x.Value.IsEmpty));
+        public bool IsEmpty => Enums.None() && AllInterfaces.None() && Aliases.None() && (Namespaces.None() || Namespaces.All(x => x.Value.IsEmpty));
     }
 
     public class TSAliasDescription : EqualityBase<TSAliasDescription> {
@@ -309,7 +367,7 @@ namespace TsActivexGen {
 
         public HashSet<string> NominalTypes { get; } = new HashSet<string>();
 
-        protected override IEnumerable<TSInterfaceDescription> allInterfaces => Interfaces.Values.Concat(GlobalInterfaces.Values);
+        public override IEnumerable<TSInterfaceDescription> AllInterfaces => Interfaces.Values.Concat(GlobalInterfaces.Values);
     }
 
     public class TSNamespaceSet {
@@ -321,6 +379,7 @@ namespace TsActivexGen {
             ret.ExceptWith(GetKnownTypes());
             return ret;
         }
+
         public TSNamespaceDescription GetNamespace(string path) {
             var (firstPart, rest) = FirstPathPart(path);
             if (!Namespaces.TryGetValue(firstPart, out var root)) {
@@ -329,6 +388,96 @@ namespace TsActivexGen {
             }
             return root.GetNamespace(rest);
         }
+
+        public (string resolvedNamespace, string resolvedName, object description) FindTypeDescription(string fullname) {
+            var (ns, name) = SplitName(fullname);
+
+            if (ns.IsNullOrEmpty()) {
+                foreach (var (rootNs, rootNsDescr) in Namespaces) {
+                    if (rootNsDescr.GlobalInterfaces.TryGetValue(name, out var @interface)) {
+                        return exitValue(@interface);
+                    }
+                    return exitValue(null);
+                }
+            }
+
+            var nsDescr = GetNamespace(ns);
+            if (nsDescr == null) { return exitValue(null); }
+
+            //HACK we should standardize on the full name or the single name as the alias key
+            if (nsDescr.Aliases.TryGetValue(fullname, out var aliasDescr) || nsDescr.Aliases.TryGetValue(name, out aliasDescr)) {
+                if (aliasDescr.TargetType is TSSimpleType t) { return FindTypeDescription(t.FullName); }
+                return exitValue(null);
+            }
+
+            //HACK we should standardize on the full name or the single name as the enum key
+            if (nsDescr.Enums.TryGetValue(fullname, out var enumDescr) || nsDescr.Enums.TryGetValue(name, out enumDescr)) { return exitValue(enumDescr); }
+
+            //interfaces are already standardized to use the full name
+            if (nsDescr.Interfaces.TryGetValue(fullname, out var interfaceDescr)) { return exitValue(interfaceDescr); }
+
+            return exitValue(null);
+
+            (string, string, object) exitValue(object ret) => (ns, name, ret);
+        }
+
+        // this should be on TSNamespaceSet, so that each type will only be processed once
+        public void FixBaseMemberConvlicts() {
+            var parsed = new HashSet<string>();
+
+            foreach (var ns in Namespaces) {
+                parseNamespace(ns.Value);
+            }
+
+            void parseNamespace(TSNamespaceDescription ns) {
+                foreach (var ns1 in ns.Namespaces) {
+                    parseNamespace(ns1.Value);
+                }
+                foreach (var kvp in ns.Interfaces) {
+                    fixInterface(kvp);
+                }
+                if (ns is TSRootNamespaceDescription rootNs) {
+                    foreach (var kvp in rootNs.GlobalInterfaces) {
+                        fixInterface(kvp);
+                    }
+                }
+            }
+            void fixInterface(KeyValuePair<string, TSInterfaceDescription> kvp) {
+                if (kvp.Value.Extends.None()) { return; }
+                if (parsed.Contains(kvp.Key)) { return; }
+
+                parsed.Add(kvp.Key);
+
+                foreach (var @baseName in kvp.Value.Extends) {
+                    var @interface = FindTypeDescription(baseName).description as TSInterfaceDescription;
+                    if (@interface == null) { continue; }
+                    fixInterface(KVP(baseName, @interface));
+                }
+
+                var members = kvp.AllMembers(this);
+                var lookup = members.ToLookup(x => x.memberName);
+                var addedMembers = false;
+                foreach (var grp in lookup) {
+                    var items = grp.Distinct().ToList();
+                    if (items.Count() == 1) { continue; }
+                    var signatures = items.ToLookup(x => x.descr);
+                    if (signatures.Count == 1) { continue; } // all methods have the same signature
+                    var found = false;
+                    foreach (var sourceInterface in items.Select(x => x.interfaceName).ToHashSet()) {
+                        if (signatures.All(signatureGroup => signatureGroup.Any(x => x.interfaceName == sourceInterface))) { //make sure all the signatures appear together in at least one interface
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) { continue; }
+                    signatures.Select(signatureGroup => KVP(grp.First().memberName, signatureGroup.Key.Clone())).AddRangeTo(kvp.Value.Members);
+                    addedMembers = true;
+                }
+                if (addedMembers) { kvp.Value.ConsolidateMembers(); }
+            }
+        }
+
+        public void ConsolidateMembers() => Namespaces.ForEachKVP((key, ns) => ns.ConsolidateMembers());
     }
 
     public class TSParameterListComparer : IEqualityComparer<List<KeyValuePair<string, TSParameterDescription>>> {

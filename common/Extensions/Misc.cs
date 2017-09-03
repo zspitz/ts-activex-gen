@@ -43,5 +43,24 @@ namespace TsActivexGen {
 
         public static void AddRangeTo(this IEnumerable<KeyValuePair<string,string>> toAdd, Dictionary<string, TSEnumValueDescription> dest) =>
             toAdd.SelectKVP((key, value) => KVP(key, new TSEnumValueDescription() { Value = value })).AddRangeTo(dest);
+
+        public static IEnumerable<(string interfaceName, string memberName, TSMemberDescription descr)> AllMembers(this KeyValuePair<string, TSInterfaceDescription> kvp, TSNamespaceSet nsset)  =>
+            kvp.Value.Members.Select(kvp1 => (kvp.Key, kvp1.Key, kvp1.Value))
+            .Concat(kvp.Value.InheritedMembers(nsset))
+            .ToList();
+
+        public static KeyValuePair<string, TSMemberDescription> Clone(this KeyValuePair<string, TSMemberDescription> kvp) {
+            var original = kvp.Value;
+            return KVP(kvp.Key, original.Clone());
+        }
+
+        public static KeyValuePair<string, TSParameterDescription> Clone(this KeyValuePair<string, TSParameterDescription> kvp) {
+            var original = kvp.Value;
+            var ret = new TSParameterDescription();
+            ret.ParameterType = original.ParameterType;
+            ret.Type = original.Type;
+            return KVP(kvp.Key, ret);
+        }
+
     }
 }

@@ -23,8 +23,6 @@ namespace TsActivexGen {
 
         public static void AddRangeTo<T>(this IEnumerable<T> src, ICollection<T> dest) => dest.AddRange(src);
 
-        public static void AddRange<T>(this ICollection<T> dest, IEnumerable<T> toAdd) => toAdd.ForEach(x => dest.Add(x));
-
         public static HashSet<T> ToHashSet<T>(this IEnumerable<T> src) => new HashSet<T>(src);
 
         public static IEnumerable<T> Ordered<T>(this IEnumerable<T> src) => src.OrderBy(x => x);
@@ -71,5 +69,17 @@ namespace TsActivexGen {
                 return ret;
             });
         }
+
+        public static int IndexOf<T>(this IEnumerable<T> src, Func<T, bool> predicate) => src.Select((x, i) => new { result = predicate(x), i }).FirstOrDefault(x => x.result)?.i ?? -1;
+
+        public static void InsertRangeTo<T>(this IEnumerable<T> src, int index, List<T> destination) => destination.InsertRange(index, src);
+
+        public static long Product<T>(this IEnumerable<T> src, Func<T, long> selector) {
+            unchecked {
+                return src.Aggregate((long)1, (prev, x) => prev * selector(x));
+            };
+        }
+
+        public static IEnumerable<(T1, T2)> Zip<T1, T2>(this IEnumerable<T1> first, IEnumerable<T2> second) => first.Zip(second, (a, b) => (a, b));
     }
 }

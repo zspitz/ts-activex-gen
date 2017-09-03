@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using static System.Linq.Enumerable;
 using System.Text.RegularExpressions;
 using System;
+using static TsActivexGen.Functions;
 
 namespace TsActivexGen {
     /// <summary>Describes namespace+name types, literal types, built-ins, and open generic types</summary>
@@ -24,7 +25,7 @@ namespace TsActivexGen {
                 return parts[0];
             }
         }
-        public bool IsLiteralType => Functions.IsLiteralTypeName(FullName);
+        public bool IsLiteralType => IsLiteralTypeName(FullName);
 
         public IEnumerable<TSSimpleType> TypeParts() => new[] { this };
         public bool Equals(ITSType other) => other is TSSimpleType x && FullName == x.FullName;
@@ -42,6 +43,10 @@ namespace TsActivexGen {
         public static implicit operator TSSimpleType(string s) => new TSSimpleType(s);
 
         public override string ToString() => FullName;
+
+        public ITSType Clone() => new TSSimpleType(FullName);
+
+        public override int GetHashCode() => FullName.GetHashCode();
     }
 
     public class TSTupleType : ITSType {
@@ -54,6 +59,20 @@ namespace TsActivexGen {
         public TSTupleType(IEnumerable<string> members) => Members = members.Select(x => new TSSimpleType(x)).Cast<ITSType>().ToList();
 
         public override string ToString() => "[" + Members.Joined(",") + "]";
+
+        public ITSType Clone() {
+            var ret = new TSTupleType();
+            Members.Select(x => x.Clone()).AddRangeTo(ret.Members);
+            return ret;
+        }
+
+        public override int GetHashCode() {
+            unchecked {
+                long hash = 17;
+                hash *= Members.Product(x => x.GetHashCode() * 486187739);
+                return (int)hash;
+            }
+        }
     }
 
     public class TSObjectType : ITSType {
@@ -67,6 +86,8 @@ namespace TsActivexGen {
         public TSObjectType(IEnumerable<KeyValuePair<string, (ITSType type, bool @readonly)>> members) => Members = members.ToDictionary();
 
         public override string ToString() => $"{Members.Keys.Joined(",", x => $".{x}")}";
+
+        public ITSType Clone() => new TSObjectType(Members.SelectKVP((key, value) => KVP(key, (value.type.Clone(), value.@readonly))));
     }
 
     public class TSFunctionType : ITSType {
@@ -78,6 +99,8 @@ namespace TsActivexGen {
         public TSFunctionType(TSMemberDescription fn) => FunctionDescription = fn;
 
         public override string ToString() => $"({FunctionDescription.Parameters.Keys().Joined(",")}) => {FunctionDescription.ReturnType}";
+
+        public ITSType Clone() => new TSFunctionType(FunctionDescription.Clone());
     }
 
     public class TSUnionType : ITSType {
@@ -96,6 +119,12 @@ namespace TsActivexGen {
         public IEnumerable<TSSimpleType> TypeParts() => Parts.SelectMany(x => x.TypeParts());
 
         public override string ToString() => Parts.Joined("|");
+
+        public ITSType Clone() {
+            var ret = new TSUnionType();
+            Parts.Select(x => x.Clone()).AddRangeTo(ret.Parts);
+            return ret;
+        }
     }
 
     public class TSPlaceholder : ITSType {
@@ -106,6 +135,8 @@ namespace TsActivexGen {
         public IEnumerable<TSSimpleType> TypeParts() => Empty<TSSimpleType>();
 
         public override string ToString() => Name;
+
+        public ITSType Clone() => new TSPlaceholder() { Name = Name };
     }
 
     public class TSGenericType : ITSType {
@@ -124,5 +155,11 @@ namespace TsActivexGen {
         public override string ToString() => $"{Name}<{Parameters.Joined(",", x => x is TSPlaceholder ? null : x?.ToString())}>";
 
         public TSSimpleType GenericDefinition => $"{Name}<{Parameters.Joined(",", x => "")}>";
+
+        public ITSType Clone() {
+            var ret = new TSGenericType() { Name = Name };
+            Parameters.Select(x => x.Clone()).AddRangeTo(ret.Parameters);
+            return ret;
+        }
     }
 }

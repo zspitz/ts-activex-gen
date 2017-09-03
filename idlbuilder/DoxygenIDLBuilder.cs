@@ -57,7 +57,6 @@ namespace TsActivexGen.idlbuilder {
                     case "service":
                     case "singleton":
                     case "struct":
-                        Debug.Print(x.path);
                         var kvp = parseCompound(compounddef);
                         (ns, _) = SplitName(kvp.Key);
                         kvp.AddInterfaceTo(ret.GetNamespace(ns));
@@ -95,13 +94,34 @@ namespace TsActivexGen.idlbuilder {
                 ret.Namespaces["com"].GlobalInterfaces["ActiveXObject"] = @interface;
             }
 
-            var xmsf = ret.GetNamespace("com.sun.star.lang").Interfaces["com.sun.star.lang.XMultiServiceFactory"];
+            var xmsf = ret.FindTypeDescription("com.sun.star.lang.XMultiServiceFactory").description as TSInterfaceDescription;
             foreach (var serviceName in services) {
                 var overload = new TSMemberDescription();
                 overload.AddParameter("aServiceSpecifier", $"'{serviceName}'");
                 overload.ReturnType = (TSSimpleType)serviceName;
                 xmsf.Members.Add("createInstance", overload);
             }
+
+            //add strongly typed overloads for loadComponentFromURL
+            var xcl = ret.FindTypeDescription("com.sun.star.frame.XComponentLoader").description as TSInterfaceDescription;
+            var loadComponentFromURL = xcl.Members.FirstOrDefault(x => x.Key == "loadComponentFromURL");
+            var insertPostion = xcl.Members.IndexOf(kvp => kvp.Key == "loadComponentFromURL");
+            new[] {
+                ("private:factory/swriter","com.sun.star.text.TextDocument"),
+                ("private:factory/scalc", "com.sun.star.sheet.SpreadsheetDocument"),
+                ("private:factory/sdraw", "com.sun.star.drawing.DrawingDocument"),
+                ("private:factory/simpress", "com.sun.star.presentation.PresentationDocument")
+            }.Select(x => {
+                var (url, returnTypeName) = x;
+                var (name, descr) = loadComponentFromURL.Clone();
+                descr.SetParameter("URL", $"'{url}'");
+                descr.ReturnType = (TSSimpleType)returnTypeName;
+                return KVP("loadComponentFromURL", descr);
+            }).InsertRangeTo(insertPostion, xcl.Members);
+
+            ret.FixBaseMemberConvlicts();
+
+            
 
             if (ret.GetUndefinedTypes().Any()) {
                 throw new Exception("Undefined types");
@@ -145,7 +165,7 @@ namespace TsActivexGen.idlbuilder {
         private KeyValuePair<string, TSInterfaceDescription> parseCompound(XElement x) {
             var fullName = x.Element("compoundname").Value.DeJavaName();
 
-            if (((string)x.Attribute("kind")).In("service","singleton")) { services.Add(fullName); }
+            if ((string)x.Attribute("kind") == "service") { services.Add(fullName); }
 
             var ret = new TSInterfaceDescription();
 
