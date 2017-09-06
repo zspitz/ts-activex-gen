@@ -29,6 +29,7 @@ namespace TsActivexGen.idlbuilder {
 
         private Dictionary<string, string> refIDs;
         private HashSet<string> services = new HashSet<string>();
+        private HashSet<string> singletons = new HashSet<string>();
 
         public TSNamespaceSet Generate() {
             var ret = new TSNamespaceSet();
@@ -83,24 +84,11 @@ namespace TsActivexGen.idlbuilder {
                 }
             }
 
-            ret.Namespaces.ForEachKVP((key, rootNs) => new[] { "type", "sequence<>" }.AddRangeTo(rootNs.NominalTypes));
+            var sequenceEquivalents = new List<string>() { "type", "sequence<>" };
+            if (context == Automation) { sequenceEquivalents.Add("SafeArray<>"); }
+            ret.Namespaces.ForEachKVP((key, rootNs) => sequenceEquivalents.AddRangeTo(rootNs.NominalTypes));
 
-            if (context == Automation) {
-                var serviceManagerConstructor = new TSMemberDescription();
-                serviceManagerConstructor.ReturnType = (TSSimpleType)"com.sun.star.lang.ServiceManager";
-                serviceManagerConstructor.AddParameter("progid", "'com.sun.star.ServiceManager'");
-                var @interface = new TSInterfaceDescription();
-                @interface.Constructors.Add(serviceManagerConstructor);
-                ret.Namespaces["com"].GlobalInterfaces["ActiveXObject"] = @interface;
-            }
 
-            var xmsf = ret.FindTypeDescription("com.sun.star.lang.XMultiServiceFactory").description as TSInterfaceDescription;
-            foreach (var serviceName in services) {
-                var overload = new TSMemberDescription();
-                overload.AddParameter("aServiceSpecifier", $"'{serviceName}'");
-                overload.ReturnType = (TSSimpleType)serviceName;
-                xmsf.Members.Add("createInstance", overload);
-            }
 
             //add strongly typed overloads for loadComponentFromURL
             var xcl = ret.FindTypeDescription("com.sun.star.frame.XComponentLoader").description as TSInterfaceDescription;
@@ -119,9 +107,74 @@ namespace TsActivexGen.idlbuilder {
                 return KVP("loadComponentFromURL", descr);
             }).InsertRangeTo(insertPostion, xcl.Members);
 
-            ret.FixBaseMemberConvlicts();
 
-            
+
+            var loNamespace = ret.GetNamespace("LibreOffice") as TSRootNamespaceDescription;
+            loNamespace.JsDoc.Add("", "Helper types which are not part of the UNO API");
+
+            //build services map and overload
+            {
+                var servicesMapName = "LibreOffice.ServicesNameMap";
+                loNamespace.AddMapType(servicesMapName, services);
+
+                var xmsf = ret.FindTypeDescription("com.sun.star.lang.XMultiServiceFactory").description as TSInterfaceDescription;
+                var overload = new TSMemberDescription();
+                var placeholder = new TSPlaceholder() { Name = "K", Extends = new TSKeyOf() { Operand = (TSSimpleType)servicesMapName } };
+                overload.GenericParameters.Add(placeholder);
+                overload.AddParameter("aServiceSpecifier", placeholder);
+                overload.ReturnType = new TSLookup() { Type = (TSSimpleType)servicesMapName, Accessor = placeholder };
+                xmsf.Members.Add("createInstance", overload);
+            }
+
+            var singletonOverloads = new List<KeyValuePair<string, TSMemberDescription>>();
+            {
+                //overload for singleton access that takes any parameter
+                var overload = new TSMemberDescription();
+                overload.AddParameter("aName", "string");
+                overload.ReturnType = TSSimpleType.Any;
+                singletonOverloads.Add("getByName", overload);
+
+                //build the singleton name<->type mapping
+                var singletonMapName = "LibreOffice.SingletonsNameMap";
+                loNamespace.AddMapType(singletonMapName, singletons.Select(x => ($"/singleton/{x}", x)));
+
+                //create the overload that uses the mapping
+                overload = new TSMemberDescription();
+                var placeholder = new TSPlaceholder() { Name = "K", Extends = new TSKeyOf() { Operand = (TSSimpleType)singletonMapName } };
+                overload.GenericParameters.Add(placeholder);
+                overload.AddParameter("aName", placeholder);
+                overload.ReturnType = new TSLookup() { Type = (TSSimpleType)singletonMapName, Accessor = placeholder };
+                singletonOverloads.Add("getByName", overload);
+            }
+
+            if (context == Automation) {
+                //typed overloads for singleton access go on the script context, which is defined here
+                var automationContextName = "LibreOffice.AutomationScriptContext";
+                var automationContext = new TSInterfaceDescription();
+                automationContext.Extends.Add("com.sun.star.container.XNameAccess");
+                singletonOverloads.AddRangeTo(automationContext.Members);
+                loNamespace.Interfaces.Add(automationContextName, automationContext);
+
+                //enables access to the script context from the service manager
+                var defaultContextMember = new TSMemberDescription();
+                defaultContextMember.ReturnType = (TSSimpleType)automationContextName;
+                var serviceManagerName = "LibreOffice.AutomationServiceManager";
+                var serviceManagerInterface = new TSInterfaceDescription();
+                serviceManagerInterface.Extends.Add("com.sun.star.lang.ServiceManager");
+                serviceManagerInterface.Members.Add("defaultContext", defaultContextMember);
+                loNamespace.Interfaces.Add(serviceManagerName, serviceManagerInterface);
+
+                //adds the service manager entry point to the ActiveX interface
+                var serviceManagerConstructor = new TSMemberDescription();
+                serviceManagerConstructor.ReturnType = (TSSimpleType)serviceManagerName;
+                serviceManagerConstructor.AddParameter("progid", "'com.sun.star.ServiceManager'");
+                var @interface = new TSInterfaceDescription();
+                @interface.Constructors.Add(serviceManagerConstructor);
+                ret.Namespaces["com"].GlobalInterfaces["ActiveXObject"] = @interface;
+            }
+            //TODO if context is not Automation -- presumably Rhino.JS -- declare the XSCRIPTCONTEXT variable, with the singleton overloads
+
+            //ret.FixBaseMemberConvlicts();
 
             if (ret.GetUndefinedTypes().Any()) {
                 throw new Exception("Undefined types");
@@ -157,7 +210,7 @@ namespace TsActivexGen.idlbuilder {
         private KeyValuePair<string, TSAliasDescription> parseTypedef(XElement x, string ns) {
             var fullname = $"{ns}.{x.Element("name").Value}";
             var ret = new TSAliasDescription();
-            ret.TargetType = parseType(x);
+            ret.TargetType = parseType(x, null); //might be for a return type, might be for a parameter type
             buildJsDoc(x, ret.JsDoc);
             return KVP(fullname, ret);
         }
@@ -165,7 +218,14 @@ namespace TsActivexGen.idlbuilder {
         private KeyValuePair<string, TSInterfaceDescription> parseCompound(XElement x) {
             var fullName = x.Element("compoundname").Value.DeJavaName();
 
-            if ((string)x.Attribute("kind") == "service") { services.Add(fullName); }
+            switch ((string)x.Attribute("kind")) {
+                case "service":
+                    services.Add(fullName);
+                    break;
+                case "singleton":
+                    singletons.Add(fullName);
+                    break;
+            }
 
             var ret = new TSInterfaceDescription();
 
@@ -174,30 +234,29 @@ namespace TsActivexGen.idlbuilder {
             buildJsDoc(x, ret.JsDoc);
 
             // it is possible to have multiple sectiondefs
-            var sectiondef = x.Elements("sectiondef").Where(y => y.Attribute("kind").Value.In("public-func", "public-attr")).SingleOrDefault();
-            if (sectiondef != null) {
-                sectiondef.Elements("memberdef").Select(parseMember).AddRangeTo(ret.Members);
+            var sectiondef = x.Elements("sectiondef").Where(y => y.Attribute("kind").Value.In("public-func", "public-attrib"));
+            if (sectiondef.Any()) {
+                sectiondef.SelectMany(y => y.Elements("memberdef")).Select(parseMember).AddRangeTo(ret.Members);
             }
 
             return KVP(fullName, ret);
         }
 
+        HashSet<string> kinds = new HashSet<string>();
         private KeyValuePair<string, TSMemberDescription> parseMember(XElement x) {
+            var kind = (string)x.Attribute("kind");
             var ret = new TSMemberDescription();
             buildJsDoc(x, ret.JsDoc);
-
-            ret.ReturnType = parseType(x);
-
-            // are there never any properties?
-            ret.Parameters = x.Elements("param").Select(parseParameter).ToList();
-            // assuming there are no properties, there is never any readonly either
-
+            ret.ReturnType = parseType(x, true);
+            if (kind == "function") {
+                ret.Parameters = x.Elements("param").Select(parseParameter).ToList();
+            }
             return KVP(x.Element("name").Value, ret);
         }
 
         private KeyValuePair<string, TSParameterDescription> parseParameter(XElement x) {
             var ret = new TSParameterDescription();
-            ret.Type = parseType(x);
+            ret.Type = parseType(x, false);
 
             if (x.Element("attributes").Value.NotIn("[in]", "[out]", "[inout]")) { throw new NotImplementedException("Unknown parameter attribute"); }
 
@@ -214,10 +273,31 @@ namespace TsActivexGen.idlbuilder {
             return ret;
         });
 
-        private ITSType parseType(XElement x) {
+        private ITSType parseType(XElement x, bool? forReturn) {
+            Func<ITSType, ITSType> mapper = y => {
+                if (!(y is TSGenericType t) || t.Name != "sequence") { return y; }
+                if (forReturn ?? false) {
+                    if (context != Automation) { throw new NotImplementedException(); }
+                    var safearray = new TSGenericType() { Name = "SafeArray" };
+                    safearray.Parameters.Add(t.Parameters.Single());
+                    return safearray;
+                } else {
+                    var union = new TSUnionType();
+                    if (context != Automation) { throw new NotImplementedException(); }
+                    new[] { "sequence", "Array", "SafeArray" }.Select(z => {
+                        var generic = new TSGenericType() { Name = z };
+                        generic.Parameters.Add(t.Parameters.Single());
+                        return generic;
+                    }).AddRangeTo(union.Parts);
+                    return union;
+                }
+            };
+
             var type = x.Element("type");
             var name = type.Nodes().Joined("", nodeMapper);
-            return ParseTypeName(name, typeMapping);
+            var ret = ParseTypeName(name, typeMapping);
+            ret = MappedType(ret, mapper);
+            return ret;
 
             string nodeMapper(XNode node) {
                 string ret1;

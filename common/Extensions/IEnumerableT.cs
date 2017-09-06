@@ -81,5 +81,7 @@ namespace TsActivexGen {
         }
 
         public static IEnumerable<(T1, T2)> Zip<T1, T2>(this IEnumerable<T1> first, IEnumerable<T2> second) => first.Zip(second, (a, b) => (a, b));
+
+        public static bool All<T1, T2>(this IEnumerable<(T1, T2)> src, Func<T1, T2, bool> predicate) => src.All(x => predicate(x.Item1, x.Item2));
     }
 }

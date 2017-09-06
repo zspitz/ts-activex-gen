@@ -76,6 +76,7 @@ namespace TsActivexGen {
         public ITSType ReturnType { get; set; }
         public bool? ReadOnly { get; set; }
         public JsDoc JsDoc { get; } = new JsDoc();
+        public List<TSPlaceholder> GenericParameters { get;  } = new List<TSPlaceholder>();
 
         public void AddParameter(string name, ITSType type) {
             if (Parameters == null) { Parameters = new List<KeyValuePair<string, TSParameterDescription>>(); }
@@ -117,23 +118,14 @@ namespace TsActivexGen {
 
             if (Parameters == null) { return true; }
 
-            var equalTypes = true;
-            var corresponding = Parameters.Zip(destination.Parameters, (sourceP, destP) => (sourceP: sourceP, destP: destP)).ToList();
-            if (!corresponding.All(x => {
-                var (name1, descr1) = x.sourceP;
-                var (name2, descr2) = x.destP;
-                if (name1 != name2) { return false; }
-                if (descr1.Type != descr2.Type) {
-                    equalTypes = false; //it may be possible to fold using union types
-                }
-                return true;
-            })) {
-                return false;
-            }
+            var corresponding = Parameters.Zip(destination.Parameters).ToList();
+            var equalTypes = corresponding.All((sourceP, destP) => sourceP.Value.Type.Equals(destP.Value.Type));
 
             if (equalTypes) { //if there is only one additional parameter, we can fold using optional (or a rest) parameter
                 var allPairs = Parameters.ZipLongest(destination.Parameters, (sourceP, destP) => (sourceP: sourceP, destP: destP)).ToList();
                 switch (allPairs.Count - corresponding.Count) {
+                    case 0:
+                        return true;
                     case var x when x > 1:
                         return false;
                     case 1:
@@ -147,13 +139,17 @@ namespace TsActivexGen {
                             destination.Parameters.Add(sourceName, sourceDescr);
                         }
                         return true;
-                    case 0:
-                        return true;
                 }
             }
 
             // TODO it might be possible to fold a method with one differing type, and a rest parameter.
             if (Parameters.Values().Any(x => x.ParameterType == Rest) || destination.Parameters.Values().Any(x => x.ParameterType == Rest)) { return false; }
+
+            /*if (Parameters.Count != destination.Parameters.Count) {
+                return false;
+            } else if (Parameters.Values().SequenceEqual(destination.Parameters.Values())) {
+                return true;
+            }*/
 
             var foldableMethod = true;
             var unfoldableParameters = Parameters.Values().Zip(destination.Parameters.Values(), (sourceParam, destParam) => {
@@ -368,6 +364,17 @@ namespace TsActivexGen {
         public HashSet<string> NominalTypes { get; } = new HashSet<string>();
 
         public override IEnumerable<TSInterfaceDescription> AllInterfaces => Interfaces.Values.Concat(GlobalInterfaces.Values);
+
+        public void AddMapType(string name, IEnumerable<string> typenames) => AddMapType(name, typenames.Select(x => (x, x)));
+        public void AddMapType(string typename, IEnumerable<(string name, string returntypeName)> members) {
+            var ret = new TSInterfaceDescription();
+            members.Select(x => {
+                var member = new TSMemberDescription();
+                member.ReturnType = (TSSimpleType)x.returntypeName;
+                return KVP(x.name, member);
+            }).AddRangeTo(ret.Members);
+            Interfaces.Add(typename, ret);
+        }
     }
 
     public class TSNamespaceSet {
@@ -377,6 +384,8 @@ namespace TsActivexGen {
         public HashSet<string> GetUndefinedTypes() {
             var ret = GetUsedTypes();
             ret.ExceptWith(GetKnownTypes());
+            var singleCharTypes = ret.Where(x => x.Length == 1).ToList();
+            ret.ExceptWith(singleCharTypes); //HACK no other way to differentiate between sequence<bool> and sequence<T> 
             return ret;
         }
 
@@ -386,6 +395,7 @@ namespace TsActivexGen {
                 root = new TSRootNamespaceDescription();
                 Namespaces.Add(firstPart, root);
             }
+            if (rest.IsNullOrEmpty()) { return root; }
             return root.GetNamespace(rest);
         }
 

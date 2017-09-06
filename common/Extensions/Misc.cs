@@ -20,7 +20,7 @@ namespace TsActivexGen {
 
         public static void RemoveMultipleAt<T>(this List<T> lst, IEnumerable<int> positions) => positions.Distinct().OrderedDescending().ForEach(x => lst.RemoveAt(x));
 
-        public static readonly string[] builtins = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate" };
+        public static readonly string[] builtins = new[] { "any", "void", "boolean", "string", "number", "undefined", "null", "never", "VarDate", "Array<>" };
         public static bool IsLiteralType(this ITSType type) => type is TSSimpleType x && x.IsLiteralType;
         public static bool IsBuiltIn(this ITSType type) => type is TSSimpleType x && x.FullName.In(builtins);
 
@@ -61,6 +61,5 @@ namespace TsActivexGen {
             ret.Type = original.Type;
             return KVP(kvp.Key, ret);
         }
-
     }
 }

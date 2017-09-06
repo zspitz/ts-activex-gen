@@ -129,14 +129,18 @@ namespace TsActivexGen {
 
     public class TSPlaceholder : ITSType {
         public string Name { get; set; }
+        public ITSType Extends { get; set; }
 
-        public bool Equals(ITSType other) => other is TSPlaceholder x && x.Name == Name;
+        public bool Equals(ITSType other)  => other is TSPlaceholder x && x.Name == Name && ((x.Extends == null) == (Extends == null) && (x.Extends == null || x.Extends.Equals(Extends)));
 
-        public IEnumerable<TSSimpleType> TypeParts() => Empty<TSSimpleType>();
+        public IEnumerable<TSSimpleType> TypeParts() => WrappedSequence(Extends).Where(x=>x!=null).SelectMany(x=>x.TypeParts());
 
         public override string ToString() => Name;
 
-        public ITSType Clone() => new TSPlaceholder() { Name = Name };
+        public ITSType Clone() => new TSPlaceholder() { Name = Name, Extends = Extends?.Clone() };
+
+        public static implicit operator string(TSPlaceholder t) => t.Name;
+        public static implicit operator TSPlaceholder(string s) => new TSPlaceholder() { Name = s };
     }
 
     public class TSGenericType : ITSType {
@@ -161,5 +165,27 @@ namespace TsActivexGen {
             Parameters.Select(x => x.Clone()).AddRangeTo(ret.Parameters);
             return ret;
         }
+    }
+
+    public class TSKeyOf : ITSType {
+        public ITSType Operand { get; set; }
+
+        public IEnumerable<TSSimpleType> TypeParts() => Operand.TypeParts();
+
+        //HACK -- ideally we should check the shape of the operands
+        public bool Equals(ITSType other) => other is TSKeyOf x && x.Operand.Equals(Operand);
+
+        public ITSType Clone() => new TSKeyOf() { Operand = Operand.Clone() };
+    }
+
+    public class TSLookup:ITSType {
+        public ITSType Type { get; set; }
+        public string Accessor { get; set; }
+
+        public IEnumerable<TSSimpleType> TypeParts() => Empty<TSSimpleType>();
+
+        public bool Equals(ITSType other) => false;
+
+        public ITSType Clone() => new TSLookup() { Type = Type.Clone(), Accessor = Accessor };
     }
 }

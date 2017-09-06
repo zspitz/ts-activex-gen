@@ -79,6 +79,7 @@ namespace TsActivexGen {
             var returnType = GetTypeString(m.ReturnType, ns);
 
             string parameterList = "";
+            string genericParameters = "";
             if (m.Parameters != null) {
                 var parameters = m.Parameters.Select((kvp, index) => {
                     //ShDocVw has a Javascript keyword as one of the parameters
@@ -87,11 +88,17 @@ namespace TsActivexGen {
                     return KVP(parameterName, kvp.Value);
                 }).ToList();
                 parameterList = "(" + parameters.Joined(", ", y => GetParameterString(y, ns)) + ")";
+
+                if (m.GenericParameters?.Any() ?? false) {
+                    genericParameters = $"<{m.GenericParameters.Joined(",", x => GetTypeString(x, ns, true))}>";
+                }
             }
 
             writeJsDoc(m.JsDoc, indentationLevel, true);
 
-            $"{memberIdentifier}{parameterList}: {returnType};".AppendLineTo(sb, indentationLevel);
+            if (memberIdentifier.Contains(".")) { memberIdentifier = $"'{memberIdentifier}'"; }
+
+            $"{memberIdentifier}{genericParameters}{parameterList}: {returnType};".AppendLineTo(sb, indentationLevel);
         }
 
         private void writeMember(KeyValuePair<string, TSMemberDescription> x, string ns, int indentationLevel) {
@@ -118,7 +125,7 @@ namespace TsActivexGen {
                 return;
             }
             $"interface {name} {extends}{{".AppendLineTo(sb, indentationLevel);
-            @interface.Members.OrderBy(y => y.Key).ThenByDescending(y=>y.Value.Parameters?.Count ?? -1).ThenBy(y => parametersString(y.Value)).ForEach(y => writeMember(y, ns, indentationLevel + 1));
+            @interface.Members.OrderBy(y => y.Key).ThenByDescending(y => y.Value.Parameters?.Count ?? -1).ThenBy(y => parametersString(y.Value)).ForEach(y => writeMember(y, ns, indentationLevel + 1));
             @interface.Constructors.OrderBy(parametersString).ForEach(y => writeConstructor(y, ns, indentationLevel + 1));
             "}".AppendWithNewSection(sb, indentationLevel);
         }

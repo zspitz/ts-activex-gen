@@ -50,10 +50,13 @@ namespace TsActivexGen {
             }
         }
 
-        public static string GetTypeString(ITSType type, string ns) {
+        public static string GetTypeString(ITSType type, string ns, bool asConstraint = false) {
             string ret = null;
 
             switch (type) {
+                case TSSimpleType x when x.FullName == "Array":
+                    ret = "[]";
+                    break;
                 case TSSimpleType x:
                     ret = RelativeName(x.FullName, ns);
                     break;
@@ -61,7 +64,12 @@ namespace TsActivexGen {
                     ret = $"[{x.Members.Joined(", ", y => GetTypeString(y, ns))}]";
                     break;
                 case TSObjectType x:
-                    ret = $"{{{x.Members.JoinedKVP((key, val) => $"{(val.@readonly ? "readonly " : "")}{key}: {GetTypeString(val.type, ns)}", ", ")}}}";
+                    var joined = x.Members.JoinedKVP((key, val) => {
+                        var @readonly = val.@readonly ? "readonly " : "";
+                        if (key.Contains(".")) { key = $"'{key}'"; }
+                        return $"{@readonly}{key}: {GetTypeString(val.type, ns)}";
+                    },",");
+                    ret = $"{{{joined}}}";
                     break;
                 case TSFunctionType x:
                     ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => GetParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}";
@@ -69,8 +77,25 @@ namespace TsActivexGen {
                 case TSUnionType x:
                     ret = x.Parts.Select(y => GetTypeString(y, ns)).OrderBy(y => y).Joined(" | ");
                     break;
+                case TSGenericType x when x.Name == "Array" && x.Parameters.Count == 1 && x.Parameters.Single() is TSSimpleType:
+                    var prm = x.Parameters.Single();
+                    ret = $"{GetTypeString(prm, ns)}[]";
+                    break;
                 case TSGenericType x:
                     ret = $"{x.Name}<{x.Parameters.Joined(", ", y => GetTypeString(y, ns))}>";
+                    break;
+                case TSPlaceholder x:
+                    var extends = "";
+                    if (asConstraint && x.Extends != null) {
+                        extends = $" extends {GetTypeString(x.Extends, ns)}";
+                    }
+                    ret = $"{x.Name}{extends}";
+                    break;
+                case TSKeyOf x:
+                    ret = $"keyof {GetTypeString(x.Operand, ns)}";
+                    break;
+                case TSLookup x:
+                    ret = $"{GetTypeString(x.Type, ns)}[{x.Accessor}]";
                     break;
                 default:
                     if (type != null) { throw new NotImplementedException(); }
@@ -101,7 +126,7 @@ namespace TsActivexGen {
 
         //TODO currently handles generic and simple types, not other type combinations e.g. intersection, union types
         //TODO handle array types as well
-        public static ITSType ParseTypeName(string typename, Dictionary<string, ITSType> mapping=null) {
+        public static ITSType ParseTypeName(string typename, Dictionary<string, ITSType> mapping = null) {
             if (typename.IsNullOrEmpty()) { return TSSimpleType.Void; }
 
             var root = new SimpleTreeNode<ITSType>();
@@ -150,8 +175,7 @@ namespace TsActivexGen {
             root.Descendants().ForEach(fillNode);
             return root.Data;
 
-            void fillNode(SimpleTreeNode<ITSType> node)
-            {
+            void fillNode(SimpleTreeNode<ITSType> node) {
                 switch (node.Data) {
                     case TSSimpleType x:
                         break;
@@ -181,11 +205,55 @@ namespace TsActivexGen {
 
         private static Regex reHex = new Regex("(-)?(0x)?(.+)");
         public static long ParseNumber(string s) {
-            if (!s.ContainsAny('x','X','&')) { return long.Parse(s); }
+            if (!s.ContainsAny('x', 'X', '&')) { return long.Parse(s); }
             var groups = reHex.Match(s).Groups.Cast<Group>().ToList();
             var ret = long.Parse(groups[3].Value, HexNumber);
             if (groups[1].Success) { ret = -ret; }
             return ret;
         }
+
+        public static ITSType MappedType(ITSType t, Func<ITSType, ITSType> mapper) {
+            switch (t) {
+                case TSSimpleType x:
+                case TSPlaceholder y:
+                    break;
+
+                case TSGenericType x:
+                    for (int i = 0; i < x.Parameters.Count; i++) {
+                        x.Parameters[i] = mapper(x.Parameters[i]);
+                    }
+                    break;
+                case TSUnionType x:
+                    for (int i = 0; i < x.Parts.Count; i++) {
+                        var toAdd = x.Parts.Select(mapper).ToList();
+                        x.Parts.Clear();
+                        toAdd.AddRangeTo(x.Parts);
+                    }
+                    break;
+                case TSTupleType x:
+                    for (int i = 0; i < x.Members.Count; i++) {
+                        x.Members[i] = mapper(x.Members[i]);
+                    }
+                    break;
+                case TSObjectType x:
+                    x.Members.ForEachKVP((name, t2) => {
+                        x.Members[name] = (mapper(t2.type), t2.@readonly);
+                    });
+                    break;
+                case TSFunctionType x:
+                    var m = x.FunctionDescription;
+                    m.ReturnType = mapper(m.ReturnType);
+                    for (int i = 0; i < m.Parameters.Count; i++) {
+                        var (name, p) = m.Parameters[i];
+                        p.Type = mapper(p.Type);
+                    }
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+            return mapper(t);
+        }
+
+        public static IEnumerable<T> WrappedSequence<T>(T item) => Repeat(item, 1);
     }
 }
