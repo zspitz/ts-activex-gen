@@ -124,7 +124,7 @@ acquisition";
 
             void RunTests(IEnumerable<string> jsonPaths) =>
                 jsonPaths.ForEach(x => {
-                    RunCommandlineAsync($"tsc -p {x} && tslint -p {x}");
+                    RunCommandlineAsync($"tsc -p {x} && tslint --project {x} --type-check");
                 });
 
             btnTest.Click += (s, e) => RunTests(Directory.EnumerateFiles(brOutputFolder.Path, "tsconfig.json", SearchOption.AllDirectories));
