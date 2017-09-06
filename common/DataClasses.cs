@@ -83,7 +83,7 @@ namespace TsActivexGen {
             Parameters.Add(name, new TSParameterDescription() { Type = type });
         }
         public void AddParameter(string name, TSSimpleType type) => AddParameter(name, (ITSType)type);
-        public void SetParameter(string name, TSSimpleType type) {
+        public void SetParameter(string name, ITSType type) {
             var indexOf = Parameters.IndexOf(KVP => KVP.Key == name);
             Parameters[indexOf] = KVP(name, new TSParameterDescription() { Type = type });
         }

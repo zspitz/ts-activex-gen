@@ -88,8 +88,6 @@ namespace TsActivexGen.idlbuilder {
             if (context == Automation) { sequenceEquivalents.Add("SafeArray<>"); }
             ret.Namespaces.ForEachKVP((key, rootNs) => sequenceEquivalents.AddRangeTo(rootNs.NominalTypes));
 
-
-
             //add strongly typed overloads for loadComponentFromURL
             var xcl = ret.FindTypeDescription("com.sun.star.frame.XComponentLoader").description as TSInterfaceDescription;
             var loadComponentFromURL = xcl.Members.FirstOrDefault(x => x.Key == "loadComponentFromURL");
@@ -102,12 +100,10 @@ namespace TsActivexGen.idlbuilder {
             }.Select(x => {
                 var (url, returnTypeName) = x;
                 var (name, descr) = loadComponentFromURL.Clone();
-                descr.SetParameter("URL", $"'{url}'");
+                descr.SetParameter("URL", (TSSimpleType)$"'{url}'");
                 descr.ReturnType = (TSSimpleType)returnTypeName;
                 return KVP("loadComponentFromURL", descr);
             }).InsertRangeTo(insertPostion, xcl.Members);
-
-
 
             var loNamespace = ret.GetNamespace("LibreOffice") as TSRootNamespaceDescription;
             loNamespace.JsDoc.Add("", "Helper types which are not part of the UNO API");
@@ -122,8 +118,15 @@ namespace TsActivexGen.idlbuilder {
                 var placeholder = new TSPlaceholder() { Name = "K", Extends = new TSKeyOf() { Operand = (TSSimpleType)servicesMapName } };
                 overload.GenericParameters.Add(placeholder);
                 overload.AddParameter("aServiceSpecifier", placeholder);
-                overload.ReturnType = new TSLookup() { Type = (TSSimpleType)servicesMapName, Accessor = placeholder };
+                var lookup = new TSLookup() { Type = (TSSimpleType)servicesMapName, Accessor = placeholder };
+                overload.ReturnType = lookup;
                 xmsf.Members.Add("createInstance", overload);
+
+                overload = xmsf.Members.Get("createInstanceWithArguments").Clone();
+                overload.GenericParameters.Add(placeholder);
+                overload.SetParameter("ServiceSpecifier", placeholder);
+                overload.ReturnType = lookup;
+                xmsf.Members.Add("createInstanceWithArguments", overload);
             }
 
             var singletonOverloads = new List<KeyValuePair<string, TSMemberDescription>>();
@@ -237,6 +240,28 @@ namespace TsActivexGen.idlbuilder {
             var sectiondef = x.Elements("sectiondef").Where(y => y.Attribute("kind").Value.In("public-func", "public-attrib"));
             if (sectiondef.Any()) {
                 sectiondef.SelectMany(y => y.Elements("memberdef")).Select(parseMember).AddRangeTo(ret.Members);
+            }
+
+            if (context == Automation) {
+                //map pairs of getter/setter methods, or single getter methods, to properties
+                var setters = ret.Members.WhereKVP((name, descr) => name.StartsWith("set") && descr.Parameters?.Count == 1).ToDictionary();
+
+                ret.Members.WhereKVP((name, descr) => {
+                    if (!name.StartsWith("get")) { return false; }
+                    if (descr.Parameters == null || descr.Parameters.Any()) { return false; }
+                    return true;
+                }).SelectKVP((name, descr) => {
+                    var propertyName = name.Substring(3);
+                    if (setters.TryGetValue("set" + propertyName, out var setter)) {
+                        if (!setter.Parameters.First().Value.Type.Equals(descr.ReturnType)) { setter = null; }
+                    }
+                    var propertyDescription = new TSMemberDescription {
+                        ReadOnly = setter == null,
+                        ReturnType = descr.ReturnType
+                    };
+                    descr.JsDoc.AddRangeTo(propertyDescription.JsDoc);
+                    return KVP(propertyName, propertyDescription);
+                }).ToList().AddRangeTo(ret.Members);
             }
 
             return KVP(fullName, ret);
