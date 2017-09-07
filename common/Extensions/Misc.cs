@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using static TsActivexGen.Functions;
 
@@ -60,6 +61,13 @@ namespace TsActivexGen {
             ret.ParameterType = original.ParameterType;
             ret.Type = original.Type;
             return KVP(kvp.Key, ret);
+        }
+
+        public static void MakeNominal(this KeyValuePair<string, TSInterfaceDescription> kvp) {
+            //if not class, throw exception
+            //TODO what happens if there is already a public member named typekey?
+            //if there is no private member named typekey and returning the name of the class, create it
+            throw new NotImplementedException();
         }
     }
 }

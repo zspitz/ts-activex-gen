@@ -103,37 +103,41 @@ namespace TsActivexGen {
         public ITSType Clone() => new TSFunctionType(FunctionDescription.Clone());
     }
 
-    public class TSUnionType : ITSType {
+    public class TSComposedType : ITSType {
         public HashSet<ITSType> Parts { get; } = new HashSet<ITSType>();
+        public string Operator { get; }
 
         //TODO implement this as an operator overload on +=
         public void AddPart(ITSType part) {
-            if (part is TSUnionType x) {
+            if (part is TSComposedType x && Operator == x.Operator) {
                 x.Parts.AddRangeTo(Parts);
             } else {
                 Parts.Add(part);
             }
         }
 
-        public bool Equals(ITSType other) => other is TSUnionType x && Parts.SequenceEqual(x.Parts);
+        public bool Equals(ITSType other) => other is TSComposedType x && Operator == x.Operator && Parts.SequenceEqual(x.Parts);
         public IEnumerable<TSSimpleType> TypeParts() => Parts.SelectMany(x => x.TypeParts());
 
-        public override string ToString() => Parts.Joined("|");
+        public override string ToString() => Parts.Joined(Operator);
 
         public ITSType Clone() {
-            var ret = new TSUnionType();
+            var ret = new TSComposedType(Operator);
             Parts.Select(x => x.Clone()).AddRangeTo(ret.Parts);
             return ret;
         }
+
+        public TSComposedType(string operand = "|") => Operator = operand;
     }
 
     public class TSPlaceholder : ITSType {
         public string Name { get; set; }
         public ITSType Extends { get; set; }
+        public ITSType Default { get; set; } = TSSimpleType.Any;
 
-        public bool Equals(ITSType other)  => other is TSPlaceholder x && x.Name == Name && ((x.Extends == null) == (Extends == null) && (x.Extends == null || x.Extends.Equals(Extends)));
+        public bool Equals(ITSType other) => other is TSPlaceholder x && x.Name == Name && ((x.Extends == null) == (Extends == null) && (x.Extends == null || x.Extends.Equals(Extends)));
 
-        public IEnumerable<TSSimpleType> TypeParts() => WrappedSequence(Extends).Where(x=>x!=null).SelectMany(x=>x.TypeParts());
+        public IEnumerable<TSSimpleType> TypeParts() => WrappedSequence(Extends).Where(x => x != null).SelectMany(x => x.TypeParts());
 
         public override string ToString() => Name;
 
@@ -178,7 +182,7 @@ namespace TsActivexGen {
         public ITSType Clone() => new TSKeyOf() { Operand = Operand.Clone() };
     }
 
-    public class TSLookup:ITSType {
+    public class TSLookup : ITSType {
         public ITSType Type { get; set; }
         public string Accessor { get; set; }
 

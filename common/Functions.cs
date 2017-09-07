@@ -74,8 +74,8 @@ namespace TsActivexGen {
                 case TSFunctionType x:
                     ret = $"({x.FunctionDescription.Parameters.Joined(", ", y => GetParameterString(y, ns))}) => {GetTypeString(x.FunctionDescription.ReturnType, ns)}";
                     break;
-                case TSUnionType x:
-                    ret = x.Parts.Select(y => GetTypeString(y, ns)).OrderBy(y => y).Joined(" | ");
+                case TSComposedType x:
+                    ret = x.Parts.Select(y => GetTypeString(y, ns)).OrderBy(y => y).Joined($" {x.Operator} ");
                     break;
                 case TSGenericType x when x.Name == "Array" && x.Parameters.Count == 1 && x.Parameters.Single() is TSSimpleType:
                     var prm = x.Parameters.Single();
@@ -85,11 +85,13 @@ namespace TsActivexGen {
                     ret = $"{x.Name}<{x.Parameters.Joined(", ", y => GetTypeString(y, ns))}>";
                     break;
                 case TSPlaceholder x:
+                    var @default = "";
                     var extends = "";
-                    if (asConstraint && x.Extends != null) {
-                        extends = $" extends {GetTypeString(x.Extends, ns)}";
+                    if (asConstraint) {
+                        if (x.Default != null) { @default = $" = {GetTypeString(x.Default, ns)}"; }
+                        if (x.Extends != null) { extends = $" extends {GetTypeString(x.Extends, ns)}"; }
                     }
-                    ret = $"{x.Name}{extends}";
+                    ret = $"{x.Name}{extends}{@default}";
                     break;
                 case TSKeyOf x:
                     ret = $"keyof {GetTypeString(x.Operand, ns)}";
@@ -223,7 +225,7 @@ namespace TsActivexGen {
                         x.Parameters[i] = mapper(x.Parameters[i]);
                     }
                     break;
-                case TSUnionType x:
+                case TSComposedType x:
                     for (int i = 0; i < x.Parts.Count; i++) {
                         var toAdd = x.Parts.Select(mapper).ToList();
                         x.Parts.Clear();

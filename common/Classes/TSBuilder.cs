@@ -75,8 +75,8 @@ namespace TsActivexGen {
             "}".AppendWithNewSection(sb, indentationLevel);
         }
 
-        private void writeMemberBase(TSMemberDescription m, string ns, string memberIdentifier, int indentationLevel) {
-            var returnType = GetTypeString(m.ReturnType, ns);
+        private void writeMemberBase(TSMemberDescription m, string ns, string memberIdentifier, int indentationLevel, bool isClassConstructor = false) {
+            var returnType = isClassConstructor ? "" : $": {GetTypeString(m.ReturnType, ns)}";
 
             string parameterList = "";
             string genericParameters = "";
@@ -88,17 +88,20 @@ namespace TsActivexGen {
                     return KVP(parameterName, kvp.Value);
                 }).ToList();
                 parameterList = "(" + parameters.Joined(", ", y => GetParameterString(y, ns)) + ")";
+            }
 
-                if (m.GenericParameters?.Any() ?? false) {
-                    genericParameters = $"<{m.GenericParameters.Joined(",", x => GetTypeString(x, ns, true))}>";
-                }
+            if (m.GenericParameters?.Any() ?? false) {
+                if (m.Parameters == null) { throw new InvalidOperationException("Cannot have generic parameters on properties."); }
+                genericParameters = $"<{m.GenericParameters.Joined(",", x => GetTypeString(x, ns, true))}>";
             }
 
             writeJsDoc(m.JsDoc, indentationLevel, true);
 
             if (memberIdentifier.Contains(".")) { memberIdentifier = $"'{memberIdentifier}'"; }
 
-            $"{memberIdentifier}{genericParameters}{parameterList}: {returnType};".AppendLineTo(sb, indentationLevel);
+            var @private = m.Private ? "private " : "";
+
+            $"{@private}{memberIdentifier}{genericParameters}{parameterList}{returnType};".AppendLineTo(sb, indentationLevel);
         }
 
         private void writeMember(KeyValuePair<string, TSMemberDescription> x, string ns, int indentationLevel) {
@@ -107,7 +110,7 @@ namespace TsActivexGen {
             writeMemberBase(memberDescription, ns, $"{@readonly}{x.Key}", indentationLevel);
         }
 
-        private void writeConstructor(TSMemberDescription m, string ns, int indentationLevel) => writeMemberBase(m, ns, "new", indentationLevel);
+        private void writeInterfaceConstructor(TSMemberDescription m, string ns, int indentationLevel) => writeMemberBase(m, ns, "new", indentationLevel);
 
         /// <summary>Provides a simple way to order members by the set of parameters</summary>
         private string parametersString(TSMemberDescription m) => m.Parameters?.JoinedKVP((name, prm) => $"{name}: {GetTypeString(prm.Type, "")}");
@@ -117,16 +120,27 @@ namespace TsActivexGen {
             var @interface = x.Value;
             writeJsDoc(@interface.JsDoc, indentationLevel);
 
+            var typeDefiner = @interface.IsClass ? "class" : "interface";
+
+            var genericParameters = "";
+            if (@interface.GenericParameters.Any()) { genericParameters = $"<{@interface.GenericParameters.Joined(",", y => GetTypeString(y, ns, true))}>"; }
+
             var extends = "";
             if (@interface.Extends.Any()) { extends = "extends " + @interface.Extends.Joined(", ", y => RelativeName(y, ns)) + " "; }
 
             if (@interface.Members.None() && @interface.Constructors.None()) {
-                $"interface {name} {extends}{{ }}".AppendWithNewSection(sb, indentationLevel);
+                $"{typeDefiner} {name}{genericParameters} {extends}{{ }}".AppendWithNewSection(sb, indentationLevel);
                 return;
             }
-            $"interface {name} {extends}{{".AppendLineTo(sb, indentationLevel);
+            $"{typeDefiner} {name}{genericParameters} {extends}{{".AppendLineTo(sb, indentationLevel);
             @interface.Members.OrderBy(y => y.Key).ThenByDescending(y => y.Value.Parameters?.Count ?? -1).ThenBy(y => parametersString(y.Value)).ForEach(y => writeMember(y, ns, indentationLevel + 1));
-            @interface.Constructors.OrderBy(parametersString).ForEach(y => writeConstructor(y, ns, indentationLevel + 1));
+            @interface.Constructors.OrderBy(parametersString).ForEach(m => {
+                if (@interface.IsClass) {
+                    writeMemberBase(m, ns, "constructor", indentationLevel + 1,true);
+                } else {
+                    writeMemberBase(m, ns, "new", indentationLevel+1);
+                }
+            });
             "}".AppendWithNewSection(sb, indentationLevel);
         }
 

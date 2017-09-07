@@ -57,11 +57,11 @@ namespace TsActivexGen {
         public static bool operator ==(TSParameterDescription x, TSParameterDescription y) => OperatorEquals(x, y);
         public static bool operator !=(TSParameterDescription x, TSParameterDescription y) => !OperatorEquals(x, y);
 
-        public void MergeTypeFrom(TSParameterDescription source) {
-            if (Type is TSUnionType x) {
+        public void MergeTypeFrom(TSParameterDescription source, string Operand) {
+            if (Type is TSComposedType x) {
                 x.AddPart(source.Type);
             } else if (Type != source.Type) {
-                var final = new TSUnionType();
+                var final = new TSComposedType(Operand);
                 final.AddPart(Type);
                 final.AddPart(source.Type);
                 if (final.Parts.Count > 1) {
@@ -76,7 +76,8 @@ namespace TsActivexGen {
         public ITSType ReturnType { get; set; }
         public bool? ReadOnly { get; set; }
         public JsDoc JsDoc { get; } = new JsDoc();
-        public List<TSPlaceholder> GenericParameters { get;  } = new List<TSPlaceholder>();
+        public List<TSPlaceholder> GenericParameters { get; } = new List<TSPlaceholder>();
+        public bool Private { get; set; }
 
         public void AddParameter(string name, ITSType type) {
             if (Parameters == null) { Parameters = new List<KeyValuePair<string, TSParameterDescription>>(); }
@@ -159,9 +160,9 @@ namespace TsActivexGen {
                     return null;
                 }
                 var alreadyIncludesType = false;
-                if (destParam.Type is TSUnionType x && sourceParam.Type is TSUnionType y) {
+                if (destParam.Type is TSComposedType x && sourceParam.Type is TSComposedType y) {
                     alreadyIncludesType = y.Parts.Except(x.Parts).None();
-                } else if (destParam.Type is TSUnionType x1) {
+                } else if (destParam.Type is TSComposedType x1) {
                     alreadyIncludesType = x1.Parts.Contains(sourceParam.Type);
                 } else {
                     alreadyIncludesType = destParam.Type.Equals(sourceParam.Type);
@@ -177,7 +178,7 @@ namespace TsActivexGen {
                     return false;
                 default: // 1
                     var details = unfoldableParameters[0];
-                    details.destParam.MergeTypeFrom(details.sourceParam);
+                    details.destParam.MergeTypeFrom(details.sourceParam, "|");
                     return true;
             }
         }
@@ -198,9 +199,10 @@ namespace TsActivexGen {
         public List<TSMemberDescription> Constructors { get; } = new List<TSMemberDescription>();
         public JsDoc JsDoc { get; } = new JsDoc();
         public HashSet<string> Extends { get; } = new HashSet<string>();
+        public bool IsClass { get; set; }
+        public List<TSPlaceholder> GenericParameters { get; } = new List<TSPlaceholder>();
 
         public void ConsolidateMembers() {
-
             //consolidate members
             var membersLookup = Members.Select((kvp, index) => (key: kvp.Key, value: kvp.Value, position: index)).ToLookup(x => new {
                 name = x.key,
@@ -249,12 +251,10 @@ namespace TsActivexGen {
             }
         }
 
-        //TODO what happens when it extends a generic interface?
-        //TODO what about other types?
-
         public IEnumerable<(string interfaceName, string memberName, TSMemberDescription descr)> InheritedMembers(TSNamespaceSet nsset) {
             var ret = new List<(string interfaceName, string memberName, TSMemberDescription descr)>();
             foreach (var basename in Extends) {
+                //TODO can we also make this work when it extends a generic interface? other types?
                 var @base = nsset.FindTypeDescription(basename).description as TSInterfaceDescription;
                 if (@base == null) { continue; } //might be a type alias; see AddInterfaceTo method
                 var inheritedMembers = @base.InheritedMembers(nsset);
@@ -276,10 +276,19 @@ namespace TsActivexGen {
         public override int GetHashCode() {
             unchecked {
                 int hash = 17;
-                hash = hash * 486187739 + Members.GetHashCode();
-                hash = hash * 486187739 + Constructors.GetHashCode();
+                hash = hash * 486187739 + (int)Members.Product(x => x.GetHashCode());
+                hash = hash * 486187739 + (int)Constructors.Product(x => x.GetHashCode());
+                if (Extends != null) { hash = hash * 486187739 + (int)Extends.Product(x => x.GetHashCode()); }
+                if (GenericParameters.Any()) { hash = hash * 486187739 + (int)GenericParameters.Product(x => x.GetHashCode()); }
                 return hash;
             }
+        }
+
+        public void MakeFinal() {
+            if (!IsClass) { throw new InvalidOperationException("Unable to make interface final"); }
+            if (Constructors.Any(x => x.Parameters.None())) { throw new InvalidOperationException("Adding a private constructor will not make this class final; there is already a public constructor."); }
+            if (Constructors.Any(x => x.Private && x.Parameters.None())) { return; }
+            Constructors.Add(new TSMemberDescription() { Parameters = new List<KeyValuePair<string, TSParameterDescription>>(), Private = true });
         }
     }
 
@@ -368,7 +377,7 @@ namespace TsActivexGen {
         public void AddMapType(string name, IEnumerable<string> typenames) => AddMapType(name, typenames.Select(x => (x, x)));
         public void AddMapType(string typename, IEnumerable<(string name, string returntypeName)> members) {
             var ret = new TSInterfaceDescription();
-            members.Select(x => {
+            members.Where(x=>!x.returntypeName.Contains("<")).Select(x => {
                 var member = new TSMemberDescription();
                 member.ReturnType = (TSSimpleType)x.returntypeName;
                 return KVP(x.name, member);
