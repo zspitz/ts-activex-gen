@@ -101,8 +101,10 @@ namespace TsActivexGen {
             unchecked {
                 int hash = 17;
                 hash = hash * 486187739 + ReturnType.GetHashCode();
-                foreach (var prm in Parameters) {
-                    hash = hash * 486187739 + prm.GetHashCode();
+                if (Parameters != null) {
+                    foreach (var prm in Parameters) {
+                        hash = hash * 486187739 + prm.GetHashCode();
+                    }
                 }
                 if (ReadOnly.HasValue) {
                     hash = hash * 486187739 + ReadOnly.GetHashCode();
@@ -190,6 +192,8 @@ namespace TsActivexGen {
             }
             ret.ReturnType = ReturnType.Clone();
             ret.ReadOnly = ReadOnly;
+            ret.Private = Private;
+            GenericParameters.AddRangeTo(ret.GenericParameters);
             return ret;
         }
     }
@@ -204,22 +208,16 @@ namespace TsActivexGen {
 
         public void ConsolidateMembers() {
             //consolidate members
-            var membersLookup = Members.Select((kvp, index) => (key: kvp.Key, value: kvp.Value, position: index)).ToLookup(x => new {
-                name = x.key,
-                returnType = x.value.ReturnType
-            });
+            var membersLookup = Members.Select((kvp, index) => (name: kvp.Key, description: kvp.Value, index)).ToLookup(x => (x.name, x.description.ReturnType));
             var positionsToRemove = new List<int>();
             foreach (var grp in membersLookup) {
                 if (grp.Count() == 1) { continue; }
-                ConsolidateGroup(grp.Select(x => (x.value, x.position))).AddRangeTo(positionsToRemove);
+                ConsolidateGroup(grp.Select(x => (x.description, x.index))).AddRangeTo(positionsToRemove);
             }
             Members.RemoveMultipleAt(positionsToRemove);
 
             //consolidate constructors
-            var constructorsLookup = Constructors.Select((ctor, index) => (ctor: ctor, position: index)).ToLookup(x => new {
-                returnType = x.ctor.ReturnType,
-                parameterString = x.ctor.Parameters?.Keys().Joined()
-            });
+            var constructorsLookup = Constructors.Select((ctor, index) => (ctor, index)).ToLookup(x => x.ctor.Parameters?.Keys().Joined());
             positionsToRemove = new List<int>();
             foreach (var grp in constructorsLookup) {
                 if (grp.Count() == 1) { continue; }
@@ -228,7 +226,7 @@ namespace TsActivexGen {
             Constructors.RemoveMultipleAt(positionsToRemove);
 
 
-            List<int> ConsolidateGroup(IEnumerable<(TSMemberDescription member, int position)> grp) {
+            List<int> ConsolidateGroup(IEnumerable<(TSMemberDescription member, int index)> grp) {
                 var ret = new List<int>();
                 var lst = grp.Reverse().ToList();
                 bool modified;
@@ -240,7 +238,7 @@ namespace TsActivexGen {
                             var dest = lst[j];
                             if (source.member.TryFoldInto(dest.member)) {
                                 modified = true;
-                                ret.Add(lst[i].position);
+                                ret.Add(lst[i].index);
                                 lst.RemoveAt(i);
                                 break;
                             }
@@ -311,15 +309,21 @@ namespace TsActivexGen {
             return ret;
         }
 
-        private static string nameParser(string typename) {
-            if ('<'.NotIn(typename)) { return typename; }
-            return (ParseTypeName(typename) as TSGenericType).GenericDefinition;
+        private static string[] nameParser(string typename) {
+            if ('<'.NotIn(typename)) { return new[] { typename }; }
+            var type = ParseTypeName(typename) as TSGenericType;
+            if (type.Parameters.Count==1 && type.Parameters[0] is TSPlaceholder prm && prm.Default != null) {
+                return new[] { type.GenericDefinition.FullName, (prm.Default as TSSimpleType).FullName, type.Name }; //HACK --  will fail if the default is not TSSimpleType
+            }
+            if (type.Parameters.OfType<TSPlaceholder>().Any(x => x.Default != null)) { throw new NotImplementedException(); }
+            
+            return new[] { type.GenericDefinition.FullName };
         }
         public HashSet<string> GetKnownTypes() {
             var ret = MiscExtensions.builtins.ToHashSet();
             Enums.Keys.AddRangeTo(ret);
-            Interfaces.Keys.Select(nameParser).AddRangeTo(ret);
-            Aliases.Keys.Select(nameParser).AddRangeTo(ret);
+            Interfaces.Keys.SelectMany(nameParser).AddRangeTo(ret);
+            Aliases.Keys.SelectMany(nameParser).AddRangeTo(ret);
             if (this is TSRootNamespaceDescription root) {
                 root.NominalTypes.AddRangeTo(ret);
             }
@@ -441,8 +445,9 @@ namespace TsActivexGen {
         }
 
         // this should be on TSNamespaceSet, so that each type will only be processed once
-        public void FixBaseMemberConvlicts() {
+        public void FixBaseMemberConflicts() {
             var parsed = new HashSet<string>();
+            var recursionDepth = 0;
 
             foreach (var ns in Namespaces) {
                 parseNamespace(ns.Value);
@@ -466,11 +471,14 @@ namespace TsActivexGen {
                 if (parsed.Contains(kvp.Key)) { return; }
 
                 parsed.Add(kvp.Key);
+                Debug.Print(Repeat("   ", recursionDepth).Joined("") + kvp.Key);
 
                 foreach (var @baseName in kvp.Value.Extends) {
                     var @interface = FindTypeDescription(baseName).description as TSInterfaceDescription;
                     if (@interface == null) { continue; }
+                    recursionDepth += 1;
                     fixInterface(KVP(baseName, @interface));
+                    recursionDepth -= 1;
                 }
 
                 var members = kvp.AllMembers(this);
@@ -489,7 +497,15 @@ namespace TsActivexGen {
                         }
                     }
                     if (found) { continue; }
-                    signatures.Select(signatureGroup => KVP(grp.First().memberName, signatureGroup.Key.Clone())).AddRangeTo(kvp.Value.Members);
+
+                    var toAddMultiple = signatures
+                        .Select(signatureGroup => KVP(grp.First().memberName, signatureGroup.Key.Clone()))
+                        .Where(x => kvp.Value.Members.None(y => x.Key==y.Key && x.Value.Equals(y.Value))).ToList();
+                    foreach (var item in toAddMultiple) {
+                        if (kvp.Value.Members.Any(x=>item.Key==x.Key && item.Value.Equals(x.Value))) { continue; }
+                        Debug.Print(Repeat("    ", recursionDepth+1).Joined("") + item.Key);
+                        kvp.Value.Members.Add(item);
+                    }
                     addedMembers = true;
                 }
                 if (addedMembers) { kvp.Value.ConsolidateMembers(); }

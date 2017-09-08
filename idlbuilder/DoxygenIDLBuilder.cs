@@ -32,6 +32,8 @@ namespace TsActivexGen.idlbuilder {
         private HashSet<string> singletons = new HashSet<string>();
         private HashSet<string> structs = new HashSet<string>();
 
+        private const string sequenceEquivalentName = "LibreOffice.SequenceEquivalent";
+
         public TSNamespaceSet Generate() {
             var ret = new TSNamespaceSet();
 
@@ -75,8 +77,10 @@ namespace TsActivexGen.idlbuilder {
                                 case "typedef":
                                     sectiondef.Elements("memberdef").Select(y => parseTypedef(y, ns)).AddRangeTo(nsDesc.Aliases);
                                     break;
+                                case "var":
+                                    parseConstantGroup(sectiondef, ns).AddTo(nsDesc.Enums);
+                                    break;
                             }
-
                         }
                         break;
 
@@ -85,9 +89,9 @@ namespace TsActivexGen.idlbuilder {
                 }
             }
 
-            var sequenceEquivalents = new List<string>() { "type", "sequence<>" };
-            if (context == Automation) { sequenceEquivalents.Add("SafeArray<>"); }
-            ret.Namespaces.ForEachKVP((key, rootNs) => sequenceEquivalents.AddRangeTo(rootNs.NominalTypes));
+            var nominals = new List<string>() { "type", "sequence<>" };
+            if (context == Automation) { nominals.Add("SafeArray<>"); }
+            ret.Namespaces.ForEachKVP((key, rootNs) => nominals.AddRangeTo(rootNs.NominalTypes));
 
             //add strongly typed overloads for loadComponentFromURL
             var xcl = ret.FindTypeDescription("com.sun.star.frame.XComponentLoader").description as TSInterfaceDescription;
@@ -108,6 +112,20 @@ namespace TsActivexGen.idlbuilder {
 
             var loNamespace = ret.GetNamespace("LibreOffice") as TSRootNamespaceDescription;
             loNamespace.JsDoc.Add("", "Helper types which are not part of the UNO API");
+
+            //create the LibreOffice SequenceEquivalent
+            {
+                var placeholder = new TSPlaceholder() { Name = "T", Default = null };
+                var equivalents = new List<string>() { "sequence", "Array" };
+                if (context == Automation) { equivalents.Add("SafeArray"); }
+                var targetType = new TSComposedType();
+                equivalents.Select(x => {
+                    var generic = new TSGenericType() { Name = x };
+                    generic.Parameters.Add(placeholder);
+                    return generic;
+                }).AddRangeTo(targetType.Parts);
+                loNamespace.Aliases.Add($"{sequenceEquivalentName}<T = any>", new TSAliasDescription() { TargetType = targetType });
+            }
 
             //build services map and overload
             var servicesMapName = "LibreOffice.ServicesNameMap";
@@ -210,7 +228,7 @@ namespace TsActivexGen.idlbuilder {
 
                 //add Bridge_GetStruct method, for returning structs
                 var getStruct = new TSMemberDescription();
-                var placeholder = new TSPlaceholder() { Name = "K", Extends = new TSKeyOf() { Operand = (TSSimpleType)structMapName} };
+                var placeholder = new TSPlaceholder() { Name = "K", Extends = new TSKeyOf() { Operand = (TSSimpleType)structMapName } };
                 getStruct.GenericParameters.Add(placeholder);
                 getStruct.AddParameter("structName", placeholder);
                 getStruct.ReturnType = new TSLookup() { Type = (TSSimpleType)structMapName, Accessor = placeholder };
@@ -225,7 +243,7 @@ namespace TsActivexGen.idlbuilder {
                 ret.Namespaces["com"].GlobalInterfaces["ActiveXObject"] = @interface;
             }
 
-            //ret.FixBaseMemberConvlicts();
+            ret.FixBaseMemberConflicts();
 
             if (ret.GetUndefinedTypes().Any()) {
                 throw new Exception("Undefined types");
@@ -249,13 +267,37 @@ namespace TsActivexGen.idlbuilder {
             var initializer = x.Element("initializer");
             if (initializer != null) {
                 var initializerValue = initializer.Value.TrimStart(' ', '=');
-                currentValue = ParseNumber(initializerValue);
+                currentValue = ParseLong(initializerValue);
             }
             var name = x.Element("name").Value;
             var ret = new TSEnumValueDescription() { Value = currentValue.ToString() };
             buildJsDoc(x, ret.JsDoc);
             currentValue += 1;
             return KVP(name, ret);
+        }
+
+        private KeyValuePair<string, TSEnumDescription> parseConstantGroup(XElement x, string ns) {
+            var fullname = $"{ns}.Constants";
+            var ret = new TSEnumDescription();
+
+            x.Elements("memberdef").Select(y => {
+                var name = (string)y.Element("name");
+                var enumVal = new TSEnumValueDescription();
+
+                var initializer = y.Element("initializer");
+                if (initializer==null) { throw new InvalidOperationException("Missing initializer for const value"); }
+                if (initializer.Elements().Any()) { return KVP("", ""); } //TODO get values that refer to other consts
+
+                var initializerValue = initializer.Value.TrimStart(' ', '=');
+                if (initializerValue.Contains("::")) { return KVP("", ""); } //TODO parse values that refer to other consts
+                var value = ParseDecimal(initializerValue);
+
+                buildJsDoc(y, enumVal.JsDoc);
+
+                return KVP(name, value.ToString());
+            }).WhereKVP((key,value) =>!key.IsNullOrEmpty()).AddRangeTo(ret.Members);
+
+            return KVP(fullname, ret);
         }
 
         private KeyValuePair<string, TSAliasDescription> parseTypedef(XElement x, string ns) {
@@ -287,11 +329,11 @@ namespace TsActivexGen.idlbuilder {
 
             buildJsDoc(x, ret.JsDoc);
 
-            // it is possible to have multiple sectiondefs
-            var sectiondef = x.Elements("sectiondef").Where(y => y.Attribute("kind").Value.In("public-func", "public-attrib"));
-            if (sectiondef.Any()) {
-                sectiondef.SelectMany(y => y.Elements("memberdef")).Select(parseMember).AddRangeTo(ret.Members);
-            }
+            x.Elements("sectiondef")
+                .Where(y => y.Attribute("kind").Value.In("public-func", "public-attrib"))
+                .SelectMany(y => y.Elements("memberdef"))
+                .Select(parseMember)
+                .AddRangeTo(ret.Members);
 
             if (context == Automation) {
                 //map pairs of getter/setter methods, or single getter methods, to properties
@@ -359,6 +401,11 @@ namespace TsActivexGen.idlbuilder {
         });
 
         private ITSType parseType(XElement x, bool? forReturn) {
+            bool isConstant = false;
+            return parseType(x, forReturn, ref isConstant);
+        }
+        private ITSType parseType(XElement x, bool? forReturn, ref bool isConstant) {
+            var isConstant1 = false; //cannot use ref parameters in local functions
             Func<ITSType, ITSType> mapper = y => {
                 if (!(y is TSGenericType t) || t.Name != "sequence") { return y; }
                 if (forReturn ?? false) {
@@ -367,14 +414,11 @@ namespace TsActivexGen.idlbuilder {
                     safearray.Parameters.Add(t.Parameters.Single());
                     return safearray;
                 } else {
-                    var union = new TSComposedType();
-                    if (context != Automation) { throw new NotImplementedException(); }
-                    new[] { "sequence", "Array", "SafeArray" }.Select(z => {
-                        var generic = new TSGenericType() { Name = z };
-                        generic.Parameters.Add(t.Parameters.Single());
-                        return generic;
-                    }).AddRangeTo(union.Parts);
-                    return union;
+                    var prm = t.Parameters.Single();
+                    if (prm.Equals(TSSimpleType.Any)) { return (TSSimpleType)sequenceEquivalentName; }
+                    var generic = new TSGenericType() { Name = "LibreOffice.SequenceEquivalent" };
+                    generic.Parameters.Add(t.Parameters.Single());
+                    return generic;
                 }
             };
 
@@ -382,6 +426,7 @@ namespace TsActivexGen.idlbuilder {
             var name = type.Nodes().Joined("", nodeMapper);
             var ret = ParseTypeName(name, typeMapping);
             ret = MappedType(ret, mapper);
+            isConstant = isConstant1;
             return ret;
 
             string nodeMapper(XNode node) {
@@ -389,6 +434,10 @@ namespace TsActivexGen.idlbuilder {
                 switch (node) {
                     case XText txt:
                         ret1 = txt.Value;
+                        if (ret1.StartsWith("const ")) {
+                            isConstant1 = true;
+                            ret1 = ret1.Substring(6);
+                        }
                         break;
                     case XElement elem when elem.Name == "ref":
                         if (!refIDs.TryGetValue(elem.Attribute("refid").Value, out ret1)) {
@@ -640,6 +689,10 @@ namespace TsActivexGen.idlbuilder {
                             }
                         }
                     }
+                    break;
+
+                case "deg":
+                    addInlineText(" degrees ");
                     break;
 
                 default:

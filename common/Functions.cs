@@ -163,10 +163,19 @@ namespace TsActivexGen {
                         currentNode = currentNode.AddChild((TSSimpleType)"");
                         break;
                     case '>':
-                        currentNode = currentNode.Parent;
+                        if (currentNode.Parent.Data is TSPlaceholder) {
+                            currentNode = currentNode.Parent.Parent;
+                        } else {
+                            currentNode = currentNode.Parent;
+                        }
                         break;
                     case ',':
                         currentNode = currentNode.AddSibling((TSSimpleType)"");
+                        break;
+                    case '=':
+                        var placeholder = new TSPlaceholder() { Name = (currentNode.Data as TSSimpleType).FullName };
+                        currentNode.Data = placeholder;
+                        currentNode = currentNode.AddChild((TSSimpleType)"");
                         break;
                     default:
                         throw new NotImplementedException();
@@ -183,6 +192,9 @@ namespace TsActivexGen {
                         break;
                     case TSGenericType x:
                         node.Children.Select(y => y.Data).AddRangeTo(x.Parameters);
+                        break;
+                    case TSPlaceholder x:
+                        x.Default = node.Children.Single().Data;
                         break;
                     default:
                         throw new NotImplementedException();
@@ -206,10 +218,24 @@ namespace TsActivexGen {
         }
 
         private static Regex reHex = new Regex("(-)?(0x)?(.+)");
-        public static long ParseNumber(string s) {
+        public static long ParseLong(string s) {
             if (!s.ContainsAny('x', 'X', '&')) { return long.Parse(s); }
+            if (s.Contains(".")) { throw new InvalidOperationException("Use parseDecimal"); }
             var groups = reHex.Match(s).Groups.Cast<Group>().ToList();
             var ret = long.Parse(groups[3].Value, HexNumber);
+            if (groups[1].Success) { ret = -ret; }
+            return ret;
+        }
+        public static decimal ParseDecimal(string s) {
+            if (!s.ContainsAny('x', 'X', '&')) { return decimal.Parse(s); }
+            var groups = reHex.Match(s).Groups.Cast<Group>().ToList();
+            decimal ret;
+            if (s.Contains(".")) {
+                if (groups[2].Success) { throw new InvalidOperationException("No hex together with decimal"); }
+                ret = decimal.Parse(groups[3].Value);
+            } else {
+                ret = long.Parse(groups[3].Value, HexNumber);
+            }
             if (groups[1].Success) { ret = -ret; }
             return ret;
         }
