@@ -21,6 +21,7 @@ namespace TsActivexGen.Wpf {
         public int MajorVersion { get; set; }
         public int MinorVersion { get; set; }
         public string LibraryUrl { get; set; }
+        public decimal? TypescriptVersion { get; set; }
 
         public bool IsActiveX { get; set; } = true;
         public string OutputFolderRoot { get; set; }
@@ -66,7 +67,7 @@ namespace TsActivexGen.Wpf {
             WritePackageFile("tsconfig.json", GetTsConfig(FormattedName), true);
 
             //create index.d.ts
-            var s1 = GetHeaders(Name, Description, LibraryUrl, authorName, authorUrl, MajorVersion, MinorVersion);
+            var s1 = GetHeaders(Name, Description, LibraryUrl, authorName, authorUrl, MajorVersion, MinorVersion, TypescriptVersion);
             if (NamespaceOutputs.Count ==1) { //TODO if there are multiple namespaces here, then we're assuming all the dependencies are in the same file
                 s1 += ReferenceDirectives(SingleOutput.RootNamespace.Dependencies);
                 s1 += SingleOutput.MainFile;

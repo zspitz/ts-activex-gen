@@ -209,6 +209,7 @@ namespace TsActivexGen.idlbuilder {
                 var returnType = new TSGenericType() { Name = xidlClassName };
                 returnType.Parameters.Add(new TSLookup() { Accessor = placeholder, Type = (TSSimpleType)instantiableMapName });
                 overload.ReturnType = returnType;
+                coreReflection.Members.Add("forName", overload);
             }
 
             if (context == Automation) {

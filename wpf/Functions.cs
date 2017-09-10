@@ -28,12 +28,13 @@ namespace TsActivexGen.Wpf {
     ]
 }".Trim();
 
-        public static string GetHeaders(string name, string description, string libraryUrl, string authorName, string authorUrl, int majorVerion, int minorVersion) {
+        public static string GetHeaders(string name, string description, string libraryUrl, string authorName, string authorUrl, int majorVerion, int minorVersion, decimal? TypescriptVersion=null) {
             var lines = new List<string>();
             $"// Type definitions for {new[] { description, name }.Where(x => !x.IsNullOrEmpty()).Joined(" - ")} {majorVerion}.{minorVersion}".AddTo(lines);
             if (!libraryUrl.IsNullOrEmpty()) { $"// Project: {libraryUrl}".AddTo(lines); }
             $"// Definitions by: {authorName} <{authorUrl}>".AddTo(lines);
             $"// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped".AddTo(lines);
+            if (TypescriptVersion.HasValue) { $"// TypeScript Version: {TypescriptVersion}".AddTo(lines); }
             return lines.Joined(NewLine) + NewLines(2);
         }
 
