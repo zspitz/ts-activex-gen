@@ -32,7 +32,7 @@ namespace TsActivexGen.idlbuilder {
         private HashSet<string> singletons = new HashSet<string>();
         private HashSet<string> structs = new HashSet<string>();
 
-        private const string sequenceEquivalentName = "LibreOffice.SequenceEquivalent";
+        private const string sequenceEquivalentName = "LibreOffice.SeqEquiv";
 
         public TSNamespaceSet Generate() {
             var ret = new TSNamespaceSet();
@@ -80,6 +80,8 @@ namespace TsActivexGen.idlbuilder {
                                 case "var":
                                     parseConstantGroup(sectiondef, ns).AddTo(nsDesc.Enums);
                                     break;
+                                default:
+                                    throw new NotImplementedException("Unrecognized sectiondef kind");
                             }
                         }
                         break;
@@ -241,15 +243,103 @@ namespace TsActivexGen.idlbuilder {
                 var @interface = new TSInterfaceDescription();
                 @interface.Constructors.Add(serviceManagerConstructor);
                 ret.Namespaces["com"].GlobalInterfaces["ActiveXObject"] = @interface;
+
+                //adds ValueObject interface -- https://wiki.openoffice.org/wiki/Documentation/DevGuide/ProUNO/Bridge/Value_Objects
+                {
+                    var unoTypes = new TSComposedType();
+                    new[] { "char", "boolean", "byte", "unsigned", "short", "unsigned short", "long", "unsigned long", "string", "float", "double", "any", "object" }
+                        .SelectMany(x => new [] { x, $"[]{x}", $"[][]{x}"})
+                        .Select(x =>  (TSSimpleType)$"'{x}'")
+                        .AddRangeTo(unoTypes.Parts);
+
+                    var valueObject = new TSInterfaceDescription();
+
+                    var mdescr= new TSMemberDescription();
+                    mdescr.JsDoc.Add("", "Assigns a type and a value");
+                    mdescr.ReturnType = TSSimpleType.Void;
+                    mdescr.AddParameter("type", unoTypes);
+                    mdescr.AddParameter("value", "any");
+                    valueObject.Members.Add("Set", mdescr);
+
+                    mdescr = new TSMemberDescription();
+                    mdescr.JsDoc.Add("", "Returns the value contained in the object, when the Value Object was used as an `inout` or `out` parameter");
+                    mdescr.ReturnType = TSSimpleType.Any;
+                    mdescr.Parameters = new List<KeyValuePair<string, TSParameterDescription>>();
+                    valueObject.Members.Add("Get", mdescr);
+
+                    mdescr = new TSMemberDescription();
+                    mdescr.JsDoc.Add("", "Initialize the object as an `out` parameter");
+                    mdescr.ReturnType = TSSimpleType.Void;
+                    mdescr.Parameters = new List<KeyValuePair<string, TSParameterDescription>>();
+                    valueObject.Members.Add("InitOutParam", mdescr);
+
+                    mdescr = new TSMemberDescription();
+                    mdescr.JsDoc.Add("", "Initialize the object as an `inout` parameter");
+                    mdescr.ReturnType = TSSimpleType.Void;
+                    mdescr.AddParameter("type", unoTypes);
+                    mdescr.AddParameter("value", "any");
+                    valueObject.Members.Add("InitInOutParam", mdescr);
+
+                    loNamespace.Interfaces.Add("ValueObject", valueObject);
+
+                    mdescr = new TSMemberDescription();
+                    mdescr.JsDoc.Add("", "Returns a Value Object, for explicitly specifying the types of values passed into the UNO API");
+                    mdescr.JsDoc.Add("", "Can also be used for `out` and `inout` parameters");
+                    mdescr.ReturnType = TSSimpleType.Void;
+                    mdescr.Parameters = new List<KeyValuePair<string, TSParameterDescription>>();
+                    serviceManagerInterface.Members.Add("Bridge_GetValueObject", mdescr);
+                }
             }
 
             ret.FixBaseMemberConflicts();
+
+            manualFixes(ret);
 
             if (ret.GetUndefinedTypes().Any()) {
                 throw new Exception("Undefined types");
             }
 
             return ret;
+        }
+
+        private void manualFixes(TSNamespaceSet ret) {
+            //this particular method is not getting forwarded in FixBaseMemberConflicts
+            {
+                var idescr = ret.FindTypeDescription("com.sun.star.lang.XSingleServiceFactory").description as TSInterfaceDescription;
+                var mdescr = idescr.Members.Get("createInstanceWithArguments").Clone();
+                idescr = ret.FindTypeDescription("com.sun.star.configuration.SimpleSetUpdate").description as TSInterfaceDescription;
+                idescr.Members.Add("createInstanceWithArguments", mdescr);
+
+                //TODO com.sun.star.configuration.SetUpdate has the same signature repeated twice
+                //      also com.sun.star.configuration.ConfigurationUpdateAccess, repeats four times
+
+                idescr = ret.FindTypeDescription("com.sun.star.configuration.SetUpdate").description as TSInterfaceDescription;
+                mdescr = mdescr.Clone();
+                idescr.Members.Add("createInstanceWithArguments", mdescr);
+
+                idescr = ret.FindTypeDescription("com.sun.star.configuration.ConfigurationUpdateAccess").description as TSInterfaceDescription;
+                mdescr = mdescr.Clone();
+                idescr.Members.Add("createInstanceWithArguments", mdescr);
+
+                idescr = ret.FindTypeDescription("com.sun.star.sdb.DocumentContainer").description as TSInterfaceDescription;
+                mdescr = mdescr.Clone();
+                idescr.Members.Add("createInstanceWithArguments", mdescr);
+            }
+
+            //remove the automation-generated Text property from com.sun.star.text.XTextRange; it conflicts with the Text attribute on com.sun.star.form.component.RichTextControl
+            {
+                var idescr = ret.FindTypeDescription("com.sun.star.text.XTextRange").description as TSInterfaceDescription;
+                var indexOf = idescr.Members.IndexOf(kvp => kvp.Key == "Text");
+                idescr.Members.RemoveAt(indexOf);
+            }
+
+            //auto-generated Model property conflicts bettween XTabController and XController in com.sun.star.sdb.DataSourceBrowser
+            {
+                var idescr = ret.FindTypeDescription("com.sun.star.awt.XTabController").description as TSInterfaceDescription;
+                var indexOf = idescr.Members.IndexOf(kvp => kvp.Key == "Model");
+                idescr.Members.RemoveAt(indexOf);
+            }
+
         }
 
         private KeyValuePair<string, TSEnumDescription> parseEnum(XElement x, string ns) {
@@ -416,7 +506,7 @@ namespace TsActivexGen.idlbuilder {
                 } else {
                     var prm = t.Parameters.Single();
                     if (prm.Equals(TSSimpleType.Any)) { return (TSSimpleType)sequenceEquivalentName; }
-                    var generic = new TSGenericType() { Name = "LibreOffice.SequenceEquivalent" };
+                    var generic = new TSGenericType() { Name = sequenceEquivalentName };
                     generic.Parameters.Add(t.Parameters.Single());
                     return generic;
                 }

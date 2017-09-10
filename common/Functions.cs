@@ -21,7 +21,7 @@ namespace TsActivexGen {
             }
 
             var (typeNamespace, typeOnly) = SplitName(absoluteType);
-            if (typeNamespace.Length == 0 || typeNamespace != withinNamespace) { return absoluteType; }
+            if (typeNamespace.Length == 0 || typeNamespace != withinNamespace || typeOnly=="Symbol") { return absoluteType; }  //TODO find out what other types trigger the tslint ban-types rule
             return typeOnly;
         }
         public static (string @namespace, string name) SplitName(string typename, string delimiter = ".") {
@@ -77,7 +77,7 @@ namespace TsActivexGen {
                 case TSComposedType x:
                     ret = x.Parts.Select(y => GetTypeString(y, ns)).OrderBy(y => y).Joined($" {x.Operator} ");
                     break;
-                case TSGenericType x when x.Name == "Array" && x.Parameters.Count == 1 && x.Parameters.Single() is TSSimpleType:
+                case TSGenericType x when x.Name == "Array" && x.Parameters.Count == 1 && (x.Parameters.Single() is TSSimpleType || x.Parameters.Single() is TSPlaceholder):
                     var prm = x.Parameters.Single();
                     ret = $"{GetTypeString(prm, ns)}[]";
                     break;

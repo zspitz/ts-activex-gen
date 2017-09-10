@@ -503,6 +503,7 @@ namespace TsActivexGen {
                         .Where(x => kvp.Value.Members.None(y => x.Key==y.Key && x.Value.Equals(y.Value))).ToList();
                     foreach (var item in toAddMultiple) {
                         if (kvp.Value.Members.Any(x=>item.Key==x.Key && item.Value.Equals(x.Value))) { continue; }
+                        if (item.Value.Parameters == null) { continue; } //there's no point in trying to copy properties down the inheritance chain; Typescript doesn't allow multiple overloads on properties
                         Debug.Print(Repeat("    ", recursionDepth+1).Joined("") + item.Key);
                         kvp.Value.Members.Add(item);
                     }

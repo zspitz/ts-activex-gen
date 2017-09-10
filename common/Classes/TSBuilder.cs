@@ -133,7 +133,13 @@ namespace TsActivexGen {
                 return;
             }
             $"{typeDefiner} {name}{genericParameters} {extends}{{".AppendLineTo(sb, indentationLevel);
-            @interface.Members.OrderBy(y => y.Key).ThenByDescending(y => y.Value.Parameters?.Count ?? -1).ThenBy(y => parametersString(y.Value)).ForEach(y => writeMember(y, ns, indentationLevel + 1));
+            @interface.Members
+                .OrderBy(y => y.Key)
+                .ThenByDescending(y => y.Value.Parameters?.Count ?? -1)
+                .ThenByDescending(y => y.Value.GenericParameters.Any())
+                .ThenBy(y => parametersString(y.Value))
+                .ForEach(y => writeMember(y, ns, indentationLevel + 1));
+
             @interface.Constructors.OrderBy(parametersString).ForEach(m => {
                 if (@interface.IsClass) {
                     writeMemberBase(m, ns, "constructor", indentationLevel + 1,true);
