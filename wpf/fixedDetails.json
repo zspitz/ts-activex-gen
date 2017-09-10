@@ -108,5 +108,10 @@
     "url": "https://msdn.microsoft.com/en-us/library/windows/desktop/ms630827(v=vs.85).aspx",
     "major": 2,
     "minor": 0
+  },
+  "libreoffice": {
+    "url": "https://api.libreoffice.org/",
+    "major": 5,
+    "minor": 3
   }
 }

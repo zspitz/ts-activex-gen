@@ -20,9 +20,12 @@ namespace TsActivexGen {
                 throw new NotImplementedException("Parse string as generic type");
             }
 
-            var (typeNamespace, typeOnly) = SplitName(absoluteType);
-            if (typeNamespace.Length == 0 || typeNamespace != withinNamespace || typeOnly=="Symbol") { return absoluteType; }  //TODO find out what other types trigger the tslint ban-types rule
-            return typeOnly;
+            var typeParts = absoluteType.Split('.');
+            if (typeParts.Length <= 1) { return absoluteType; }
+            var nsParts = withinNamespace.Split('.');
+            var finalParts = typeParts.SkipWhile((x, i) => i < nsParts.Length && x == nsParts[i]).ToList();
+            if (finalParts.Intersect(nsParts).Any()) { return absoluteType; }  //e.g. com.sun.star.inspection.XPropertyHandler within namespace com.sun.star.form.inspection, will otherwise resolve to form.inspection
+            return finalParts.Joined(".");
         }
         public static (string @namespace, string name) SplitName(string typename, string delimiter = ".") {
             if (IsLiteralTypeName(typename)) { return ("", typename); }

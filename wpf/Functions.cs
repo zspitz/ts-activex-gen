@@ -14,7 +14,6 @@ namespace TsActivexGen.Wpf {
         ""noImplicitAny"": true,
         ""noImplicitThis"": true,
         ""strictNullChecks"": true,
-        ""strict"": true,
         ""baseUrl"": ""../"",
         ""typeRoots"": [
             ""../""

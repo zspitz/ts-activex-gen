@@ -340,6 +340,13 @@ namespace TsActivexGen.idlbuilder {
                 idescr.Members.RemoveAt(indexOf);
             }
 
+            //resolve conflicts between com.sun.star.forms.FormControlModel (which has two overloads for getPropertyValues) and XMultiPropertySet (which has only one)
+            {
+                var getPropertyValues = (ret.FindTypeDescription("com.sun.star.form.FormControlModel").description as TSInterfaceDescription).Members.WhereKVP((name, descr) => name=="getPropertyValues").Values().ToList();
+                foreach (var idescr in ret.GetNamespace("com.sun.star.form.component").Interfaces.WhereKVP((name, descr) => name=="DatabaseImageControl" || (!name.Contains(".Bindable") && !name.Contains(".Database")))) {
+                    getPropertyValues.Select(x => KVP("getPropertyValues", x.Clone())).AddRangeTo(idescr.Value.Members);
+                }
+            }
         }
 
         private KeyValuePair<string, TSEnumDescription> parseEnum(XElement x, string ns) {
@@ -500,8 +507,10 @@ namespace TsActivexGen.idlbuilder {
                 if (!(y is TSGenericType t) || t.Name != "sequence") { return y; }
                 if (forReturn ?? false) {
                     if (context != Automation) { throw new NotImplementedException(); }
+                    var prm = t.Parameters.Single();
+                    if (prm.Equals(TSSimpleType.Any)) { return (TSSimpleType)"SafeArray"; }
                     var safearray = new TSGenericType() { Name = "SafeArray" };
-                    safearray.Parameters.Add(t.Parameters.Single());
+                    safearray.Parameters.Add(prm);
                     return safearray;
                 } else {
                     var prm = t.Parameters.Single();

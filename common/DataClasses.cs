@@ -325,7 +325,13 @@ namespace TsActivexGen {
             Interfaces.Keys.SelectMany(nameParser).AddRangeTo(ret);
             Aliases.Keys.SelectMany(nameParser).AddRangeTo(ret);
             if (this is TSRootNamespaceDescription root) {
-                root.NominalTypes.AddRangeTo(ret);
+                foreach (var n in root.NominalTypes) {
+                    ret.Add(n);
+                    if (!n.Contains("<")) { continue; }
+                    var generic = ParseTypeName(n) as TSGenericType;
+                    if (generic.Parameters.OfType<TSPlaceholder>().All(prm => prm.Default != null)) { ret.Add(generic.Name); }
+                }
+                //root.NominalTypes.AddRangeTo(ret);
             }
 
             Namespaces.Values().SelectMany(x => x.GetKnownTypes()).AddRangeTo(ret);
