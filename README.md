@@ -9,7 +9,7 @@ Optionally, definitions can be packaged for publication on DefinitelyTyped, as o
 
 ## Library
 
-The first step is to generate an instance of `TSNamespaceSet`, which is a data structure describing a set of TypeScript namespaces, interfaces, enums, and their members (see below).
+The first step is to generate a `TSNamespaceSet`, which is a data structure describing a set of TypeScript namespaces, interfaces, enums, and their members (see below on how to do this).
 ```csharp
 TSNamespaceSet nsset = ...
 ```
@@ -25,7 +25,7 @@ foreach (var x in output) {
 }
 ```
 
-### Generating a `TSNamespaceSet` for COM type libraries
+## Generating a `TSNamespaceSet` for COM type libraries
 
 To generate a` TSNamespaceSet` from a COM type library, use `TlbInf32Generator`:
 ```csharp
@@ -83,7 +83,7 @@ interface ActiveXObject {
     ...
 ```
 
-### Generating a `TSNamespace` for the LibreOffice API
+## Generating a `TSNamespace` for the LibreOffice API
 
 LibreOffice supports generating documentation using Doxygen, which provides an intermediate XML format. Using the outputted XML, the following is possible:
 ```csharp
@@ -101,3 +101,19 @@ Theoretically, definitions could be useful in three contexts:
 Each context has specific details of the available type mappings. For example, under Automation a method which expects the native `sequence<int>` can also take a `SafeArray<number>`; the Automation bridge is responsible for converting between the two types. However, in embedded Javascript macros, there is no concept of a `SafeArray<T>`, and therefore the definitions will be different.
 
 Currently only definitions for the Automation context are implemented.
+
+Changes to the object model under the Automation context include:
+
+- Parameters taking a `sequence<T>` can handle a `SafeArray<T>`
+-  Pairs of `get<X>`/`set<X>` methods are exposed as simple properties
+- The `ServiceManager` has some additional methods -- `Bridge_GetStruct`, `Bridge_GetValueObject`, `DefaultContext`
+
+All such changes are wrapped in a check for the current context:
+
+```csharp
+//create the LibreOffice SequenceEquivalent
+var equivalents = new List<string>() { "sequence", "Array" };
+if (context == Automation) { equivalents.Add("SafeArray"); }
+```
+
+so it will be relatively simple to reflect changes made in other contexts.
