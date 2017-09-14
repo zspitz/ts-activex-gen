@@ -5,15 +5,15 @@ using static TsActivexGen.Functions;
 
 namespace TsActivexGen {
     public static class MiscExtensions {
-        public static bool In<T>(this T val, IEnumerable<T> vals)  =>vals.Contains(val);
+        public static bool In<T>(this T val, IEnumerable<T> vals) => vals.Contains(val);
         public static bool In<T>(this T val, params T[] vals) => vals.Contains(val);
         public static bool In(this char c, string s) => s.IndexOf(c) > -1;
         public static bool NotIn<T>(this T val, IEnumerable<T> vals) => !vals.Contains(val);
         public static bool NotIn<T>(this T val, params T[] vals) => !vals.Contains(val);
         public static bool NotIn(this char c, string s) => s.IndexOf(c) == -1;
 
-        public static void Add<TKey,TValue>(this ICollection<KeyValuePair<TKey,TValue>> col, TKey key, TValue value) => col.Add(KVP(key, value));
-        public static void Add(this Dictionary<string, TSAliasDescription> dict, string key, TSSimpleType type, IEnumerable<KeyValuePair<string,string>> jsDoc = null) {
+        public static void Add<TKey, TValue>(this ICollection<KeyValuePair<TKey, TValue>> col, TKey key, TValue value) => col.Add(KVP(key, value));
+        public static void Add(this Dictionary<string, TSAliasDescription> dict, string key, TSSimpleType type, IEnumerable<KeyValuePair<string, string>> jsDoc = null) {
             var alias = new TSAliasDescription { TargetType = type };
             jsDoc?.AddRangeTo(alias.JsDoc);
             dict.Add(key, alias);
@@ -31,21 +31,21 @@ namespace TsActivexGen {
                 ns.Interfaces.Add(x);
             } else if (x.Value.Extends.Any()) {
                 ns.Aliases.Add(x.Key, x.Value.Extends.First(), x.Value.JsDoc);
-            } else { 
+            } else {
                 ns.Aliases.Add(x.Key, TSSimpleType.Any, x.Value.JsDoc);
             }
         }
         public static void AddInterfacesTo(this IEnumerable<KeyValuePair<string, TSInterfaceDescription>> src, TSRootNamespaceDescription ns) => src.ForEach(x => x.AddInterfaceTo(ns));
 
-        public static void Deconstruct<TKey,TValue>(this KeyValuePair<TKey,TValue> kvp, out TKey key, out TValue value) {
+        public static void Deconstruct<TKey, TValue>(this KeyValuePair<TKey, TValue> kvp, out TKey key, out TValue value) {
             key = kvp.Key;
             value = kvp.Value;
         }
 
-        public static void AddRangeTo(this IEnumerable<KeyValuePair<string,string>> toAdd, Dictionary<string, TSEnumValueDescription> dest) =>
+        public static void AddRangeTo(this IEnumerable<KeyValuePair<string, string>> toAdd, Dictionary<string, TSEnumValueDescription> dest) =>
             toAdd.SelectKVP((key, value) => KVP(key, new TSEnumValueDescription() { Value = value })).AddRangeTo(dest);
 
-        public static IEnumerable<(string interfaceName, string memberName, TSMemberDescription descr)> AllMembers(this KeyValuePair<string, TSInterfaceDescription> kvp, TSNamespaceSet nsset)  =>
+        public static IEnumerable<(string interfaceName, string memberName, TSMemberDescription descr)> AllMembers(this KeyValuePair<string, TSInterfaceDescription> kvp, TSNamespaceSet nsset) =>
             kvp.Value.Members.Select(kvp1 => (kvp.Key, kvp1.Key, kvp1.Value))
             .Concat(kvp.Value.InheritedMembers(nsset))
             .ToList();
@@ -64,10 +64,15 @@ namespace TsActivexGen {
         }
 
         public static void MakeNominal(this KeyValuePair<string, TSInterfaceDescription> kvp) {
-            //if not class, throw exception
-            //TODO what happens if there is already a public member named typekey?
-            //if there is no private member named typekey and returning the name of the class, create it
-            throw new NotImplementedException();
+            var (name, descr) = kvp;
+            if (!descr.IsClass) { throw new InvalidOperationException("Unable to make interface nominal"); }
+            var typekey = $"{name}_typekey";
+            var current = descr.Members.Get(typekey);
+            if (current != null) {
+                if (current.Private) { return; }
+                throw new InvalidOperationException("Already existing public member with typekey");
+            }
+            descr.Members.Add(typekey, new TSMemberDescription() { ReturnType = (TSSimpleType)name, Private = true });
         }
     }
 }

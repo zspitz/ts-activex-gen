@@ -71,7 +71,7 @@ namespace TsActivexGen {
                         var @readonly = val.@readonly ? "readonly " : "";
                         if (key.Contains(".")) { key = $"'{key}'"; }
                         return $"{@readonly}{key}: {GetTypeString(val.type, ns)}";
-                    },",");
+                    },", ");
                     ret = $"{{{joined}}}";
                     break;
                 case TSFunctionType x:

@@ -44,7 +44,7 @@ VT_ERROR	10
 VT_NULL	1
  */
 
-        private ITSType GetTypeName(VarTypeInfo vti, bool replaceVoidWithUndefined = false) {
+        private ITSType GetTypeName(VarTypeInfo vti, bool replaceVoidWithUndefined = false, bool isRest = false) {
             TSSimpleType ret;
             var splitValues = vti.VarType.SplitValues();
             if (splitValues.SequenceEqual(new[] { VT_EMPTY }) && vti.TypeInfo.TypeKind == TKIND_ALIAS && !vti.IsExternalType) {
@@ -73,7 +73,7 @@ VT_NULL	1
             }
             if (!isArray) { return ret; }
 
-            var safeArray = new TSGenericType() { Name = "SafeArray" };
+            var safeArray = new TSGenericType() { Name = isRest ? "Array" : "SafeArray" };
             safeArray.Parameters.Add(ret);
             return safeArray;
         }
@@ -88,7 +88,7 @@ VT_NULL	1
         private KeyValuePair<string, TSParameterDescription> ToTSParameterDescription(ParameterInfo p, bool isRest, List<KeyValuePair<string, string>> jsDoc) {
             var ret = new TSParameterDescription();
             var name = p.Name;
-            ret.Type = GetTypeName(p.VarTypeInfo, true);
+            ret.Type = GetTypeName(p.VarTypeInfo, true, isRest);
             if (isRest) {
                 ret.ParameterType = Rest;
             } else if (p.Optional || p.Default) {
@@ -194,7 +194,11 @@ VT_NULL	1
             GetMembers(m, ref enumerableType, typename).AddRangeTo(ret.Members);
             if (!enumerableType.IsNullOrEmpty()) { enumerableCollectionItemMapping[new TSSimpleType(typename)] = enumerableType; }
             ret.JsDoc.Add("", helpString);
-            return KVP(typename, ret);
+            ret.IsClass = true;
+            ret.MakeFinal();
+            var kvp = KVP(typename, ret);
+            kvp.MakeNominal();
+            return kvp;
         }
 
         private KeyValuePair<string, TSInterfaceDescription> ToTSInterfaceDescription(InterfaceInfo i) {
@@ -220,7 +224,7 @@ VT_NULL	1
 
         private TSMemberDescription ToActiveXObjectConstructorDescription(CoClassInfo c) {
             var progid = GetProgIDFromCLSID(c.GUID);
-            if (progid == null) { return null; }
+            if (progid == null) { throw new InvalidOperationException("Unable to find ProgID for CLSID"); }
             var ret = new TSMemberDescription();
             var typename = $"{c.Parent.Name}.{c.Name}";
             ret.AddParameter("progid", $"'{progid}'"); //note the string literal type
@@ -318,8 +322,19 @@ VT_NULL	1
             }
 
             var activex = new TSInterfaceDescription();
+            var progIDs = coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(c => (progid: GetProgIDFromCLSID(c.GUID), typename: $"{c.Parent.Name}.{c.Name}")).Where(x=>!x.progid.IsNullOrEmpty()).ToList();
+            if (progIDs.Any()) {
+                    var activexMapName = "ActiveXObjectNameMap";
+                    ret.AddMapType(activexMapName, progIDs);
 
-            coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(ToActiveXObjectConstructorDescription).Where(x => x != null).AddRangeTo(activex.Constructors);
+                    var descr = new TSMemberDescription();
+                    var placeholder = new TSPlaceholder() { Name = "K", Extends = new TSKeyOf() { Operand = (TSSimpleType)activexMapName } };
+                    descr.GenericParameters.Add(placeholder);
+                    descr.AddParameter("progid", placeholder);
+                    descr.ReturnType = new TSLookup() { Type = (TSSimpleType)activexMapName, Accessor = placeholder };
+                    activex.Constructors.Add(descr);
+                }
+
             var eventRegistrations = coclasses.Select(x => new {
                 coclass = x,
                 eventInterface = x.DefaultEventInterface
@@ -332,7 +347,7 @@ VT_NULL	1
                 var eventHelperTypesNamespace = new TSNamespaceDescription();
                 currentEventTypes.SelectKVP((key, value) => KVP($"{key}_ArgNames", value.argNamesType)).AddRangeTo(eventHelperTypesNamespace.Aliases);
                 currentEventTypes.SelectKVP((key, value) => KVP($"{key}_Parameter", value.parameterType)).AddRangeTo(eventHelperTypesNamespace.Interfaces);
-                ret.Namespaces.Add($"{@namespace}.EventHelperTypes", eventHelperTypesNamespace);
+                ret.Namespaces.Add("EventHelperTypes", eventHelperTypesNamespace);
             }
 
             parameterizedSetters.Where(x => x.objectType.Namespace == @namespace).ToLookup(x => x.Stringified).Select(grp => grp.First()).Select(x => KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
@@ -349,8 +364,17 @@ VT_NULL	1
                 ret.MinorVersion = tld.MinorVersion;
             }
 
-            ret.NominalTypes.Add("VarDate");
-            ret.NominalTypes.Add("SafeArray<>");
+            // pending https://github.com/Microsoft/TypeScript/issues/17526
+            // if this is accepted, we won't need to add SafeArray
+            {
+                var placeholder = new TSPlaceholder() { Name = "T", Default = TSSimpleType.Any };
+                var genericType = new TSGenericType() { Name = "SafeArray" };
+                genericType.Parameters.Add(placeholder);
+                var idesc = new TSInterfaceDescription();
+                idesc.GenericParameters.Add(placeholder);
+                idesc.Members.Add("_brand", new TSMemberDescription() { ReturnType = genericType });
+                ret.GlobalInterfaces.Add("SafeArray<>", idesc);
+            }
 
             return ret;
         }
@@ -490,7 +514,7 @@ VT_NULL	1
         }
 
         public void AddFromKeywords(IEnumerable<string> keywords) {
-            var toAdd = keywords.Select(keyword => {
+            var toAdd = keywords.Where(x => !x.Trim().IsNullOrEmpty()).Select(keyword => {
                 var matching = TypeLibDetails.FromRegistry.Value
                     .Where(x => x.Name?.Contains(keyword, InvariantCultureIgnoreCase) ?? false)
                     .OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).ThenBy(x => x.LCID)

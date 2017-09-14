@@ -75,11 +75,35 @@ namespace TsActivexGen {
             "}".AppendWithNewSection(sb, indentationLevel);
         }
 
-        private void writeMemberBase(TSMemberDescription m, string ns, string memberIdentifier, int indentationLevel, bool isClassConstructor = false) {
-            var returnType = isClassConstructor ? "" : $": {GetTypeString(m.ReturnType, ns)}";
+        private void writeMember(TSMemberDescription m, string ns, int indentationLevel, string memberName, bool isClass) {
+            bool isConstructor = memberName.IsNullOrEmpty();
+
+            writeJsDoc(m.JsDoc, indentationLevel, true);
+
+            string accessModifier = "";
+            if (m.Private) {
+                accessModifier = "private ";
+            } else if (isClass) {
+                accessModifier = "public ";
+            }
+
+            var @readonly = m.ReadOnly.GetValueOrDefault() ? "readonly " : "";
+
+            string memberIdentifier;
+            if (isConstructor) {
+                memberIdentifier = isClass ? "constructor" : "new";
+            } else {
+                memberIdentifier = memberName;
+                if (memberIdentifier.Contains(".")) { memberIdentifier = $"'{memberIdentifier}'"; }
+            }
+
+            string genericParameters = "";
+            if (m.GenericParameters?.Any() ?? false) {
+                if (m.Parameters == null) { throw new InvalidOperationException("Cannot have generic parameters on properties."); }
+                genericParameters = $"<{m.GenericParameters.Joined(",", x => GetTypeString(x, ns, true))}>";
+            }
 
             string parameterList = "";
-            string genericParameters = "";
             if (m.Parameters != null) {
                 var parameters = m.Parameters.Select((kvp, index) => {
                     //ShDocVw has a Javascript keyword as one of the parameters
@@ -90,33 +114,18 @@ namespace TsActivexGen {
                 parameterList = "(" + parameters.Joined(", ", y => GetParameterString(y, ns)) + ")";
             }
 
-            if (m.GenericParameters?.Any() ?? false) {
-                if (m.Parameters == null) { throw new InvalidOperationException("Cannot have generic parameters on properties."); }
-                genericParameters = $"<{m.GenericParameters.Joined(",", x => GetTypeString(x, ns, true))}>";
-            }
+            var returnType = isClass && isConstructor ? "" : $": {GetTypeString(m.ReturnType, ns)}";
 
-            writeJsDoc(m.JsDoc, indentationLevel, true);
-
-            if (memberIdentifier.Contains(".")) { memberIdentifier = $"'{memberIdentifier}'"; }
-
-            var @private = m.Private ? "private " : "";
-
-            $"{@private}{memberIdentifier}{genericParameters}{parameterList}{returnType};".AppendLineTo(sb, indentationLevel);
+            $"{accessModifier}{@readonly}{memberIdentifier}{genericParameters}{parameterList}{returnType};".AppendLineTo(sb, indentationLevel);
         }
-
-        private void writeMember(KeyValuePair<string, TSMemberDescription> x, string ns, int indentationLevel) {
-            var memberDescription = x.Value;
-            string @readonly = memberDescription.ReadOnly.GetValueOrDefault() ? "readonly " : "";
-            writeMemberBase(memberDescription, ns, $"{@readonly}{x.Key}", indentationLevel);
-        }
-
-        private void writeInterfaceConstructor(TSMemberDescription m, string ns, int indentationLevel) => writeMemberBase(m, ns, "new", indentationLevel);
 
         /// <summary>Provides a simple way to order members by the set of parameters</summary>
         private string parametersString(TSMemberDescription m) => m.Parameters?.JoinedKVP((name, prm) => $"{name}: {GetTypeString(prm.Type, "")}");
 
         private void writeInterface(KeyValuePair<string, TSInterfaceDescription> x, string ns, int indentationLevel) {
             var name = SplitName(x.Key).name;
+            if (ParseTypeName(name) is TSGenericType generic) { name = generic.Name; }
+
             var @interface = x.Value;
             writeJsDoc(@interface.JsDoc, indentationLevel);
 
@@ -132,21 +141,19 @@ namespace TsActivexGen {
                 $"{typeDefiner} {name}{genericParameters} {extends}{{ }}".AppendWithNewSection(sb, indentationLevel);
                 return;
             }
+
             $"{typeDefiner} {name}{genericParameters} {extends}{{".AppendLineTo(sb, indentationLevel);
+
             @interface.Members
-                .OrderBy(y => y.Key)
+                .Concat(@interface.Constructors.Select(y=>KVP("",y)))
+                .OrderByDescending(y=>y.Value.Private)
+                .ThenBy(y=>y.Key.IsNullOrEmpty())
+                .ThenBy(y => y.Key)
                 .ThenByDescending(y => y.Value.Parameters?.Count ?? -1)
                 .ThenByDescending(y => y.Value.GenericParameters.Any())
                 .ThenBy(y => parametersString(y.Value))
-                .ForEach(y => writeMember(y, ns, indentationLevel + 1));
+                .ForEach(y => writeMember(y.Value, ns, indentationLevel + 1,y.Key, @interface.IsClass));
 
-            @interface.Constructors.OrderBy(parametersString).ForEach(m => {
-                if (@interface.IsClass) {
-                    writeMemberBase(m, ns, "constructor", indentationLevel + 1,true);
-                } else {
-                    writeMemberBase(m, ns, "new", indentationLevel+1);
-                }
-            });
             "}".AppendWithNewSection(sb, indentationLevel);
         }
 

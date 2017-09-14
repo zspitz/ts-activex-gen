@@ -10,7 +10,7 @@
         <s:Boolean x:Key="False">False</s:Boolean>
     </Window.Resources>
     <DockPanel>
-        
+
         <DockPanel Margin="10">
             <DockPanel DockPanel.Dock="Top">
                 <Button Content="Generate" Name="btnGenerate" Padding="10" DockPanel.Dock="Right" />
@@ -38,11 +38,11 @@
                                 </Style>
                             </DataGrid.Resources>
                             <DataGrid.Columns>
-                                <DataGridCheckBoxColumn Binding="{Binding Selected}" Header="Selected" SortDirection="Ascending"/>
+                                <DataGridCheckBoxColumn Binding="{Binding Selected}" Header="Selected" SortDirection="Ascending" />
                                 <DataGridTextColumn Binding="{Binding Name}" Header="Name" IsReadOnly="True" />
                                 <DataGridTextColumn Binding="{Binding Version}" Header="Version" IsReadOnly="True" />
                                 <DataGridCheckBoxColumn Binding="{Binding Is32bit}" Header="32-bit" IsReadOnly="True" />
-                                <DataGridCheckBoxColumn Binding="{Binding Is64bit}" Header="64-bit" IsReadOnly="True"/>
+                                <DataGridCheckBoxColumn Binding="{Binding Is64bit}" Header="64-bit" IsReadOnly="True" />
                                 <DataGridTextColumn Binding="{Binding LCID}" Header="LCID" IsReadOnly="True" />
                             </DataGrid.Columns>
                         </DataGrid>
@@ -62,7 +62,7 @@
                 </TabItem>
             </TabControl>
         </DockPanel>
-        
+
         <DockPanel>
             <DockPanel DockPanel.Dock="Top">
                 <UniformGrid Rows="4" Columns="1" Margin="10" DockPanel.Dock="Right">

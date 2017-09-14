@@ -79,6 +79,8 @@ namespace TsActivexGen {
         public List<TSPlaceholder> GenericParameters { get; } = new List<TSPlaceholder>();
         public bool Private { get; set; }
 
+        public bool IsProperty => Parameters == null;
+
         public void AddParameter(string name, ITSType type) {
             if (Parameters == null) { Parameters = new List<KeyValuePair<string, TSParameterDescription>>(); }
             Parameters.Add(name, new TSParameterDescription() { Type = type });
@@ -301,7 +303,11 @@ namespace TsActivexGen {
 
         public HashSet<string> GetUsedTypes() {
             var types = new List<TSSimpleType>();
-            AllInterfaces.SelectMany(i => i.Members).Values().SelectMany(x => x.TypeParts()).AddRangeTo(types);
+            AllInterfaces.SelectMany(i => i.Members).SelectMany(x => {
+                var parts = x.Value.TypeParts();
+                if (parts.Any(y=>y.FullName == "StdFont")) { Debugger.Break(); }
+                return parts;
+            }).AddRangeTo(types);
             Aliases.SelectMany(x => x.Value.TargetType.TypeParts()).AddRangeTo(types);
             types.RemoveAll(x => x.IsLiteralType);
             var ret = types.Select(x => x.FullName).ToHashSet();
@@ -310,14 +316,15 @@ namespace TsActivexGen {
         }
 
         private static string[] nameParser(string typename) {
-            if ('<'.NotIn(typename)) { return new[] { typename }; }
-            var type = ParseTypeName(typename) as TSGenericType;
-            if (type.Parameters.Count==1 && type.Parameters[0] is TSPlaceholder prm && prm.Default != null) {
-                return new[] { type.GenericDefinition.FullName, (prm.Default as TSSimpleType).FullName, type.Name }; //HACK --  will fail if the default is not TSSimpleType
+            var ret = new List<string>();
+            if ("<".NotIn(typename)) {
+                ret.Add(typename);
+            } else {
+                var generic = ParseTypeName(typename) as TSGenericType;
+                ret.Add(generic.GenericDefinition.FullName);
+                if (generic.Parameters.OfType<TSPlaceholder>().All(prm => prm.Default != null)) { ret.Add(generic.Name); } //since all the placeholders have default parameters, the type can also be used without generics
             }
-            if (type.Parameters.OfType<TSPlaceholder>().Any(x => x.Default != null)) { throw new NotImplementedException(); }
-            
-            return new[] { type.GenericDefinition.FullName };
+            return ret.ToArray();
         }
         public HashSet<string> GetKnownTypes() {
             var ret = MiscExtensions.builtins.ToHashSet();
@@ -325,13 +332,8 @@ namespace TsActivexGen {
             Interfaces.Keys.SelectMany(nameParser).AddRangeTo(ret);
             Aliases.Keys.SelectMany(nameParser).AddRangeTo(ret);
             if (this is TSRootNamespaceDescription root) {
-                foreach (var n in root.NominalTypes) {
-                    ret.Add(n);
-                    if (!n.Contains("<")) { continue; }
-                    var generic = ParseTypeName(n) as TSGenericType;
-                    if (generic.Parameters.OfType<TSPlaceholder>().All(prm => prm.Default != null)) { ret.Add(generic.Name); }
-                }
-                //root.NominalTypes.AddRangeTo(ret);
+                root.GlobalInterfaces.Keys.SelectMany(nameParser).AddRangeTo(ret);
+                root.NominalTypes.SelectMany(nameParser).AddRangeTo(ret);
             }
 
             Namespaces.Values().SelectMany(x => x.GetKnownTypes()).AddRangeTo(ret);
@@ -387,12 +389,20 @@ namespace TsActivexGen {
         public void AddMapType(string name, IEnumerable<string> typenames) => AddMapType(name, typenames.Select(x => (x, x)));
         public void AddMapType(string typename, IEnumerable<(string name, string returntypeName)> members) {
             var ret = new TSInterfaceDescription();
-            members.Where(x=>!x.returntypeName.Contains("<")).Select(x => {
-                var member = new TSMemberDescription();
-                member.ReturnType = (TSSimpleType)x.returntypeName;
-                return KVP(x.name, member);
-            }).AddRangeTo(ret.Members);
-            Interfaces.Add(typename, ret);
+            members
+                .Where(x => !x.returntypeName.Contains("<")) //exclude generic return types
+                .Select(x => {
+                    var member = new TSMemberDescription();
+                    member.ReturnType = (TSSimpleType)x.returntypeName;
+                    return KVP(x.name, member);
+                })
+                .AddRangeTo(ret.Members);
+            var (ns, name) = SplitName(typename);
+            if (ns.IsNullOrEmpty()) {
+                GlobalInterfaces.Add(typename, ret);
+            } else {
+                Interfaces.Add(typename, ret);
+            }
         }
     }
 
@@ -506,11 +516,11 @@ namespace TsActivexGen {
 
                     var toAddMultiple = signatures
                         .Select(signatureGroup => KVP(grp.First().memberName, signatureGroup.Key.Clone()))
-                        .Where(x => kvp.Value.Members.None(y => x.Key==y.Key && x.Value.Equals(y.Value))).ToList();
+                        .Where(x => kvp.Value.Members.None(y => x.Key == y.Key && x.Value.Equals(y.Value))).ToList();
                     foreach (var item in toAddMultiple) {
-                        if (kvp.Value.Members.Any(x=>item.Key==x.Key && item.Value.Equals(x.Value))) { continue; }
+                        if (kvp.Value.Members.Any(x => item.Key == x.Key && item.Value.Equals(x.Value))) { continue; }
                         if (item.Value.Parameters == null) { continue; } //there's no point in trying to copy properties down the inheritance chain; Typescript doesn't allow multiple overloads on properties
-                        Debug.Print(Repeat("    ", recursionDepth+1).Joined("") + item.Key);
+                        Debug.Print(Repeat("    ", recursionDepth + 1).Joined("") + item.Key);
                         kvp.Value.Members.Add(item);
                     }
                     addedMembers = true;
