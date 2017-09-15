@@ -80,9 +80,10 @@ namespace TsActivexGen.Wpf {
 
             //create tests file; prompt if it exists already
             var overwrite = false;
-            if (Exists(TestsFilePath) && MessageBox.Show("Overwrite tests file?", "", YesNo) == Yes) {
-                overwrite = true;
-            }
+            //if (Exists(TestsFilePath) && MessageBox.Show("Overwrite tests file?", "", YesNo) == Yes) {
+            //    overwrite = true;
+            //}
+
             //TODO generate tests file from all namespace outputs
             WriteTestsFile(SingleOutput.TestsFile, overwrite);
 

@@ -508,7 +508,12 @@ VT_NULL	1
         }
 
         public void AddFromFile(string filename) {
-            var toAdd = tliApp.TypeLibInfoFromFile(filename);
+            TypeLibInfo toAdd;
+            try {
+                toAdd = tliApp.TypeLibInfoFromFile(filename);
+            } catch (Exception) {
+                return;
+            }
             AddTLI(toAdd);
             GenerateNSSetParts();
         }

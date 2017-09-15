@@ -56,7 +56,8 @@ fax service extended com library
 internet controls
 shell controls and automation
 speech
-acquisition";
+acquisition
+microsoft forms";
 
             brOutputFolder.Path = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
             brOutputFolder.SelectionChanged += updateOptions;

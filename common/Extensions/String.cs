@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System.Linq;
 using static System.StringComparison;
 using System.Diagnostics;
+using static System.Linq.Enumerable;
 
 namespace TsActivexGen {
     public static class StringExtensions {
@@ -123,5 +124,7 @@ namespace TsActivexGen {
         }
 
         public static bool IsMatchedBy(this string s, Regex re) => re.IsMatch(s);
+
+        public static string Repeated(this string s, int count) => Repeat(s, count).Joined("");
     }
 }

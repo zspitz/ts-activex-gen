@@ -94,7 +94,7 @@ namespace TsActivexGen {
                 memberIdentifier = isClass ? "constructor" : "new";
             } else {
                 memberIdentifier = memberName;
-                if (memberIdentifier.Contains(".")) { memberIdentifier = $"'{memberIdentifier}'"; }
+                if (memberIdentifier.Contains(".") || memberIdentifier.In("constructor")) { memberIdentifier = $"'{memberIdentifier}'"; }
             }
 
             string genericParameters = "";
@@ -231,8 +231,8 @@ namespace TsActivexGen {
             };
 
             //Build the tests file
-            ns.GlobalInterfaces.IfContainsKey("ActiveXObject", y => {
-                ret.TestsFile = y.Constructors.Joined(NewLine + NewLine, (z, index) => $"let obj{index} = new ActiveXObject({GetTypeString(z.Parameters[0].Value.Type, "")});") + NewLine;
+            ns.GlobalInterfaces.IfContainsKey("ActiveXObjectNameMap", y => {
+                ret.TestsFile = y.Members.Joined(NewLine.Repeated(2), (kvp, index) => $"let obj{index} = new ActiveXObject('{kvp.Key}');") + NewLine;
             });
 
             //these have to be written separately, because if the final output is for a single file, these types cannot be repeated
