@@ -97,7 +97,13 @@ namespace TsActivexGen.Wpf {
 }".TrimStart(), true);
 
             //create package.json
-            WritePackageFile("package.json", @"{ ""dependencies"": { ""activex-helpers"": ""*""}}", true);
+            WritePackageFile("package.json", @"
+{
+    ""private"": true,
+    ""dependencies"": {
+        ""activex-helpers"": ""*""
+    }
+}".TrimStart(), true);
         }
 
         public DiskOutputDetails(string initialName = "") {
