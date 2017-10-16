@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq;
 using static System.StringComparison;
-using System.Diagnostics;
 using static System.Linq.Enumerable;
 
 namespace TsActivexGen {
@@ -13,13 +12,6 @@ namespace TsActivexGen {
         public static string RegexReplace(this string s, string pattern, string replacement) => Regex.Replace(s, pattern, replacement);
         public static bool IsNullOrEmpty(this string s) => string.IsNullOrEmpty(s);
         public static string IfNullOrEmpty(this string s, string replacement) => s.IsNullOrEmpty() ? replacement : s;
-
-        private static Regex linebreakers = new Regex(@".*?(?:\(|\{)");
-        private static Regex linebreakers2 = new Regex(@".{1,170}(?:\||,(?= \w*\??:))");
-        private static Regex comma = new Regex(@",(?= \w*\??:)");
-        private static Regex typeAlias = new Regex(@"\s*type \w* = \[.{0,140},");
-
-        private static Regex extends = new Regex(@"(\s*interface [\w\.]+ extends )([\w\. ,\{\}]+)");
 
         public static void AppendLineTo(this string s, StringBuilder sb, int indentationLevel = 0) {
             s = s.TrimEnd();
