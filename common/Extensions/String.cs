@@ -22,56 +22,11 @@ namespace TsActivexGen {
         private static Regex extends = new Regex(@"(\s*interface [\w\.]+ extends )([\w\. ,\{\}]+)");
 
         public static void AppendLineTo(this string s, StringBuilder sb, int indentationLevel = 0) {
-            //HACK
-            var match = extends.Match(s);
-            if (match.Success && s.Length > 170) {
-                var currentLine = (new string(' ', indentationLevel * 4)) + match.Groups[1].Value;
-                var names = match.Groups[2].Value.Split(' ');
-                foreach (var name in names) {
-                    if (currentLine.Length +name.Length > 170) {
-                        sb.AppendLine(currentLine.TrimEnd());
-                        currentLine = new string(' ', (indentationLevel + 1) * 4);
-                    }
-                    currentLine += name + " ";
-                }
-                sb.AppendLine(currentLine.TrimEnd());
-                return;
-            }
-
-            var toAppend = (new string(' ', indentationLevel * 4) + s).TrimEnd();
-            var isAfterPipeBreak = false;
-            while (toAppend.Length > 200) {
-                isAfterPipeBreak = false;
-                match = toAppend.ShortestMatch(linebreakers, linebreakers2);
-                if (match == null) {
-                    match = typeAlias.Match(toAppend);
-                    if (match.Success) {
-                        sb.AppendLine(match.Value);
-                        toAppend = new string(' ', indentationLevel * 4) + toAppend.Substring(match.Value.Length);
-                        if (toAppend.Length > 200 && Debugger.IsAttached) { throw new Exception("Unable to split long line"); }
-                        sb.AppendLine(toAppend);
-                        return;
-                    }
-                    //if (toAppend.Length > 200 && Debugger.IsAttached) { throw new Exception("Unable to split long line"); }
-                    sb.AppendLine(toAppend);
-                    return;
-                }
-                if (match.Value.EndsWithAny(new[] { "(", "{" })) { indentationLevel += 1; }
-                sb.AppendLine(match.Value);
-                toAppend = new string(' ', indentationLevel * 4) + toAppend.Substring(match.Length).TrimStart();
-
-                if (match.Value.EndsWith("|")) { isAfterPipeBreak = true; }
-            }
-
-            if (isAfterPipeBreak) {
-                match = comma.Match(toAppend);
-                if (match.Success) {
-                    sb.AppendLine(toAppend.Substring(0, match.Index + 1));
-                    toAppend = new string(' ', indentationLevel * 4) + toAppend.Substring(match.Index + 1).TrimStart();
-                }
-            }
-
-            if (!toAppend.IsNullOrEmpty()) { sb.AppendLine(toAppend); }
+            s = s.TrimEnd();
+            if (s.IsNullOrEmpty()) { return; }
+            var toAppend = new String(' ', indentationLevel * 4) + s.TrimEnd();
+            if (toAppend.Length>200) { toAppend += " // tslint:disable-line: max-line-length"; }
+            sb.AppendLine(toAppend);
         }
 
         /// <summary>Appends the passed-in string as a line, followed by another empty line</summary>
