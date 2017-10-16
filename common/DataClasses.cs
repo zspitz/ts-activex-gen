@@ -303,11 +303,7 @@ namespace TsActivexGen {
 
         public HashSet<string> GetUsedTypes() {
             var types = new List<TSSimpleType>();
-            AllInterfaces.SelectMany(i => i.Members).SelectMany(x => {
-                var parts = x.Value.TypeParts();
-                if (parts.Any(y=>y.FullName == "StdFont")) { Debugger.Break(); }
-                return parts;
-            }).AddRangeTo(types);
+            AllInterfaces.SelectMany(i => i.Members).SelectMany(x => x.Value.TypeParts()).AddRangeTo(types);
             Aliases.SelectMany(x => x.Value.TargetType.TypeParts()).AddRangeTo(types);
             types.RemoveAll(x => x.IsLiteralType);
             var ret = types.Select(x => x.FullName).ToHashSet();
@@ -403,6 +399,20 @@ namespace TsActivexGen {
             } else {
                 Interfaces.Add(typename, ret);
             }
+        }
+
+        // this is no longer needed -- https://github.com/Microsoft/TypeScript/issues/17526
+        // leaving it here for backward compatibility for older TypeScript versions
+        public void AddSafeArray() {
+            if (GlobalInterfaces.ContainsKey("SafeArray<>")) { return; }
+            var placeholder = new TSPlaceholder() { Name = "T", Default = TSSimpleType.Any };
+            var genericType = new TSGenericType() { Name = "SafeArray" };
+            genericType.Parameters.Add(placeholder);
+            var idesc = new TSInterfaceDescription();
+            idesc.GenericParameters.Add(placeholder);
+            // we need this dummy member, because otherwise empty interfaces are written as type aliases to `any`
+            idesc.Members.Add("_brand", new TSMemberDescription() { ReturnType = genericType });
+            GlobalInterfaces.Add("SafeArray<>", idesc);
         }
     }
 

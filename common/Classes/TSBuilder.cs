@@ -82,9 +82,8 @@ namespace TsActivexGen {
 
             string accessModifier = "";
             if (m.Private) {
+                if (!isClass) { throw new InvalidOperationException("Interface members cannot be private"); }
                 accessModifier = "private ";
-            } else if (isClass) {
-                accessModifier = "public ";
             }
 
             var @readonly = m.ReadOnly.GetValueOrDefault() ? "readonly " : "";

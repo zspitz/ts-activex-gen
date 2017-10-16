@@ -52,7 +52,7 @@ namespace TsActivexGen {
                         sb.AppendLine(toAppend);
                         return;
                     }
-                    if (toAppend.Length > 200 && Debugger.IsAttached) { throw new Exception("Unable to split long line"); }
+                    //if (toAppend.Length > 200 && Debugger.IsAttached) { throw new Exception("Unable to split long line"); }
                     sb.AppendLine(toAppend);
                     return;
                 }

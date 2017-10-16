@@ -364,17 +364,7 @@ VT_NULL	1
                 ret.MinorVersion = tld.MinorVersion;
             }
 
-            // pending https://github.com/Microsoft/TypeScript/issues/17526
-            // if this is accepted, we won't need to add SafeArray
-            {
-                var placeholder = new TSPlaceholder() { Name = "T", Default = TSSimpleType.Any };
-                var genericType = new TSGenericType() { Name = "SafeArray" };
-                genericType.Parameters.Add(placeholder);
-                var idesc = new TSInterfaceDescription();
-                idesc.GenericParameters.Add(placeholder);
-                idesc.Members.Add("_brand", new TSMemberDescription() { ReturnType = genericType });
-                ret.GlobalInterfaces.Add("SafeArray<>", idesc);
-            }
+            ret.AddSafeArray();
 
             return ret;
         }
@@ -411,7 +401,9 @@ VT_NULL	1
         private void AddTLI(TypeLibInfo tli, bool resolveMaxVersion = false) {
             if (resolveMaxVersion) {
                 var maxVersion = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == tli.GUID).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).FirstOrDefault();
-                tli = tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
+                if (maxVersion != null) { //not sure how this is possible, but it happens using Microsoft Disk Quota 1.0
+                    tli = tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
+                }
             }
             if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
             tlis.Add(tli);
