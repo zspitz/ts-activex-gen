@@ -191,10 +191,13 @@ namespace TsActivexGen.idlbuilder {
             {
                 var xidlClassName = "com.sun.star.reflection.XIdlClass";
 
-                //add generic parameter with default to XIdlClass
-                var xidlClass = ret.FindTypeDescription(xidlClassName).description as TSInterfaceDescription;
+                //recreate XIdClass with generic parameter
+                var reflection = ret.GetNamespace("com.sun.star.reflection");
+                var xidlClass = reflection.Interfaces[xidlClassName];
+                reflection.Interfaces.Remove(xidlClassName);
                 var placeholder = new TSPlaceholder() { Name = "T" };
                 xidlClass.GenericParameters.Add(placeholder);
+                reflection.Interfaces[xidlClassName + "<>"] = xidlClass;
 
                 //modify createObject to take a tuple type of T
                 var outParam = new TSTupleType();
