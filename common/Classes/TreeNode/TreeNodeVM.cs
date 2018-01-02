@@ -9,13 +9,18 @@ namespace TsActivexGen {
     [AddINotifyPropertyChangedInterface]
     public class TreeNodeVM<TData> : TreeNodeBase<TData> {
         private ObservableCollection<TreeNodeBase<TData>> children = new ObservableCollection<TreeNodeBase<TData>>();
-
         protected override IList<TreeNodeBase<TData>> InitWith() => children;
+
+        public ReadOnlyObservableCollection<TreeNodeBase<TData>> ChildrenOC { get; set; }
+        public TreeNodeVM(): this(default) {}
+        public TreeNodeVM(TData data): base(data) => ChildrenOC = new ReadOnlyObservableCollection<TreeNodeBase<TData>>(children);
 
         //public readonly bool SelectChildrenOnSelected = true;
 
-        public bool? IsSelected { get; set; }
-        private void OnIsSelectedChanged(bool? previous, bool? @new) {
+        public bool? IsSelected { get; set; } = false;
+        public void OnIsSelectedChanged(object oPrevious, object oNew) {
+            var previous = (bool?)oPrevious;
+            var @new = (bool?)oNew;
             if (@new.HasValue) {
                 children.Cast<TreeNodeVM<TData>>().ForEach(x=> x.IsSelected = @new);
             }
