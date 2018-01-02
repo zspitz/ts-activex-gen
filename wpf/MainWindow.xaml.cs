@@ -223,6 +223,9 @@ disk quota";
                         if (txbKeywords.Text.IsNullOrEmpty()) { return; }
                         tlbGenerator.AddFromKeywords(txbKeywords.Text.Split('\n').Select(x => x.Trim()));
                         break;
+                    case 3:
+
+                        break;
                     default:
                         throw new InvalidOperationException();
                 }
