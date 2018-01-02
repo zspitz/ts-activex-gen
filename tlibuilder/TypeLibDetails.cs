@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using TLI;
 using Microsoft.Win32;
+using System.ComponentModel;
+using PropertyChanged;
 
 namespace TsActivexGen.tlibuilder {
-    public class TypeLibDetails {
+    public class TypeLibDetails : INotifyPropertyChanged {
         private static List<TypeLibDetails> initializer() {
             var tliapp = new TLIApplication();
             var ret = new List<TypeLibDetails>();
@@ -46,8 +48,8 @@ namespace TsActivexGen.tlibuilder {
                                                 continue;
                                             }
                                             var tli = tliapp.TypeLibInfoFromFile(paths.First());
-                                            td.MajorVersion = tli.MajorVersion;
-                                            td.MinorVersion = tli.MinorVersion;
+                                            if (majorVersion == 0) { td.MajorVersion = tli.MajorVersion; }
+                                            if (minorVersion == 0) { td.MinorVersion = tli.MinorVersion; }
                                         }
                                         ret.Add(td);
                                     }
@@ -85,5 +87,20 @@ namespace TsActivexGen.tlibuilder {
             }
             return $"Name={Name}, Version={Version} ({MajorVersion}.{MinorVersion}), {bittedness}";
         }
+
+#pragma warning disable 0067
+        public event PropertyChangedEventHandler PropertyChanged;
+#pragma warning restore 0067
+
+        public TypeLibInfo GetTypeLibInfo(TLIApplication tliapp = null) {
+            tliapp = tliapp ?? tliappInstance.Value;
+            try {
+                return tliapp.TypeLibInfoFromRegistry(TypeLibID, MajorVersion, MinorVersion, LCID);
+            } catch (Exception) {
+                return null;
+            }
+        }
+
+        private static Lazy<TLIApplication> tliappInstance = new Lazy<TLIApplication>(() => new TLIApplication());
     }
 }

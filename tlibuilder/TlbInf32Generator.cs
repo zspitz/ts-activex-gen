@@ -519,13 +519,7 @@ VT_NULL	1
                 var names = matching.Select(x => x.Name).Distinct().ToList();
                 if (names.Count > 1) { throw new Exception("keyword matches multiple names"); }
                 return matching.FirstOrDefault();
-            }).Where(x => x != null).Select(tlb => {
-                try {
-                    return tliApp.TypeLibInfoFromRegistry(tlb.TypeLibID, tlb.MajorVersion, tlb.MinorVersion, tlb.LCID);
-                } catch (Exception) {
-                    return null;
-                }
-            }).Where(x => x != null).ToList();
+            }).Select(tld => tld?.GetTypeLibInfo(tliApp)).Where(x => x != null).ToList();
             toAdd.ForEach(x => {
                 AddTLI(x, true);
                 GenerateNSSetParts();
