@@ -8,9 +8,10 @@ using System.IO;
 using System.Linq;
 using static TsActivexGen.Wpf.Misc;
 using static TsActivexGen.Wpf.Functions;
-using static System.Windows.MessageBoxButton;
-using static System.Windows.MessageBoxResult;
 using static System.Environment;
+using System.Windows.Data;
+using System;
+using System.Globalization;
 
 namespace TsActivexGen.Wpf {
     [AddINotifyPropertyChangedInterface]
@@ -130,7 +131,7 @@ namespace TsActivexGen.Wpf {
 
     public class DefinitionTypesComboBox : ComboBox {
         public DefinitionTypesComboBox() {
-            ItemsSource = new[] { "Type lib from registry", "Type lib from file", "Default library list", "WMI class", "Doxygen IDL XML files" };
+            ItemsSource = new[] { "Type lib from registry", "Type lib from file", "Default library list", "WMI class", "Doxygen IDL XML files", "Selected types" };
             SelectedIndex = 0;
         }
     }
@@ -155,5 +156,15 @@ namespace TsActivexGen.Wpf {
         public string url { get; set; }
         public int major { get; set; }
         public int minor { get; set; }
+    }
+
+    public class ValueTupleNameConverter : IValueConverter {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture) {
+            var t = value as (String name, Object o)?;;
+            if (t == null) { return DependencyProperty.UnsetValue; }
+            return t.Value.name;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => DependencyProperty.UnsetValue;
     }
 }

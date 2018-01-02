@@ -26,27 +26,7 @@
                     </Style>
                 </TabControl.Resources>
                 <TabItem>
-                    <DockPanel>
-                        <DockPanel DockPanel.Dock="Top">
-                            <Label Content="Filter text" />
-                            <TextBox x:Name="txbFilter" />
-                        </DockPanel>
-                        <DataGrid x:Name="dgTypeLibs" AutoGenerateColumns="False" CanUserSortColumns="False" CanUserAddRows="False" CanUserDeleteRows="False">
-                            <DataGrid.Resources>
-                                <Style TargetType="{x:Type DataGridCell}">
-                                    <Setter Property="ToolTip" Value="{Binding RegistryKey}" />
-                                </Style>
-                            </DataGrid.Resources>
-                            <DataGrid.Columns>
-                                <DataGridCheckBoxColumn Binding="{Binding Selected}" Header="Selected" SortDirection="Ascending" />
-                                <DataGridTextColumn Binding="{Binding Name}" Header="Name" IsReadOnly="True" />
-                                <DataGridTextColumn Binding="{Binding Version}" Header="Version" IsReadOnly="True" />
-                                <DataGridCheckBoxColumn Binding="{Binding Is32bit}" Header="32-bit" IsReadOnly="True" />
-                                <DataGridCheckBoxColumn Binding="{Binding Is64bit}" Header="64-bit" IsReadOnly="True" />
-                                <DataGridTextColumn Binding="{Binding LCID}" Header="LCID" IsReadOnly="True" />
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </DockPanel>
+                    <my:RegistryTypeLibsGrid x:Name="dgTypeLibs" />
                 </TabItem>
                 <TabItem>
                     <my:PathBrowser x:Name="brTypeLibFile" Folders="False" Caption="Type library file" />
@@ -59,6 +39,37 @@
                 </TabItem>
                 <TabItem>
                     <my:PathBrowser x:Name="brDoxygenXMLFolder" Caption="Doxygen XML folder" Folders="True" />
+                </TabItem>
+                <TabItem>
+                    <DockPanel>
+                        <my:RegistryTypeLibsGrid x:Name="dgTypeLibs1" Height="300" DockPanel.Dock="Top" />
+                        <Button Content="Add from file" DockPanel.Dock="Top" />
+                        <TreeView Name="tvwSelectedTypes">
+                            <TreeView.Resources>
+                                <!--<Style TargetType="{x:Type TreeViewItem}">
+                                    <Setter Property="HeaderTemplate">
+                                        <Setter.Value>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <CheckBox Name="chk" Margin="2" Tag="{Binding}" />
+                                                    <TextBlock Text="{Binding}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>-->
+                                <my:ValueTupleNameConverter x:Key="ValueTupleNameConverter" />
+                            </TreeView.Resources>
+                            <TreeView.ItemTemplate>
+                                <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <CheckBox Name="chk" Margin="2" IsChecked="{Binding Selected}" />
+                                        <TextBlock Text="{Binding Data, Converter={StaticResource ValueTupleNameConverter}}" />
+                                    </StackPanel>
+                                </HierarchicalDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+                    </DockPanel>
                 </TabItem>
             </TabControl>
         </DockPanel>

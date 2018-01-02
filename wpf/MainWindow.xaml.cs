@@ -1,26 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using TsActivexGen.idlbuilder;
+using TsActivexGen.tlibuilder;
 using TsActivexGen.Util;
-using static System.IO.Path;
+using static System.Environment;
 using static System.IO.File;
+using static System.IO.Path;
+using static System.Reflection.Assembly;
 using static System.Windows.MessageBoxButton;
 using static System.Windows.MessageBoxResult;
-using System.Diagnostics;
-using static System.Reflection.Assembly;
-using System.Windows.Data;
-using System.Collections.ObjectModel;
-using static TsActivexGen.Wpf.Functions;
-using System.IO;
 using static TsActivexGen.Functions;
-using static TsActivexGen.Wpf.Misc;
-using static System.Environment;
-using TsActivexGen.tlibuilder;
-using TsActivexGen.idlbuilder;
 using static TsActivexGen.idlbuilder.Context;
-using System.Windows.Controls;
-using static System.StringComparison;
+using static TsActivexGen.Wpf.Misc;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -32,12 +29,7 @@ namespace TsActivexGen.Wpf {
         public MainWindow() {
             InitializeComponent();
 
-            //TODO enable sorting on this datagrid such that selected items are always on top
-            dgTypeLibs.ItemsSource = TypeLibDetails.FromRegistry.Value;
-
             btnGenerate.Click += (s, e) => generateNSSet();
-
-            txbFilter.TextChanged += (s, e) => applyFilter();
 
             //we're setting this in code because it's easier to do so than in XAML
             txbKeywords.Text = @"ole automation
@@ -57,12 +49,47 @@ internet controls
 shell controls and automation
 speech
 acquisition
-microsoft forms";
+microsoft forms
+disk quota";
 
             brOutputFolder.Path = Combine(GetDirectoryName(GetEntryAssembly().Location), "typings");
             brOutputFolder.SelectionChanged += updateOptions;
 
             brDoxygenXMLFolder.Path = new[] { "../../../idlbuilder/output/xml", "output/xml" }.Select(x => GetFullPath(Combine(GetDirectoryName(GetEntryAssembly().Location), x))).FirstOrDefault(x => Directory.Exists(x));
+
+            var treeviewSource = new ObservableCollection<TreeNodeVM<(string name, object o)>>();
+            dgTypeLibs1.SelectionDataChanged += (s, e) => {
+                e.AddedItems.Cast<TypeLibDetails>().ForEach(x => {
+                    var tli = x.GetTypeLibInfo();
+                    var name = tli.Name;
+                    if (treeviewSource.Any(y => y.Data.name == name)) { return; }
+
+                    var root = CreateTreeNode((tli.Name, (object)tli));
+
+                    var generators = new Dictionary<string, IEnumerable<(string name, object o)>> {
+                        {"Constants", tli.Constants.Cast().Select(y=>(y.Name,(object)y)) },
+                        {"CoClasses", tli.CoClasses.Cast().Select(y=>(y.Name,(object)y)) },
+                        {"Declarations", tli.Declarations.Cast().Select(y=>(y.Name,(object)y)) },
+                        {"Interfaces", tli.Interfaces.Cast().Select(y=>(y.Name,(object)y)) },
+                        {"IntrinsicAliases", tli.IntrinsicAliases.Cast().Select(y=>(y.Name,(object)y)) },
+                        {"Records", tli.Records.Cast().Select(y=>(y.Name,(object)y)) },
+                        {"Unions", tli.Unions.Cast().Select(y=>(y.Name,(object)y)) },
+                    };
+
+                    foreach (var (collectionName,generator) in generators) {
+                        var items = generator.ToList();
+                        if (items.None()) { continue; }
+                        var collection = root.AddChild<(string Name, object obj), TreeNodeVM<(string Name, object obj)>>((collectionName, null));
+                        items.OrderBy(y=>y.name).ForEach(y => collection.AddChild(y));
+                    }
+
+                    treeviewSource.Add(root);
+                });
+                e.RemovedItems.Cast<TypeLibDetails>().ForEach(x => {
+                    treeviewSource.Remove(treeviewSource.FirstOrDefault(y => y.Data.name == x.Name));
+                });
+            };
+            tvwSelectedTypes.ItemsSource = treeviewSource;
 
             dtgFiles.ItemsSource = fileList;
 
@@ -184,7 +211,7 @@ microsoft forms";
             } else {
                 switch (selected) {
                     case 0:
-                        var details = dgTypeLibs.Items<TypeLibDetails>().Where(x => x.Selected).ToList();
+                        var details = dgTypeLibs.Items;
                         if (details.None()) { return; }
                         details.ForEach(x => tlbGenerator.AddFromRegistry(x.TypeLibID, x.MajorVersion, x.MinorVersion, x.LCID));
                         break;
@@ -230,11 +257,6 @@ microsoft forms";
                 fileList.Add(details);
             }
         }
-
-        private void applyFilter() => CollectionViewSource.GetDefaultView(dgTypeLibs.ItemsSource).Filter = x => {
-            var details = x as TypeLibDetails;
-            return details.Selected || (details.Name ?? "").Contains(txbFilter.Text, OrdinalIgnoreCase);
-        };
 
         private void TextBox_Loaded(object sender, RoutedEventArgs e) {
             //we need this because these controls are all within a RadioButtonListBox, and name cannot be applied in XAML

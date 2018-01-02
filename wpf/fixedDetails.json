@@ -113,5 +113,10 @@
     "url": "https://api.libreoffice.org/",
     "major": 5,
     "minor": 3
+  },
+  "diskquotatypelibrary": {
+    "url": "https://msdn.microsoft.com/en-us/library/windows/desktop/bb773938(v=vs.85).aspx",
+    "major": 1,
+    "minor": 0
   }
 }
