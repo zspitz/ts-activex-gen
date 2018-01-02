@@ -19,6 +19,8 @@ namespace TsActivexGen {
         }
         public static IEnumerable<TResult> SelectKVP<TKey, TValue, TResult>(this IEnumerable<KeyValuePair<TKey, TValue>> src, Func<TKey, TValue, TResult> selector) => src.Select(kvp => selector(kvp.Key, kvp.Value));
 
+        public static IEnumerable<TResult> SelectManyKVP<TKey, TValue, TResult>(this IEnumerable<KeyValuePair<TKey, TValue>> src, Func<TKey, TValue, IEnumerable<TResult>> selector) => src.SelectKVP(selector).SelectMany();
+
         public static string JoinedKVP<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> src, Func<TKey, TValue, string> selector, string delimiter = ",") => src.SelectKVP(selector).Joined(delimiter);
         public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> src) => src.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         public static IEnumerable<KeyValuePair<TKey, TValue>> WhereKVP<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> src, Func<TKey, TValue, bool> predicate) => src.Where(kvp => predicate(kvp.Key, kvp.Value));

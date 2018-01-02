@@ -71,7 +71,7 @@ namespace TsActivexGen {
                         var @readonly = val.@readonly ? "readonly " : "";
                         if (key.Contains(".")) { key = $"'{key}'"; }
                         return $"{@readonly}{key}: {GetTypeString(val.type, ns)}";
-                    },", ");
+                    }, ", ");
                     ret = $"{{{joined}}}";
                     break;
                 case TSFunctionType x:
@@ -163,22 +163,22 @@ namespace TsActivexGen {
                     case '<':
                         if (currentNode.Data == null) { throw new NullReferenceException(); }
                         currentNode.Data = new TSGenericType() { Name = (currentNode.Data as TSSimpleType).FullName };
-                        currentNode = currentNode.AddChild((TSSimpleType)"");
+                        currentNode = currentNode.AddChild((ITSType)(TSSimpleType)"");
                         break;
                     case '>':
                         if (currentNode.Parent.Data is TSPlaceholder) {
-                            currentNode = currentNode.Parent.Parent;
+                            currentNode = currentNode.Parent<ITSType, SimpleTreeNode<ITSType>>().Parent<ITSType, SimpleTreeNode<ITSType>>();
                         } else {
-                            currentNode = currentNode.Parent;
+                            currentNode = currentNode.Parent<ITSType, SimpleTreeNode<ITSType>>();
                         }
                         break;
                     case ',':
-                        currentNode = currentNode.AddSibling((TSSimpleType)"");
+                        currentNode = currentNode.AddSibling<ITSType, SimpleTreeNode<ITSType>>((TSSimpleType)"");
                         break;
                     case '=':
                         var placeholder = new TSPlaceholder() { Name = (currentNode.Data as TSSimpleType).FullName };
                         currentNode.Data = placeholder;
-                        currentNode = currentNode.AddChild((TSSimpleType)"");
+                        currentNode = currentNode.AddChild((ITSType)(TSSimpleType)"");
                         break;
                     default:
                         throw new NotImplementedException();
@@ -186,7 +186,7 @@ namespace TsActivexGen {
             }
 
             fillNode(root);
-            root.Descendants().ForEach(fillNode);
+            root.Descendants<ITSType, SimpleTreeNode<ITSType>>().ForEach(fillNode);
             return root.Data;
 
             void fillNode(SimpleTreeNode<ITSType> node) {
@@ -286,5 +286,7 @@ namespace TsActivexGen {
         }
 
         public static IEnumerable<T> WrappedSequence<T>(T item) => Repeat(item, 1);
+
+        public static TreeNodeVM<TData> CreateTreeNode<TData>(TData data, TreeNodeVM<TData> parent = null) => new TreeNodeVM<TData>() { Data = data };
     }
 }

@@ -4,4 +4,10 @@
         Optional,
         Rest
     }
+
+    public enum FilterState {
+        NotMatched,
+        Match,
+        DescendantMatch
+    }
 }

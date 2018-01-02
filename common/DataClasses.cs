@@ -299,11 +299,11 @@ namespace TsActivexGen {
         public Dictionary<string, TSNamespaceDescription> Namespaces { get; } = new Dictionary<string, TSNamespaceDescription>();
         public JsDoc JsDoc { get; } = new JsDoc();
 
-        public virtual IEnumerable<TSInterfaceDescription> AllInterfaces => Interfaces.Values;
+        public virtual IEnumerable<KeyValuePair<string, TSInterfaceDescription>> AllInterfaces => Interfaces;
 
         public HashSet<string> GetUsedTypes() {
             var types = new List<TSSimpleType>();
-            AllInterfaces.SelectMany(i => i.Members).SelectMany(x => x.Value.TypeParts()).AddRangeTo(types);
+            AllInterfaces.Values().SelectMany(i => i.Members).SelectMany(x => x.Value.TypeParts()).AddRangeTo(types);
             Aliases.SelectMany(x => x.Value.TargetType.TypeParts()).AddRangeTo(types);
             types.RemoveAll(x => x.IsLiteralType);
             var ret = types.Select(x => x.FullName).ToHashSet();
@@ -313,7 +313,7 @@ namespace TsActivexGen {
 
         private static string[] nameParser(string typename) {
             var ret = new List<string>();
-            if ("<".NotIn(typename)) {
+            if ('<'.NotIn(typename)) {
                 ret.Add(typename);
             } else {
                 var generic = ParseTypeName(typename) as TSGenericType;
@@ -343,7 +343,7 @@ namespace TsActivexGen {
         }
 
         public void ConsolidateMembers() {
-            AllInterfaces.ForEach(x => x.ConsolidateMembers());
+            AllInterfaces.Values().ForEach(x => x.ConsolidateMembers());
             Namespaces.ForEachKVP((name, ns) => ns.ConsolidateMembers());
         }
 
@@ -360,6 +360,26 @@ namespace TsActivexGen {
         }
 
         public bool IsEmpty => Enums.None() && AllInterfaces.None() && Aliases.None() && (Namespaces.None() || Namespaces.All(x => x.Value.IsEmpty));
+
+        public List<(string usedType, string typename, string membername, string parametername)> GetTypeUsage() {
+            string @null = null; //because null on its own doesn't provide type information when used on the right side of var
+            var data = new List<(IEnumerable<TSSimpleType> typeParts, string typeName, string memberName, string parameterName)>();
+            foreach (var (name, descr) in AllInterfaces) {
+                foreach (var (memberName, memberDescr) in descr.Members) {
+                    memberDescr.Parameters?.SelectKVP((parameterName, parameterDescr) => (parameterDescr.Type.TypeParts(), name, memberName, parameterName)).AddRangeTo(data);
+                    data.Add((memberDescr.ReturnType.TypeParts(), name, memberName, @null));
+                }
+                descr.Extends.Select(x => (ParseTypeName(x).TypeParts(), name, @null, @null)).AddRangeTo(data);
+                foreach (var ctor in descr.Constructors) {
+                    ctor.Parameters?.SelectKVP((parameterName, parameterDescr) => (parameterDescr.Type.TypeParts(), name, "ctor", parameterName)).AddRangeTo(data);
+                }
+            }
+            Aliases.SelectKVP((name, target) => (target.TargetType.TypeParts(), name, @null, @null)).AddRangeTo(data);
+
+            var ret = data.SelectMany(x => x.typeParts.Select(y => (y.FullName, x.typeName, x.memberName, x.parameterName))).ToList();
+            Namespaces.Values.SelectMany(x => x.GetTypeUsage()).AddRangeTo(ret);
+            return ret;
+        }
     }
 
     public class TSAliasDescription : EqualityBase<TSAliasDescription> {
@@ -380,7 +400,7 @@ namespace TsActivexGen {
 
         public HashSet<string> NominalTypes { get; } = new HashSet<string>();
 
-        public override IEnumerable<TSInterfaceDescription> AllInterfaces => Interfaces.Values.Concat(GlobalInterfaces.Values);
+        public override IEnumerable<KeyValuePair<string, TSInterfaceDescription>> AllInterfaces => Interfaces.Concat(GlobalInterfaces);
 
         public void AddMapType(string name, IEnumerable<string> typenames) => AddMapType(name, typenames.Select(x => (x, x)));
         public void AddMapType(string typename, IEnumerable<(string name, string returntypeName)> members) {

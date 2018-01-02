@@ -300,6 +300,7 @@ namespace TsActivexGen.idlbuilder {
             manualFixes(ret);
 
             if (ret.GetUndefinedTypes().Any()) {
+                var lookup = ret.Namespaces.SelectManyKVP((name, ns) => ns.GetTypeUsage()).ToLookup(x => x.usedType);
                 throw new Exception("Undefined types");
             }
 
