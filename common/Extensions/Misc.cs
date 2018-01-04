@@ -16,7 +16,7 @@ namespace TsActivexGen {
         public static void Add(this Dictionary<string, TSAliasDescription> dict, string key, TSSimpleType type, IEnumerable<KeyValuePair<string, string>> jsDoc = null) {
             var alias = new TSAliasDescription { TargetType = type };
             jsDoc?.AddRangeTo(alias.JsDoc);
-            dict.Add(key, alias);
+            dict[key] = alias;
         }
 
         public static void RemoveMultipleAt<T>(this List<T> lst, IEnumerable<int> positions) => positions.Distinct().OrderedDescending().ForEach(x => lst.RemoveAt(x));
@@ -28,7 +28,7 @@ namespace TsActivexGen {
         /// empty interfaces are added as aliases
         public static void AddInterfaceTo(this KeyValuePair<string, TSInterfaceDescription> x, TSNamespaceDescription ns) {
             if (x.Value.Members.Any() || x.Value.Extends.Count > 1) {
-                ns.Interfaces.Add(x);
+                ns.Interfaces[x.Key] = x.Value;
             } else if (x.Value.Extends.Any()) {
                 ns.Aliases.Add(x.Key, x.Value.Extends.First(), x.Value.JsDoc);
             } else {

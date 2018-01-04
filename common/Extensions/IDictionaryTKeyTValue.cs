@@ -39,5 +39,6 @@ namespace TsActivexGen {
             return ret;
         }
         public static List<TKey> Keys<TKey, TElement>(this ILookup<TKey, TElement> lookup) => lookup.Select(grp => grp.Key).ToList();
+        public static void SetIn<TKey, TValue>(this KeyValuePair<TKey, TValue> kvp, Dictionary<TKey, TValue> dict) => dict[kvp.Key] = kvp.Value;
     }
 }

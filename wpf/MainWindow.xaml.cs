@@ -33,6 +33,8 @@ namespace TsActivexGen.Wpf {
         public MainWindow() {
             InitializeComponent();
 
+            cmbDefinitionType.SelectionChanged += (s, e) => OutputUI.SelectedIndex = cmbDefinitionType.SelectedIndex == 5 ? 1 : 0;
+
             btnGenerate.Click += (s, e) => generateNSSet();
 
             //we're setting this in code because it's easier to do so than in XAML
@@ -78,11 +80,9 @@ disk quota";
                 var result = fileDlg.ShowDialog() ?? false;
                 if (!result) { return; }
 
-                var tliApp = new TLIApplication() { ResolveAliases = false };
-
                 TypeLibInfo tli;
                 try {
-                    tli = tliApp.TypeLibInfoFromFile(fileDlg.FileName);
+                    tli = tlbSelectedTypesGenerator.tliApp.TypeLibInfoFromFile(fileDlg.FileName);
                 } catch (Exception) {
                     return;
                 }
@@ -210,14 +210,22 @@ disk quota";
         }
 
         TlbInf32Generator tlbGenerator = new TlbInf32Generator();
+        TlbInf32Generator tlbSelectedTypesGenerator = new TlbInf32Generator() { ResolveExternal = false };
         private void generateNSSet() {
             TSNamespaceSet nsset;
             var selected = cmbDefinitionType.SelectedIndex;
-            if (selected == 4) {
+            if (selected==5) {
+                var selectedTypes = treeviewSource.SelectMany(x => x.Descendants<(string name, object o), TreeNodeVM<(string name, object o)>>()).Where(x => (x.IsSelected ?? false) && x.Data.o != null).Select(x => x.Data.o).ToList();
+                tlbSelectedTypesGenerator.AddSelectedTypes(selectedTypes);
+                nsset = tlbSelectedTypesGenerator.NSSet;
+                var outputs1 = new TSBuilder().GetTypescript(nsset);
+                tbSelectedTypesOutput.Text = outputs1.JoinedKVP((name, output) => output.MainFile, new string('-', 50));
+                return;
+            } else if (selected == 4) {
                 if (brDoxygenXMLFolder.Path.IsNullOrEmpty()) { return; }
                 var idlBuilder = new DoxygenIDLBuilder(brDoxygenXMLFolder.Path, Automation);
                 nsset = idlBuilder.Generate();
-            } else {
+            } else { 
                 switch (selected) {
                     case 0:
                         var details = dgTypeLibs.Items;
@@ -233,8 +241,7 @@ disk quota";
                         tlbGenerator.AddFromKeywords(txbKeywords.Text.Split('\n').Select(x => x.Trim()));
                         break;
                     case 3:
-
-                        break;
+                        throw new NotImplementedException("WMI");
                     default:
                         throw new InvalidOperationException();
                 }

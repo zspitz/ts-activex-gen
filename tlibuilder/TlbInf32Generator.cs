@@ -64,7 +64,7 @@ VT_NULL	1
             } else if (splitValues.ContainsAny(VT_EMPTY)) {
                 var ti = vti.TypeInfo;
                 ret = $"{ti.Parent.Name}.{ti.Name}";
-                if (vti.IsExternalType) { AddTLI(vti.TypeLibInfoExternal, true); }
+                if (vti.IsExternalType && ResolveExternal) { AddTLI(vti.TypeLibInfoExternal, true); }
                 interfaceToCoClassMapping.IfContainsKey(ret.FullName, val => ret = val.FirstOrDefault());
             } else if (splitValues.ContainsAny(VT_VARIANT, VT_DISPATCH, VT_UNKNOWN)) {
                 ret = "any";
@@ -321,40 +321,7 @@ VT_NULL	1
                 //there are a few in the DirectX transforms library
             }
 
-            var activex = new TSInterfaceDescription();
-            var progIDs = coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(c => (progid: GetProgIDFromCLSID(c.GUID), typename: $"{c.Parent.Name}.{c.Name}")).Where(x=>!x.progid.IsNullOrEmpty()).ToList();
-            if (progIDs.Any()) {
-                    var activexMapName = "ActiveXObjectNameMap";
-                    ret.AddMapType(activexMapName, progIDs);
-
-                    var descr = new TSMemberDescription();
-                    var placeholder = new TSPlaceholder() { Name = "K", Extends = new TSKeyOf() { Operand = (TSSimpleType)activexMapName } };
-                    descr.GenericParameters.Add(placeholder);
-                    descr.AddParameter("progid", placeholder);
-                    descr.ReturnType = new TSLookup() { Type = (TSSimpleType)activexMapName, Accessor = placeholder };
-                    activex.Constructors.Add(descr);
-                }
-
-            var eventRegistrations = coclasses.Select(x => new {
-                coclass = x,
-                eventInterface = x.DefaultEventInterface
-            }).Where(x => x.eventInterface != null).SelectMany(x => x.eventInterface.Members.Cast().Select(y => KVP("on", ToActiveXEventMember(y, x.coclass)))).ToList();
-
-            eventRegistrations.AddRangeTo(activex.Members);
-
-            var currentEventTypes = eventHelperTypes.WhereKVP((key, value) => SplitName(key).@namespace == $"{@namespace}.EventHelperTypes").ToList();
-            if (currentEventTypes.Any()) {
-                var eventHelperTypesNamespace = new TSNamespaceDescription();
-                currentEventTypes.SelectKVP((key, value) => KVP($"{key}_ArgNames", value.argNamesType)).AddRangeTo(eventHelperTypesNamespace.Aliases);
-                currentEventTypes.SelectKVP((key, value) => KVP($"{key}_Parameter", value.parameterType)).AddRangeTo(eventHelperTypesNamespace.Interfaces);
-                ret.Namespaces.Add("EventHelperTypes", eventHelperTypesNamespace);
-            }
-
-            parameterizedSetters.Where(x => x.objectType.Namespace == @namespace).ToLookup(x => x.Stringified).Select(grp => grp.First()).Select(x => KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
-
-            if (activex.Constructors.Any() || activex.Members.Any()) {
-                ret.GlobalInterfaces["ActiveXObject"] = activex;
-            }
+            buildActiveX(@namespace, ret, coclasses);
 
             var guid = tli.GUID;
             var tld = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == guid).OrderByDescending(x => x.MajorVersion).ThenBy(x => x.MinorVersion).FirstOrDefault();
@@ -385,7 +352,7 @@ VT_NULL	1
             return KVP($"{ii.Parent.Name}.{ ii.Name}", ret);
         }
 
-        TLIApplication tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime
+        public readonly TLIApplication tliApp = new TLIApplication() { ResolveAliases = false }; //Setting ResolveAliases to true has the odd side-effect of resolving enum types to the hidden version in Microsoft Scripting Runtime
         List<TypeLibInfo> tlis = new List<TypeLibInfo>();
         Dictionary<string, List<string>> interfaceToCoClassMapping = new Dictionary<string, List<string>>();
         Dictionary<TSSimpleType, string> enumerableCollectionItemMapping = new Dictionary<TSSimpleType, string>();
@@ -526,6 +493,81 @@ VT_NULL	1
             });
         }
 
+        public bool ResolveExternal { get; set; } = true;
+        public void AddSelectedTypes(IEnumerable<object> types) {
+            ResolveExternal = false;
+            var byNamespace = types.Cast<dynamic>().GroupBy(x => (string)x.Parent.Name);
+            foreach (var grp in byNamespace) {
+                var ns = (TSRootNamespaceDescription)NSSet.GetNamespace(grp.Key); //this will fall with an invalid cast if there is a . in the typelib name
+                var coclasses = new List<CoClassInfo>();
+                foreach (var type in grp) {
+                    switch (type) {
+                        case InterfaceInfo ii:
+                            ToTSInterfaceDescription(ii).AddInterfaceTo(ns);
+                            break;
+                        case RecordInfo ri:
+                            ToTSInterfaceDescription(ri).AddInterfaceTo(ns);
+                            break;
+                        case UnionInfo ui:
+                            ToTypeAlias(ui).SetIn(ns.Aliases);
+                            break;
+                        case ConstantInfo ci:
+                            ToTSEnumDescription(ci).SetIn(ns.Enums);
+                            break;
+                        case CoClassInfo cc:
+                            ToTSInterfaceDescription(cc).AddInterfaceTo(ns);
+                            coclasses.Add(cc);
+                            break;
+                        case DeclarationInfo di:
+                            throw new NotImplementedException();
+                        case IntrinsicAliasInfo iai:
+                            ToTypeAlias(iai).SetIn(ns.Aliases);
+                            break;
+                        default:
+                            throw new InvalidOperationException();
+                    }
+                }
+                buildActiveX(grp.Key, ns, coclasses);
+            }
+        }
+
         public TSNamespaceSet NSSet { get; } = new TSNamespaceSet();
+
+        private void buildActiveX(string @namespace, TSRootNamespaceDescription ns, List<CoClassInfo> coclasses) {
+            var activex = new TSInterfaceDescription();
+            var progIDs = coclasses.Where(x => x.IsCreateable()).OrderBy(x => x.Name).Select(c => (progid: GetProgIDFromCLSID(c.GUID), typename: $"{c.Parent.Name}.{c.Name}")).Where(x => !x.progid.IsNullOrEmpty()).ToList();
+            if (progIDs.Any()) {
+                var activexMapName = "ActiveXObjectNameMap";
+                ns.AddMapType(activexMapName, progIDs);
+
+                var descr = new TSMemberDescription();
+                var placeholder = new TSPlaceholder() { Name = "K", Extends = new TSKeyOf() { Operand = (TSSimpleType)activexMapName } };
+                descr.GenericParameters.Add(placeholder);
+                descr.AddParameter("progid", placeholder);
+                descr.ReturnType = new TSLookup() { Type = (TSSimpleType)activexMapName, Accessor = placeholder };
+                activex.Constructors.Add(descr);
+            }
+
+            var eventRegistrations = coclasses.Select(x => new {
+                coclass = x,
+                eventInterface = x.DefaultEventInterface
+            }).Where(x => x.eventInterface != null).SelectMany(x => x.eventInterface.Members.Cast().Select(y => KVP("on", ToActiveXEventMember(y, x.coclass)))).ToList();
+
+            eventRegistrations.AddRangeTo(activex.Members);
+
+            var currentEventTypes = eventHelperTypes.WhereKVP((key, value) => SplitName(key).@namespace == $"{@namespace}.EventHelperTypes").ToList();
+            if (currentEventTypes.Any()) {
+                var eventHelperTypesNamespace = new TSNamespaceDescription();
+                currentEventTypes.SelectKVP((key, value) => KVP($"{key}_ArgNames", value.argNamesType)).AddRangeTo(eventHelperTypesNamespace.Aliases);
+                currentEventTypes.SelectKVP((key, value) => KVP($"{key}_Parameter", value.parameterType)).AddRangeTo(eventHelperTypesNamespace.Interfaces);
+                ns.Namespaces.Add("EventHelperTypes", eventHelperTypesNamespace);
+            }
+
+            parameterizedSetters.Where(x => x.objectType.Namespace == @namespace).ToLookup(x => x.Stringified).Select(grp => grp.First()).Select(x => KVP("set", ToMemberDescription(x))).AddRangeTo(activex.Members);
+
+            if (activex.Constructors.Any() || activex.Members.Any()) {
+                ns.GlobalInterfaces["ActiveXObject"] = activex;
+            }
+        }
     }
 }
