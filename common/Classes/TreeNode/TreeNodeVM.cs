@@ -13,7 +13,7 @@ namespace TsActivexGen {
         protected override IList<TreeNodeBase<TData>> InitWith() => children;
 
         public ReadOnlyObservableCollection<TreeNodeBase<TData>> ChildrenOC { get; set; }
-        public TreeNodeVM(): this(default) {}
+        public TreeNodeVM() : this(default) { }
         public TreeNodeVM(TData data, FilterState filterState = Matched) : base(data) {
             ChildrenOC = new ReadOnlyObservableCollection<TreeNodeBase<TData>>(children);
             FilterState = FilterState;
@@ -42,7 +42,7 @@ namespace TsActivexGen {
         }
 
         // FilterState has to be implemented by hand (and not automatically by Fody) because we have to be able to cancel the setter
-        private FilterState _filterState = NotMatched;
+        private FilterState _filterState = Matched;
         public FilterState FilterState {
             get => _filterState;
             set {
@@ -64,8 +64,6 @@ namespace TsActivexGen {
                     case NotMatched when value.In(Matched, DescendantMatched):
                         parent.FilterState = DescendantMatched;
                         break;
-                    default:
-                        throw new InvalidOperationException();
                 }
             }
         }

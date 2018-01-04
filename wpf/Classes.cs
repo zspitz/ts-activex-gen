@@ -157,14 +157,4 @@ namespace TsActivexGen.Wpf {
         public int major { get; set; }
         public int minor { get; set; }
     }
-
-    public class ValueTupleNameConverter : IValueConverter {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture) {
-            var t = value as (String name, Object o)?;;
-            if (t == null) { return DependencyProperty.UnsetValue; }
-            return t.Value.name;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => DependencyProperty.UnsetValue;
-    }
 }
