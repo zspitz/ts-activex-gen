@@ -4,7 +4,6 @@ using System.Linq;
 using TLI;
 using Microsoft.Win32;
 using System.ComponentModel;
-using PropertyChanged;
 
 namespace TsActivexGen.tlibuilder {
     public class TypeLibDetails : INotifyPropertyChanged {

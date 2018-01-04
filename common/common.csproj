@@ -13,9 +13,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fody" Version="2.2.0" />
-    <PackageReference Include="morelinq" Version="2.8.0" />
-    <PackageReference Include="PropertyChanged.Fody" Version="2.1.4" />
+    <PackageReference Include="Fody" Version="2.3.15" />
+    <PackageReference Include="morelinq" Version="2.9.0" />
+    <PackageReference Include="PropertyChanged.Fody" Version="2.2.4" />
   </ItemGroup>
 
 </Project>
