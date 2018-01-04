@@ -18,6 +18,7 @@ using static System.Windows.MessageBoxResult;
 using static TsActivexGen.Functions;
 using static TsActivexGen.idlbuilder.Context;
 using static TsActivexGen.Wpf.Misc;
+using static System.StringComparison;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -76,11 +77,11 @@ disk quota";
                         {"Unions", tli.Unions.Cast().Select(y=>(y.Name,(object)y)) },
                     };
 
-                    foreach (var (collectionName,generator) in generators) {
+                    foreach (var (collectionName, generator) in generators) {
                         var items = generator.ToList();
                         if (items.None()) { continue; }
                         var collection = root.AddChild<(string Name, object obj), TreeNodeVM<(string Name, object obj)>>((collectionName, null));
-                        items.OrderBy(y=>y.name).ForEach(y => collection.AddChild(y));
+                        items.OrderBy(y => y.name).ForEach(y => collection.AddChild(y));
                     }
 
                     treeviewSource.Add(root);
@@ -90,6 +91,21 @@ disk quota";
                 });
             };
             tvwSelectedTypes.ItemsSource = treeviewSource;
+
+            btnSelectTypeFromFile.Click += (s, e) => {
+                throw new NotImplementedException();
+            };
+
+            treeviewFilter.TextChanged += (s, e) => {
+                var text = treeviewFilter.Text;
+                Predicate<(string name, object o)> predicate;
+                if (text.IsNullOrEmpty()) {
+                    predicate = data => true;
+                } else {
+                    predicate = data => data.name.Contains(text, InvariantCultureIgnoreCase);
+                }
+                treeviewSource.ForEach(x => x.ApplyFilter(predicate));
+            };
 
             dtgFiles.ItemsSource = fileList;
 

@@ -287,6 +287,6 @@ namespace TsActivexGen {
 
         public static IEnumerable<T> WrappedSequence<T>(T item) => Repeat(item, 1);
 
-        public static TreeNodeVM<TData> CreateTreeNode<TData>(TData data, TreeNodeVM<TData> parent = null) => new TreeNodeVM<TData>() { Data = data };
+        public static TreeNodeVM<TData> CreateTreeNode<TData>(TData data, TreeNodeVM<TData> parent = null) => new TreeNodeVM<TData>(data) { Parent=parent };
     }
 }

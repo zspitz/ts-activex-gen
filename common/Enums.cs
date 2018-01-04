@@ -7,7 +7,7 @@
 
     public enum FilterState {
         NotMatched,
-        Match,
-        DescendantMatch
+        Matched,
+        DescendantMatched
     }
 }

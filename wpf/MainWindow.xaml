@@ -43,7 +43,11 @@
                 <TabItem>
                     <DockPanel>
                         <my:RegistryTypeLibsGrid x:Name="dgTypeLibs1" Height="300" DockPanel.Dock="Top" />
-                        <Button Content="Add from file" DockPanel.Dock="Top" />
+                        <Button Content="Add from file" DockPanel.Dock="Top" Name="btnSelectTypeFromFile" />
+                        <DockPanel>
+                            <Label Content="Treeview text filter:" />
+                            <TextBox Name="treeviewFilter" />
+                        </DockPanel>
                         <TreeView Name="tvwSelectedTypes">
                             <TreeView.Resources>
                                 <my:ValueTupleNameConverter x:Key="ValueTupleNameConverter" />
