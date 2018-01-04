@@ -57,7 +57,7 @@
                                 <HierarchicalDataTemplate ItemsSource="{Binding ChildrenOC}">
                                     <StackPanel Orientation="Horizontal" Visibility="{Binding FilterState, Converter={StaticResource FilterStateConverter}}">
                                         <CheckBox Name="chk" Margin="2" IsChecked="{Binding IsSelected}" />
-                                        <TextBlock Text="{Binding Data, Converter={StaticResource ValueTupleNameConverter}}" Foreground="{Binding FilterState, Converter={StaticResource FilterStateConverter}}" />
+                                        <TextBlock Text="{Binding Data, Converter={StaticResource ValueTupleNameConverter}}" Foreground="{Binding FilterState, Converter={StaticResource FilterStateConverter}}" FontWeight="{Binding FilterState, Converter={StaticResource FilterStateConverter}}" />
                                     </StackPanel>
                                 </HierarchicalDataTemplate>
                             </TreeView.ItemTemplate>

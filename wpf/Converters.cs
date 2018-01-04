@@ -13,7 +13,6 @@ namespace TsActivexGen.Wpf {
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => UnsetValue;
     }
 
-
     public class ValueTupleNameConverter : ReadOnlyConverterBase {
         public override object Convert(object value, Type targetType, object parameter, CultureInfo culture) {
             var t = value as (String name, Object o)?; ;
@@ -24,11 +23,14 @@ namespace TsActivexGen.Wpf {
 
     public class FilterStateConverter: ReadOnlyConverterBase {
         public override object Convert(object value, Type targetType, object parameter, CultureInfo culture) {
-            var filterState = (FilterState)value;
+            var filterState = (FilterState?)value;
             if (targetType == typeof(Brush)) {
                 return filterState == DescendantMatched ? Brushes.Gray : UnsetValue;
             } else if (targetType == typeof(Visibility)) {
+                if (filterState == null) { return UnsetValue; }
                 return filterState.In(Matched, DescendantMatched) ? Visible : Collapsed;
+            } else if (targetType == typeof(FontWeight)) {
+                return filterState == Matched ? FontWeights.Bold : UnsetValue;
             }
             throw new InvalidOperationException();
         }

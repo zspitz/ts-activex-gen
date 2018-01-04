@@ -98,13 +98,13 @@ disk quota";
 
             treeviewFilter.TextChanged += (s, e) => {
                 var text = treeviewFilter.Text;
-                Predicate<(string name, object o)> predicate;
+                Action<TreeNodeVM<(string name, object o)>> action;
                 if (text.IsNullOrEmpty()) {
-                    predicate = data => true;
+                    action = x => x.ResetFilter();
                 } else {
-                    predicate = data => data.name.Contains(text, InvariantCultureIgnoreCase);
+                    action = x => x.ApplyFilter(data => data.name.Contains(text, InvariantCultureIgnoreCase));
                 }
-                treeviewSource.ForEach(x => x.ApplyFilter(predicate));
+                treeviewSource.ForEach(action);
             };
 
             dtgFiles.ItemsSource = fileList;

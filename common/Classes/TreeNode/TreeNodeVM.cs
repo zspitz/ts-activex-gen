@@ -42,10 +42,17 @@ namespace TsActivexGen {
         }
 
         // FilterState has to be implemented by hand (and not automatically by Fody) because we have to be able to cancel the setter
-        private FilterState _filterState = Matched;
-        public FilterState FilterState {
+        private FilterState? _filterState;
+        public FilterState? FilterState {
             get => _filterState;
-            set {
+            private set {
+                if (value == null && _filterState != null) {
+                    _filterState = null;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("FilterState"));
+                    children.Cast<TreeNodeVM<TData>>().ForEach(x => x.FilterState = null);
+                    return;
+                }
+
                 if (value == NotMatched && children.Cast<TreeNodeVM<TData>>().Any(x => x.FilterState != NotMatched)) {
                     value = DescendantMatched;
                 }
@@ -80,6 +87,6 @@ namespace TsActivexGen {
 
             children.Cast<TreeNodeVM<TData>>().ForEach(x => x.ApplyFilter(predicate));
         }
-
+        public void ResetFilter() => FilterState = null;
     }
 }
