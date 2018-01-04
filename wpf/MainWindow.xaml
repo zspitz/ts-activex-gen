@@ -72,7 +72,7 @@
             </TabControl>
         </DockPanel>
 
-        <DockPanel>
+        <DockPanel Name="dpStandardUI">
             <DockPanel DockPanel.Dock="Top">
                 <UniformGrid Rows="4" Columns="1" Margin="10" DockPanel.Dock="Right">
                     <Button Name="btnOutput" Content="Output" />
@@ -125,5 +125,7 @@
                 </DataGrid.Columns>
             </DataGrid>
         </DockPanel>
+
+        <TextBox Background="Black" Foreground="White" FontFamily="Consolas" Name="tbSelectedTypesOutput" Visibility="Collapsed" />
     </DockPanel>
 </Window>

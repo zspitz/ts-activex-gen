@@ -19,6 +19,8 @@ using static TsActivexGen.Functions;
 using static TsActivexGen.idlbuilder.Context;
 using static TsActivexGen.Wpf.Misc;
 using static System.StringComparison;
+using TLI;
+using Ookii.Dialogs.Wpf;
 
 namespace TsActivexGen.Wpf {
     public partial class MainWindow : Window {
@@ -26,6 +28,7 @@ namespace TsActivexGen.Wpf {
         TextBox txbFileBaseName;
         TextBox txbAuthorName;
         TextBox txbAuthorURL;
+        ObservableCollection<TreeNodeVM<(string name, object o)>> treeviewSource = new ObservableCollection<TreeNodeVM<(string name, object o)>>();
 
         public MainWindow() {
             InitializeComponent();
@@ -58,42 +61,32 @@ disk quota";
 
             brDoxygenXMLFolder.Path = new[] { "../../../idlbuilder/output/xml", "output/xml" }.Select(x => GetFullPath(Combine(GetDirectoryName(GetEntryAssembly().Location), x))).FirstOrDefault(x => Directory.Exists(x));
 
-            var treeviewSource = new ObservableCollection<TreeNodeVM<(string name, object o)>>();
             dgTypeLibs1.SelectionDataChanged += (s, e) => {
                 e.AddedItems.Cast<TypeLibDetails>().ForEach(x => {
                     var tli = x.GetTypeLibInfo();
-                    var name = tli.Name;
-                    if (treeviewSource.Any(y => y.Data.name == name)) { return; }
-
-                    var root = CreateTreeNode((tli.Name, (object)tli));
-
-                    var generators = new Dictionary<string, IEnumerable<(string name, object o)>> {
-                        {"Constants", tli.Constants.Cast().Select(y=>(y.Name,(object)y)) },
-                        {"CoClasses", tli.CoClasses.Cast().Select(y=>(y.Name,(object)y)) },
-                        {"Declarations", tli.Declarations.Cast().Select(y=>(y.Name,(object)y)) },
-                        {"Interfaces", tli.Interfaces.Cast().Select(y=>(y.Name,(object)y)) },
-                        {"IntrinsicAliases", tli.IntrinsicAliases.Cast().Select(y=>(y.Name,(object)y)) },
-                        {"Records", tli.Records.Cast().Select(y=>(y.Name,(object)y)) },
-                        {"Unions", tli.Unions.Cast().Select(y=>(y.Name,(object)y)) },
-                    };
-
-                    foreach (var (collectionName, generator) in generators) {
-                        var items = generator.ToList();
-                        if (items.None()) { continue; }
-                        var collection = root.AddChild<(string Name, object obj), TreeNodeVM<(string Name, object obj)>>((collectionName, null));
-                        items.OrderBy(y => y.name).ForEach(y => collection.AddChild(y));
-                    }
-
-                    treeviewSource.Add(root);
-                });
-                e.RemovedItems.Cast<TypeLibDetails>().ForEach(x => {
-                    treeviewSource.Remove(treeviewSource.FirstOrDefault(y => y.Data.name == x.Name));
+                    AddTLIToTreeview(tli);
                 });
             };
             tvwSelectedTypes.ItemsSource = treeviewSource;
 
             btnSelectTypeFromFile.Click += (s, e) => {
-                throw new NotImplementedException();
+                var fileDlg = new VistaOpenFileDialog() {
+                    CheckFileExists = true,
+                    CheckPathExists = true,
+                    Multiselect = false
+                };
+                var result = fileDlg.ShowDialog() ?? false;
+                if (!result) { return; }
+
+                var tliApp = new TLIApplication() { ResolveAliases = false };
+
+                TypeLibInfo tli;
+                try {
+                    tli = tliApp.TypeLibInfoFromFile(fileDlg.FileName);
+                } catch (Exception) {
+                    return;
+                }
+                AddTLIToTreeview(tli);
             };
 
             treeviewFilter.TextChanged += (s, e) => {
@@ -292,6 +285,32 @@ disk quota";
                     txbAuthorURL = tb;
                     break;
             }
+        }
+
+        private void AddTLIToTreeview(TypeLibInfo tli) {
+            var name = tli.Name;
+            if (treeviewSource.Any(y => y.Data.name == name)) { return; }
+
+            var root = CreateTreeNode((tli.Name, (object)tli));
+
+            var generators = new Dictionary<string, IEnumerable<(string name, object o)>> {
+                {"Constants", tli.Constants.Cast().Select(y=>(y.Name,(object)y)) },
+                {"CoClasses", tli.CoClasses.Cast().Select(y=>(y.Name,(object)y)) },
+                {"Declarations", tli.Declarations.Cast().Select(y=>(y.Name,(object)y)) },
+                {"Interfaces", tli.Interfaces.Cast().Select(y=>(y.Name,(object)y)) },
+                {"IntrinsicAliases", tli.IntrinsicAliases.Cast().Select(y=>(y.Name,(object)y)) },
+                {"Records", tli.Records.Cast().Select(y=>(y.Name,(object)y)) },
+                {"Unions", tli.Unions.Cast().Select(y=>(y.Name,(object)y)) },
+            };
+
+            foreach (var (collectionName, generator) in generators) {
+                var items = generator.ToList();
+                if (items.None()) { continue; }
+                var collection = root.AddChild<(string Name, object obj), TreeNodeVM<(string Name, object obj)>>((collectionName, null));
+                items.OrderBy(y => y.name).ForEach(y => collection.AddChild(y));
+            }
+
+            treeviewSource.Add(root);
         }
     }
 }
