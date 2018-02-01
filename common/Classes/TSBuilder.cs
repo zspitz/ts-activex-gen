@@ -67,6 +67,7 @@ namespace TsActivexGen {
 
             writeJsDoc(@enum.JsDoc, indentationLevel);
 
+            writeTSLintRuleDisable("no-const-enum", indentationLevel);
             $"const enum {name} {{".AppendLineTo(sb, indentationLevel);
             foreach (var (memberName, memberDescription) in members) {
                 writeJsDoc(memberDescription.JsDoc, indentationLevel + 1);
@@ -121,12 +122,18 @@ namespace TsActivexGen {
         /// <summary>Provides a simple way to order members by the set of parameters</summary>
         private string parametersString(TSMemberDescription m) => m.Parameters?.JoinedKVP((name, prm) => $"{name}: {GetTypeString(prm.Type, "")}");
 
+        private void writeTSLintRuleDisable(string ruleName, int indentationLevel) => writeTSLintRuleDisable(new[] { ruleName }, indentationLevel);
+        private void writeTSLintRuleDisable(IEnumerable<string> ruleNames, int indentationLevel) => $"// tslint:disable-next-line {ruleNames.Joined(" ")}".AppendLineTo(sb, indentationLevel);
+
         private void writeInterface(KeyValuePair<string, TSInterfaceDescription> x, string ns, int indentationLevel) {
             var name = SplitName(x.Key).name;
             if (ParseTypeName(name) is TSGenericType generic) { name = generic.Name; }
 
             var @interface = x.Value;
             writeJsDoc(@interface.JsDoc, indentationLevel);
+
+            var tslintRules = new List<string>();
+            if (!@interface.IsClass && name.StartsWith("I")) { tslintRules.Add("interface-name"); }
 
             var typeDefiner = @interface.IsClass ? "class" : "interface";
 
@@ -137,10 +144,13 @@ namespace TsActivexGen {
             if (@interface.Extends.Any()) { extends = "extends " + @interface.Extends.Joined(", ", y => RelativeName(y, ns)) + " "; }
 
             if (@interface.Members.None() && @interface.Constructors.None()) {
+                tslintRules.Add("no-empty-interface");
+                writeTSLintRuleDisable(tslintRules, indentationLevel);
                 $"{typeDefiner} {name}{genericParameters} {extends}{{ }}".AppendWithNewSection(sb, indentationLevel);
                 return;
             }
 
+            writeTSLintRuleDisable(tslintRules, indentationLevel);
             $"{typeDefiner} {name}{genericParameters} {extends}{{".AppendLineTo(sb, indentationLevel);
 
             @interface.Members
