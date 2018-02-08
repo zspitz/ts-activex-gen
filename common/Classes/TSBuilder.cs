@@ -77,7 +77,7 @@ namespace TsActivexGen {
         }
 
         private void writeMember(TSMemberDescription m, string ns, int indentationLevel, string memberName, bool isClass) {
-            bool isConstructor = memberName.IsNullOrEmpty();
+            bool isConstructor = memberName == "<ctor>";
 
             writeJsDoc(m.JsDoc, indentationLevel, true);
 
@@ -123,7 +123,10 @@ namespace TsActivexGen {
         private string parametersString(TSMemberDescription m) => m.Parameters?.JoinedKVP((name, prm) => $"{name}: {GetTypeString(prm.Type, "")}");
 
         private void writeTSLintRuleDisable(string ruleName, int indentationLevel) => writeTSLintRuleDisable(new[] { ruleName }, indentationLevel);
-        private void writeTSLintRuleDisable(IEnumerable<string> ruleNames, int indentationLevel) => $"// tslint:disable-next-line {ruleNames.Joined(" ")}".AppendLineTo(sb, indentationLevel);
+        private void writeTSLintRuleDisable(IEnumerable<string> ruleNames, int indentationLevel) {
+            if (ruleNames.None()) { return; }
+            $"// tslint:disable-next-line {ruleNames.Joined(" ")}".AppendLineTo(sb, indentationLevel);
+        }
 
         private void writeInterface(KeyValuePair<string, TSInterfaceDescription> x, string ns, int indentationLevel) {
             var name = SplitName(x.Key).name;
@@ -154,14 +157,14 @@ namespace TsActivexGen {
             $"{typeDefiner} {name}{genericParameters} {extends}{{".AppendLineTo(sb, indentationLevel);
 
             @interface.Members
-                .Concat(@interface.Constructors.Select(y=>KVP("",y)))
-                .OrderByDescending(y=>y.Value.Private)
-                .ThenBy(y=>y.Key.IsNullOrEmpty())
+                .Concat(@interface.Constructors.Select(y => KVP("<ctor>", y)))
+                .OrderByDescending(y => y.Value.Private)
+                .ThenBy(y => y.Key.IsNullOrEmpty())
                 .ThenBy(y => y.Key)
                 .ThenByDescending(y => y.Value.Parameters?.Count ?? -1)
                 .ThenByDescending(y => y.Value.GenericParameters.Any())
                 .ThenBy(y => parametersString(y.Value))
-                .ForEach(y => writeMember(y.Value, ns, indentationLevel + 1,y.Key, @interface.IsClass));
+                .ForEach(y => writeMember(y.Value, ns, indentationLevel + 1, y.Key, @interface.IsClass));
 
             "}".AppendWithNewSection(sb, indentationLevel);
         }

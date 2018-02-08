@@ -20,7 +20,8 @@ namespace TsActivexGen.Wpf {
         ],
         ""types"": [],
         ""noEmit"": true,
-        ""forceConsistentCasingInFileNames"": true
+        ""forceConsistentCasingInFileNames"": true,
+        ""esModuleInterop"": true
     },
     ""files"": [
         ""index.d.ts"",

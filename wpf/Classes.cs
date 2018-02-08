@@ -9,9 +9,6 @@ using System.Linq;
 using static TsActivexGen.Wpf.Misc;
 using static TsActivexGen.Wpf.Functions;
 using static System.Environment;
-using System.Windows.Data;
-using System;
-using System.Globalization;
 
 namespace TsActivexGen.Wpf {
     [AddINotifyPropertyChangedInterface]

@@ -177,12 +177,32 @@ VT_NULL	1
         }
 
         private Dictionary<string, TSMemberDescription> GetMembers(Members members, ref string enumerableType, string typename) {
-            var ret = members.Cast().Where(x => !x.IsRestricted() && x.Name != "_NewEnum").ToLookup(x => x.Name).Select(grp => KVP(grp.Key, GetMemberDescriptionForName(grp, typename))).ToDictionary();
+            var membersList = members.Cast().ToList();
+            TSMemberDescription defaultProperty = null;
+            var ret = membersList.Where(x => !x.IsRestricted() && x.Name != "_NewEnum").ToLookup(x => x.Name).Select(grp => {
+                var memberKVP = KVP(grp.Key, GetMemberDescriptionForName(grp, typename));
+                var defaultMember = grp.Where(x => x.MemberId == 0).ToList();
+                if (!memberKVP.Value.IsProperty && defaultMember.Any()) {
+                    if (memberKVP.Value.Parameters.None()) {
+                        var i = 5;
+                    }
+                    if (grp.Count() != defaultMember.Count) { throw new Exception("Default and non-default properties on the same name"); }
+                    if (defaultProperty != null) { throw new Exception("Multiple default properties in 'members'"); }
+                    defaultProperty = memberKVP.Value;
+                }
+                return memberKVP;
+            }).ToDictionary();
+
+            if (defaultProperty != null) { ret.Add("", defaultProperty); }
 
             var enumerableType1 = enumerableType; //because ref parameters cannot be used within lambda expressions
-            members.Cast().ToLookup(x => x.Name).IfContainsKey("_NewEnum", mi => {
+            membersList.ToLookup(x => x.Name).IfContainsKey("_NewEnum", mi => {
                 ret.IfContainsKey("Item", itemMI => enumerableType1 = ((TSSimpleType)itemMI.ReturnType).FullName);
             });
+
+            // there is an overload of EnumeratorConstructor that accepts anything with an Item member, and resolves the enumerator type to the return type of Item
+            var lookup = ret.WhereKVP((name, descr) => name == "Item").ToLookup(kvp => kvp.Value.ReturnType);
+            if (lookup.Count == 1) { enumerableType1 = null; }
             enumerableType = enumerableType1;
 
             return ret;
@@ -194,10 +214,14 @@ VT_NULL	1
             GetMembers(m, ref enumerableType, typename).AddRangeTo(ret.Members);
             if (!enumerableType.IsNullOrEmpty()) { enumerableCollectionItemMapping[new TSSimpleType(typename)] = enumerableType; }
             ret.JsDoc.Add("", helpString);
-            ret.IsClass = true;
-            ret.MakeFinal();
+            if (ret.Members.NoneKVP((name, descr) => name == "")) {
+                ret.IsClass = true;
+                ret.MakeFinal();
+            } else {
+                ret.IsClass = false;
+            }
             var kvp = KVP(typename, ret);
-            kvp.MakeNominal();
+            if (ret.IsClass) { kvp.MakeNominal(); }
             return kvp;
         }
 
