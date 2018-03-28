@@ -125,7 +125,7 @@ namespace TsActivexGen {
         private void writeTSLintRuleDisable(string ruleName, int indentationLevel) => writeTSLintRuleDisable(new[] { ruleName }, indentationLevel);
         private void writeTSLintRuleDisable(IEnumerable<string> ruleNames, int indentationLevel) {
             if (ruleNames.None()) { return; }
-            $"// tslint:disable-next-line {ruleNames.Joined(" ")}".AppendLineTo(sb, indentationLevel);
+            $"// tslint:disable-next-line:{ruleNames.Joined(" ")}".AppendLineTo(sb, indentationLevel);
         }
 
         private void writeInterface(KeyValuePair<string, TSInterfaceDescription> x, string ns, int indentationLevel) {
