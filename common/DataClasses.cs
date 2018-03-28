@@ -420,20 +420,6 @@ namespace TsActivexGen {
                 Interfaces.Add(typename, ret);
             }
         }
-
-        // this is no longer needed -- https://github.com/Microsoft/TypeScript/issues/17526
-        // leaving it here for backward compatibility for older TypeScript versions
-        public void AddSafeArray() {
-            if (GlobalInterfaces.ContainsKey("SafeArray<>")) { return; }
-            var placeholder = new TSPlaceholder() { Name = "T", Default = TSSimpleType.Any };
-            var genericType = new TSGenericType() { Name = "SafeArray" };
-            genericType.Parameters.Add(placeholder);
-            var idesc = new TSInterfaceDescription();
-            idesc.GenericParameters.Add(placeholder);
-            // we need this dummy member, because otherwise empty interfaces are written as type aliases to `any`
-            idesc.Members.Add("_brand", new TSMemberDescription() { ReturnType = genericType });
-            GlobalInterfaces.Add("SafeArray<>", idesc);
-        }
     }
 
     public class TSNamespaceSet {

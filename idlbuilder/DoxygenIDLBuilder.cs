@@ -94,10 +94,6 @@ namespace TsActivexGen.idlbuilder {
             var nominals = new List<string>() { "type", "sequence<>" };
             ret.Namespaces.ForEachKVP((key, rootNs) => nominals.AddRangeTo(rootNs.NominalTypes));
 
-            if (context==Automation) {
-                ret.Namespaces.ForEachKVP((key, rootNs) => rootNs.AddSafeArray());
-            }
-
             //add strongly typed overloads for loadComponentFromURL
             var xcl = ret.FindTypeDescription("com.sun.star.frame.XComponentLoader").description as TSInterfaceDescription;
             var loadComponentFromURL = xcl.Members.FirstOrDefault(x => x.Key == "loadComponentFromURL");

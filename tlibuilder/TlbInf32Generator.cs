@@ -355,8 +355,6 @@ VT_NULL	1
                 ret.MinorVersion = tld.MinorVersion;
             }
 
-            ret.AddSafeArray();
-
             return ret;
         }
 
