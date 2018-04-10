@@ -17,7 +17,6 @@ namespace TsActivexGen {
             s = s.TrimEnd();
             if (s.IsNullOrEmpty()) { return; }
             var toAppend = new String(' ', indentationLevel * 4) + s.TrimEnd();
-            if (toAppend.Length>200) { toAppend += " // tslint:disable-line: max-line-length"; }
             sb.AppendLine(toAppend);
         }
 

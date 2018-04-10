@@ -67,7 +67,6 @@ namespace TsActivexGen {
 
             writeJsDoc(@enum.JsDoc, indentationLevel);
 
-            writeTSLintRuleDisable("no-const-enum", indentationLevel);
             $"const enum {name} {{".AppendLineTo(sb, indentationLevel);
             foreach (var (memberName, memberDescription) in members) {
                 writeJsDoc(memberDescription.JsDoc, indentationLevel + 1);
