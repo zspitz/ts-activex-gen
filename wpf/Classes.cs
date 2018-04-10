@@ -88,7 +88,11 @@ namespace TsActivexGen.Wpf {
             //create tslint.json
             WritePackageFile("tslint.json", @"
 {
-    ""extends"": ""dtslint/dt.json""
+    ""extends"": ""dtslint/dt.json"",
+    ""rules"": {
+        ""no-const-enum"": false,
+        ""max-line-length"": false
+    }
 }".TrimStart(), true);
 
             //create package.json

@@ -14,14 +14,14 @@ namespace TsActivexGen.Wpf {
         ""noImplicitAny"": true,
         ""noImplicitThis"": true,
         ""strictNullChecks"": true,
+        ""strictFunctionTypes"": true,
         ""baseUrl"": ""../"",
         ""typeRoots"": [
             ""../""
         ],
         ""types"": [],
         ""noEmit"": true,
-        ""forceConsistentCasingInFileNames"": true,
-        ""esModuleInterop"": true
+        ""forceConsistentCasingInFileNames"": true
     },
     ""files"": [
         ""index.d.ts"",
