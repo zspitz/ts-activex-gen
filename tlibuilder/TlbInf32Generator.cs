@@ -99,7 +99,7 @@ VT_NULL	1
             if (p.Default) {
                 var defaultValue = p.DefaultValue;
                 if (defaultValue != null) {
-                    var kvp = KVP("param", $"{ret.Type} [{name}={AsString(p.DefaultValue)}]");
+                    var kvp = KVP("param", $"{name} [{name}={AsString(p.DefaultValue)}]");
                     if (!jsDoc.Contains(kvp)) { jsDoc.Add(kvp); }
                 }
             }
