@@ -35,20 +35,24 @@ namespace TsActivexGen.tlibuilder {
                                             Is64bit = names.Contains("win64"),
                                             RegistryKey = lcidKey.ToString()
                                         };
+                                        if (td.Is32bit) {
+                                            td.Path32bit = (string)lcidKey.OpenSubKey("win32").GetValue("");
+                                        }
+                                        if (td.Is64bit) {
+                                            td.Path64bit = (string)lcidKey.OpenSubKey("win64").GetValue("");
+                                        }
                                         if (!char.IsDigit(td.Version[0])) {
-                                            var paths = new HashSet<string>();
-                                            if (td.Is32bit) {
-                                                paths.Add((string)lcidKey.OpenSubKey("win32").GetValue(""));
-                                            }
-                                            if (td.Is64bit) {
-                                                paths.Add((string)lcidKey.OpenSubKey("win64").GetValue(""));
-                                            }
-                                            if (paths.Count > 1) {
-                                                continue;
-                                            }
-                                            var tli = tliapp.TypeLibInfoFromFile(paths.First());
-                                            if (majorVersion == 0) { td.MajorVersion = tli.MajorVersion; }
-                                            if (minorVersion == 0) { td.MinorVersion = tli.MinorVersion; }
+                                            var versions = new[] { td.Path32bit, td.Path64bit }
+                                                .Where(x => !x.IsNullOrEmpty())
+                                                .Select(x => {
+                                                    var tli = tliapp.TypeLibInfoFromFile(x);
+                                                    return (tli.MajorVersion, tli.MinorVersion);
+                                                })
+                                                .Distinct()
+                                                .ToList();
+                                            if (versions.Count>1) { continue; } // we can't resolve an absolute major / minor version, because the different paths have two different versions
+                                            td.MajorVersion = versions[0].MajorVersion;
+                                            td.MinorVersion = versions[0].MinorVersion;
                                         }
                                         ret.Add(td);
                                     }
@@ -71,20 +75,35 @@ namespace TsActivexGen.tlibuilder {
         public short MinorVersion { get; set; }
         public short LCID { get; set; }
         public bool Is32bit { get; set; }
+        public string Path32bit { get; set; }
         public bool Is64bit { get; set; }
+        public string Path64bit { get; set; }
         public string RegistryKey { get; set; }
         public bool Selected { get; set; }
 
         public override string ToString() {
             var bittedness = "AnyCPU";
-            if (!Is32bit && !Is64bit) {
-                bittedness = "None";
-            } else if (!Is32bit) {
+            if (Is32bit && Is64bit) {
+                bittedness = "32/64bit";
+            } else if (Is32bit) {
                 bittedness = "32bit";
-            } else if (!Is64bit) {
+            } else if (Is64bit) {
                 bittedness = "64bit";
+            } else {
+                bittedness = "Unknown";
             }
             return $"Name={Name}, Version={Version} ({MajorVersion}.{MinorVersion}), {bittedness}";
+        }
+
+        public string Tooltip {
+            get {
+                var parts = new List<string>();
+                parts.Add(ToString());
+                if (!Path32bit.IsNullOrEmpty()) { parts.Add($"32-bit path: {Path32bit}"); }
+                if (!Path64bit.IsNullOrEmpty()) { parts.Add($"64-bit path: {Path64bit}"); }
+                parts.Add(RegistryKey);
+                return parts.Joined("\n");
+            }
         }
 
 #pragma warning disable 0067
@@ -96,7 +115,11 @@ namespace TsActivexGen.tlibuilder {
             try {
                 return tliapp.TypeLibInfoFromRegistry(TypeLibID, MajorVersion, MinorVersion, LCID);
             } catch (Exception) {
-                return null;
+                // sometimes the version includes an alphabetical component -- e.g. c.0
+                // since TypeLibInfoFromRegistry only takes numeric arguments for major / minor versions, it throws an exception when 0 is passed in
+                // so we use the path stored in the registry; preferring 64-bit if available
+                var path = Path64bit.IsNullOrEmpty() ? Path32bit : Path64bit;
+                return tliapp.TypeLibInfoFromFile(path);
             }
         }
 

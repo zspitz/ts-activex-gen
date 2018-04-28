@@ -183,9 +183,6 @@ VT_NULL	1
                 var memberKVP = KVP(grp.Key, GetMemberDescriptionForName(grp, typename));
                 var defaultMember = grp.Where(x => x.MemberId == 0).ToList();
                 if (!memberKVP.Value.IsProperty && defaultMember.Any()) {
-                    if (memberKVP.Value.Parameters.None()) {
-                        var i = 5;
-                    }
                     if (grp.Count() != defaultMember.Count) { throw new Exception("Default and non-default properties on the same name"); }
                     if (defaultProperty != null) { throw new Exception("Multiple default properties in 'members'"); }
                     defaultProperty = memberKVP.Value;
@@ -391,7 +388,7 @@ VT_NULL	1
             if (resolveMaxVersion) {
                 var maxVersion = TypeLibDetails.FromRegistry.Value.Where(x => x.TypeLibID == tli.GUID).OrderByDescending(x => x.MajorVersion).ThenByDescending(x => x.MinorVersion).FirstOrDefault();
                 if (maxVersion != null) { //not sure how this is possible, but it happens using Microsoft Disk Quota 1.0
-                    tli = tliApp.TypeLibInfoFromRegistry(maxVersion.TypeLibID, maxVersion.MajorVersion, maxVersion.MinorVersion, maxVersion.LCID);
+                    tli = maxVersion.GetTypeLibInfo();
                 }
             }
             if (tlis.Any(x => x.IsSameLibrary(tli))) { return; }
