@@ -6,7 +6,7 @@
     <DataGrid x:Name="dgTypeLibs" AutoGenerateColumns="False" CanUserSortColumns="False" CanUserAddRows="False" CanUserDeleteRows="False">
         <DataGrid.Resources>
             <Style TargetType="DataGridCell">
-                <Setter Property="ToolTip" Value="{Binding RegistryKey}" />
+                <Setter Property="ToolTip" Value="{Binding Tooltip}" />
                 <Setter Property="Focusable" Value="False" />
             </Style>
         </DataGrid.Resources>

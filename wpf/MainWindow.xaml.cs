@@ -49,6 +49,11 @@ microsoft excel
 microsoft word
 microsoft powerpoint
 microsoft outlook 14.0 object library
+onenote 14.0
+publisher
+microsoft sharepoint 3.0 client support type library
+visio viewer
+graph
 infopath 3.0 type library
 fax service extended com library
 internet controls
