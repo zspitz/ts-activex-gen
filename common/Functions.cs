@@ -216,6 +216,8 @@ namespace TsActivexGen {
                 return $"{value}";
             } else if (t == typeof(bool)) {
                 return (bool)value ? "true" : "false";
+            } else if (t==typeof(DateTime)) {
+                return ((DateTime)value).ToString("yyyy-MM-ddTHH\\:mm\\:ss.fffffffzzz");
             }
             throw new Exception($"Unable to generate string representation of value '{value}' of type '{t.Name}'");
         }
