@@ -157,8 +157,9 @@ namespace TsActivexGen {
 
             @interface.Members
                 .Concat(@interface.Constructors.Select(y => KVP("<ctor>", y)))
-                .OrderByDescending(y => y.Value.Private)
-                .ThenBy(y => y.Key.IsNullOrEmpty())
+                .OrderByDescending(y => y.Value.Private) // private members first
+                .ThenBy(y => y.Key.IsNullOrEmpty())  // callable interface signature last
+                .ThenBy(y=> y.Key=="<ctor>") // constructor after all named members, but before callable interface
                 .ThenBy(y => y.Key)
                 .ThenByDescending(y => y.Value.Parameters?.Count ?? -1)
                 .ThenByDescending(y => y.Value.GenericParameters.Any())
