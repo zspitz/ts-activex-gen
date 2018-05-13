@@ -394,7 +394,7 @@ namespace TsActivexGen {
         public string Description { get; set; }
         public int MajorVersion { get; set; }
         public int MinorVersion { get; set; }
-        public HashSet<string> Dependencies { get; } = new HashSet<string>();
+        public HashSet<string> Dependencies { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "interop" };
 
         public Dictionary<string, TSInterfaceDescription> GlobalInterfaces { get; } = new Dictionary<string, TSInterfaceDescription>();
 

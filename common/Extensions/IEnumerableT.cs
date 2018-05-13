@@ -23,7 +23,7 @@ namespace TsActivexGen {
 
         public static void AddRangeTo<T>(this IEnumerable<T> src, ICollection<T> dest) => dest.AddRange(src);
 
-        public static HashSet<T> ToHashSet<T>(this IEnumerable<T> src) => new HashSet<T>(src);
+        public static HashSet<T> ToHashSet<T>(this IEnumerable<T> src, IEqualityComparer<T> comparer = null) => new HashSet<T>(src, comparer);
 
         public static IEnumerable<T> Ordered<T>(this IEnumerable<T> src) => src.OrderBy(x => x);
         public static IEnumerable<T> OrderedDescending<T>(this IEnumerable<T> src) => src.OrderByDescending(x => x);

@@ -10,7 +10,7 @@ namespace TsActivexGen.Wpf {
 {
     ""compilerOptions"": {
         ""module"": ""commonjs"",
-        ""lib"": [""es5"", ""scripthost""],
+        ""lib"": [""es5""],
         ""noImplicitAny"": true,
         ""noImplicitThis"": true,
         ""strictNullChecks"": true,

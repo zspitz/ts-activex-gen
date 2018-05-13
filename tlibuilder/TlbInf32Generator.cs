@@ -243,16 +243,6 @@ VT_NULL	1
             return KVP(typename, ret);
         }
 
-        private TSMemberDescription ToActiveXObjectConstructorDescription(CoClassInfo c) {
-            var progid = GetProgIDFromCLSID(c.GUID);
-            if (progid == null) { throw new InvalidOperationException("Unable to find ProgID for CLSID"); }
-            var ret = new TSMemberDescription();
-            var typename = $"{c.Parent.Name}.{c.Name}";
-            ret.AddParameter("progid", $"'{progid}'"); //note the string literal type
-            ret.ReturnType = new TSSimpleType(typename);
-            return ret;
-        }
-
         //ActiveXObject.on(obj: 'Word.Application', 'BeforeDocumentSave', ['Doc','SaveAsUI','Cancel'], function (params) {});
         private TSMemberDescription ToActiveXEventMember(MemberInfo m, CoClassInfo c) {
             var @namespace = c.Parent.Name;
@@ -558,13 +548,6 @@ VT_NULL	1
             if (progIDs.Any()) {
                 var activexMapName = "ActiveXObjectNameMap";
                 ns.AddMapType(activexMapName, progIDs);
-
-                var descr = new TSMemberDescription();
-                var placeholder = new TSPlaceholder() { Name = "K", Extends = new TSKeyOf() { Operand = (TSSimpleType)activexMapName } };
-                descr.GenericParameters.Add(placeholder);
-                descr.AddParameter("progid", placeholder);
-                descr.ReturnType = new TSLookup() { Type = (TSSimpleType)activexMapName, Accessor = placeholder };
-                activex.Constructors.Add(descr);
             }
 
             var eventRegistrations = coclasses.Select(x => new {
