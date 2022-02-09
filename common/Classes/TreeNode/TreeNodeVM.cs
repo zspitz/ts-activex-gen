@@ -16,7 +16,7 @@ namespace TsActivexGen {
         public TreeNodeVM() : this(default) { }
         public TreeNodeVM(TData data, FilterState filterState = Matched) : base(data) {
             ChildrenOC = new ReadOnlyObservableCollection<TreeNodeBase<TData>>(children);
-            FilterState = FilterState;
+            FilterState = filterState;
         }
 
         //public readonly bool SelectChildrenOnSelected = true;

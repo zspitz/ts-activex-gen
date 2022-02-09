@@ -32,7 +32,7 @@ namespace TsActivexGen {
     }
 
     public static class TreeNodeExtensions {
-        public static TNode Parent<TData, TNode>(this TNode node) where TNode : TreeNodeBase<TData>, new() => (TNode)node.Parent;
+        public static TNode Parent<TData, TNode>(this TNode node) where TNode : TreeNodeBase<TData> => (TNode)node.Parent;
 
         public static TNode AddChild<TData, TNode>(this TNode node, TData data = default) where TNode : TreeNodeBase<TData>, new() =>
             new TNode() { Data = data, Parent = node };
